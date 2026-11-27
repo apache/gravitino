@@ -107,6 +107,26 @@ COMMENT ON COLUMN policy_tag_relation_meta.current_version IS 'policy tag relati
 COMMENT ON COLUMN policy_tag_relation_meta.last_version IS 'policy tag relation last version';
 COMMENT ON COLUMN policy_tag_relation_meta.deleted_at IS 'policy tag relation deleted at';
 
+CREATE TABLE IF NOT EXISTS policy_role_relation_meta (
+    id BIGSERIAL NOT NULL,
+    policy_id BIGINT NOT NULL,
+    role_name VARCHAR(128) NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE (policy_id, role_name, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS policy_role_relation_meta_idx_role_name ON policy_role_relation_meta (role_name);
+COMMENT ON TABLE policy_role_relation_meta IS 'policy role relation';
+COMMENT ON COLUMN policy_role_relation_meta.id IS 'auto increment id';
+COMMENT ON COLUMN policy_role_relation_meta.policy_id IS 'policy id';
+COMMENT ON COLUMN policy_role_relation_meta.role_name IS 'role name referenced by the policy content';
+COMMENT ON COLUMN policy_role_relation_meta.current_version IS 'policy role relation current version';
+COMMENT ON COLUMN policy_role_relation_meta.last_version IS 'policy role relation last version';
+COMMENT ON COLUMN policy_role_relation_meta.deleted_at IS 'policy role relation deleted at';
+
 ALTER TABLE job_run_meta ADD COLUMN IF NOT EXISTS runtime_job_template TEXT DEFAULT NULL;
 COMMENT ON COLUMN job_run_meta.runtime_job_template IS 'job run runtime job template';
 
@@ -118,6 +138,7 @@ CREATE TABLE IF NOT EXISTS semantic_model_meta (
     schema_id BIGINT NOT NULL,
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
+    active_version INT NOT NULL DEFAULT 0,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (semantic_model_id),
@@ -135,6 +156,7 @@ COMMENT ON COLUMN semantic_model_meta.catalog_id IS 'catalog id';
 COMMENT ON COLUMN semantic_model_meta.schema_id IS 'schema id';
 COMMENT ON COLUMN semantic_model_meta.audit_info IS 'semantic model identity audit info';
 COMMENT ON COLUMN semantic_model_meta.current_version IS 'current version';
+COMMENT ON COLUMN semantic_model_meta.active_version IS 'published revision, 0 if none';
 COMMENT ON COLUMN semantic_model_meta.last_version IS 'last allocated version';
 COMMENT ON COLUMN semantic_model_meta.deleted_at IS 'semantic model deleted at';
 
@@ -145,7 +167,9 @@ CREATE TABLE IF NOT EXISTS semantic_model_version_info (
     schema_id BIGINT NOT NULL,
     semantic_model_id BIGINT NOT NULL,
     version INT NOT NULL,
-    semantic_model_name VARCHAR(128) NOT NULL,
+    publication_status VARCHAR(32) NOT NULL DEFAULT 'DRAFT',
+    published_by VARCHAR(128) NOT NULL DEFAULT '',
+    published_at BIGINT NOT NULL DEFAULT 0,
     semantic_model_comment TEXT DEFAULT NULL,
     datasets TEXT NOT NULL,
     relationships TEXT DEFAULT NULL,
@@ -170,7 +194,9 @@ COMMENT ON COLUMN semantic_model_version_info.catalog_id IS 'catalog id';
 COMMENT ON COLUMN semantic_model_version_info.schema_id IS 'schema id';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_id IS 'semantic model id';
 COMMENT ON COLUMN semantic_model_version_info.version IS 'semantic model version';
-COMMENT ON COLUMN semantic_model_version_info.semantic_model_name IS 'semantic model name snapshot';
+COMMENT ON COLUMN semantic_model_version_info.publication_status IS 'publication status of the revision';
+COMMENT ON COLUMN semantic_model_version_info.published_by IS 'publishing principal, empty for a draft';
+COMMENT ON COLUMN semantic_model_version_info.published_at IS 'publication time in epoch millis, 0 for a draft';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_comment IS 'semantic model comment snapshot';
 COMMENT ON COLUMN semantic_model_version_info.datasets IS 'dataset definitions snapshot (JSON)';
 COMMENT ON COLUMN semantic_model_version_info.relationships IS 'relationship definitions snapshot (JSON)';
@@ -371,18 +397,22 @@ CREATE TABLE IF NOT EXISTS semantic_model_source_rel (
     dataset_name TEXT NOT NULL,
     source_type VARCHAR(64) NOT NULL,
     source_id BIGINT NOT NULL,
+    from_version INT NOT NULL,
+    to_version INT NOT NULL DEFAULT 0,
     deleted_at BIGINT NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_smsr_model ON semantic_model_source_rel (semantic_model_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_smsr_source ON semantic_model_source_rel (metalake_id, source_type, source_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_smsr_deleted_at ON semantic_model_source_rel (deleted_at);
-COMMENT ON TABLE semantic_model_source_rel IS 'current semantic model dataset source associations';
+COMMENT ON TABLE semantic_model_source_rel IS 'versioned semantic model dataset source associations';
 COMMENT ON COLUMN semantic_model_source_rel.id IS 'auto increment id';
 COMMENT ON COLUMN semantic_model_source_rel.metalake_id IS 'containing metalake id';
 COMMENT ON COLUMN semantic_model_source_rel.semantic_model_id IS 'containing semantic model id';
-COMMENT ON COLUMN semantic_model_source_rel.dataset_name IS 'exact dataset name in the current definition';
+COMMENT ON COLUMN semantic_model_source_rel.dataset_name IS 'exact dataset name in the associated revisions';
 COMMENT ON COLUMN semantic_model_source_rel.source_type IS 'TABLE or VIEW';
 COMMENT ON COLUMN semantic_model_source_rel.source_id IS 'resolved source object id';
+COMMENT ON COLUMN semantic_model_source_rel.from_version IS 'first revision containing this association';
+COMMENT ON COLUMN semantic_model_source_rel.to_version IS 'first revision without it, 0 if open';
 COMMENT ON COLUMN semantic_model_source_rel.deleted_at IS 'association retired at';
 
 -- Clear governance attached to retired external registrations before their IDs can be reused.
@@ -554,3 +584,84 @@ COMMENT ON COLUMN domain_rel.audit_info IS 'domain relation audit info';
 COMMENT ON COLUMN domain_rel.current_version IS 'domain relation current version';
 COMMENT ON COLUMN domain_rel.last_version IS 'domain relation last version';
 COMMENT ON COLUMN domain_rel.deleted_at IS 'domain relation deleted at';
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_meta (
+  idempotency_key  VARCHAR(36) NOT NULL PRIMARY KEY,
+  http_method      VARCHAR(16) NOT NULL,
+  request_uri      TEXT        NOT NULL,
+  http_status      INT,
+  response_summary TEXT,
+  audit_info       TEXT        NOT NULL,
+  created_at       BIGINT      NOT NULL,
+  expires_at       BIGINT      NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_iim_expires ON iceberg_idempotency_meta (expires_at);
+COMMENT ON TABLE iceberg_idempotency_meta IS 'Iceberg REST idempotency records';
+COMMENT ON COLUMN iceberg_idempotency_meta.idempotency_key IS 'client-provided UUIDv7 idempotency key';
+COMMENT ON COLUMN iceberg_idempotency_meta.http_method IS 'HTTP method of the request';
+COMMENT ON COLUMN iceberg_idempotency_meta.request_uri IS 'encoded request path and sorted query string';
+COMMENT ON COLUMN iceberg_idempotency_meta.http_status IS 'HTTP status of finalized response, NULL while reserved';
+COMMENT ON COLUMN iceberg_idempotency_meta.response_summary IS 'serialized response body (JSON) for replay';
+COMMENT ON COLUMN iceberg_idempotency_meta.audit_info IS 'idempotency record audit info';
+COMMENT ON COLUMN iceberg_idempotency_meta.created_at IS 'record created at (unix epoch millis)';
+COMMENT ON COLUMN iceberg_idempotency_meta.expires_at IS 'record expires at (unix epoch millis)';
+
+-- Keep retained deletions out of live metadata lists and relationship cleanup scans.
+CREATE INDEX IF NOT EXISTS idx_tag_meta_live ON tag_meta (metalake_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_policy_meta_live ON policy_meta (metalake_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_role_meta_live ON role_meta (metalake_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_user_meta_live ON user_meta (metalake_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_tag_relation_meta_live ON tag_relation_meta (metadata_object_id, metadata_object_type) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_role_meta_securable_object_live ON role_meta_securable_object (metadata_object_id, type) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_user_role_rel_live ON user_role_rel (role_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_policy_tag_relation_meta_live ON policy_tag_relation_meta (tag_id) WHERE deleted_at = 0;
+
+CREATE TABLE IF NOT EXISTS ontology_meta (
+    ontology_id BIGINT NOT NULL,
+    ontology_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (ontology_id),
+    CONSTRAINT uk_onm_mid_name_del UNIQUE (metalake_id, ontology_name, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_onm_deleted ON ontology_meta (deleted_at);
+COMMENT ON TABLE ontology_meta IS 'ontology identity';
+COMMENT ON COLUMN ontology_meta.ontology_id IS 'ontology id';
+COMMENT ON COLUMN ontology_meta.ontology_name IS 'ontology name';
+COMMENT ON COLUMN ontology_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN ontology_meta.audit_info IS 'ontology identity audit info';
+COMMENT ON COLUMN ontology_meta.current_version IS 'current version';
+COMMENT ON COLUMN ontology_meta.last_version IS 'last allocated version';
+COMMENT ON COLUMN ontology_meta.deleted_at IS 'ontology deleted at';
+
+CREATE TABLE IF NOT EXISTS ontology_version_info (
+    id BIGSERIAL,
+    metalake_id BIGINT NOT NULL,
+    ontology_id BIGINT NOT NULL,
+    version INT NOT NULL,
+    ontology_comment TEXT DEFAULT NULL,
+    definition TEXT NOT NULL,
+    properties TEXT DEFAULT NULL,
+    audit_info TEXT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_onvi_oid_ver_del UNIQUE (ontology_id, version, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_onvi_mid ON ontology_version_info (metalake_id) WHERE deleted_at = 0;
+
+CREATE INDEX IF NOT EXISTS idx_onvi_deleted ON ontology_version_info (deleted_at);
+COMMENT ON TABLE ontology_version_info IS 'ontology versions';
+COMMENT ON COLUMN ontology_version_info.id IS 'auto increment id';
+COMMENT ON COLUMN ontology_version_info.metalake_id IS 'metalake id';
+COMMENT ON COLUMN ontology_version_info.ontology_id IS 'ontology id';
+COMMENT ON COLUMN ontology_version_info.version IS 'version';
+COMMENT ON COLUMN ontology_version_info.ontology_comment IS 'comment snapshot';
+COMMENT ON COLUMN ontology_version_info.definition IS 'normalized OntologyDefinition (JSON)';
+COMMENT ON COLUMN ontology_version_info.properties IS 'properties snapshot (JSON)';
+COMMENT ON COLUMN ontology_version_info.audit_info IS 'version audit info';
+COMMENT ON COLUMN ontology_version_info.deleted_at IS 'version deleted at';

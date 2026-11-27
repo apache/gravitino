@@ -109,7 +109,7 @@ When using the `spark-sql` shell client, you must explicitly set the `spark.bypa
 
 ### S3
 
-Refer to [Hive catalog with s3](../hive-catalog-with-cloud-storage.md) to set up a Hive catalog with s3 storage. To query the data stored in S3, Spark needs S3 credentials: either add them to the Spark configuration using `spark.sql.catalog.${hive_catalog_name}.fs.s3a.access.key` and `spark.sql.catalog.${hive_catalog_name}.fs.s3a.secret.key`, or store them on the Gravitino catalog (see below). Additionally, download [hadoop aws jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), [aws java sdk jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) and place them in the classpath of Spark.
+Refer to [Hive catalog with s3](../hive-catalog-with-cloud-storage.md) to set up a Hive catalog with s3 storage. To query the data stored in S3, Spark needs S3 credentials: either add them to the Spark configuration using `spark.sql.catalog.${hive_catalog_name}.fs.s3a.access.key` and `spark.sql.catalog.${hive_catalog_name}.fs.s3a.secret.key`, or store them on the Gravitino catalog (see below). Additionally, download [hadoop aws jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), the AWS SDK jar that matches the Hadoop version of Spark ([aws java sdk v1 jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) for Hadoop 3.3, [aws java sdk v2 jar](https://mvnrepository.com/artifact/software.amazon.awssdk/bundle) for Hadoop 3.4 and later) and place them in the classpath of Spark.
 
 ## Credentials stored on the Gravitino catalog
 

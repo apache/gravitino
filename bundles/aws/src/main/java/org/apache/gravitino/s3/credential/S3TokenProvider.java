@@ -21,12 +21,14 @@ package org.apache.gravitino.s3.credential;
 
 import org.apache.gravitino.credential.CredentialProviderDelegator;
 import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.credential.SupportsDynamicCredential;
 
 /**
  * A lightweight credential provider for S3. It delegates the actual credential generation to {@link
  * S3TokenGenerator} which is loaded via reflection to avoid classpath issues.
  */
-public class S3TokenProvider extends CredentialProviderDelegator<S3TokenCredential> {
+public class S3TokenProvider extends CredentialProviderDelegator<S3TokenCredential>
+    implements SupportsDynamicCredential {
 
   @Override
   public boolean supportsScheme(String scheme) {

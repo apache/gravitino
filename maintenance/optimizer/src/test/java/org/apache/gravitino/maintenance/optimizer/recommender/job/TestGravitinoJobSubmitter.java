@@ -104,12 +104,13 @@ public class TestGravitinoJobSubmitter {
   }
 
   @Test
-  void buildJobConfigMergesWithExpectedPrecedence() {
+  void buildJobConfigReturnsAdapterOutputOnly() {
     OptimizerConfig config =
         new OptimizerConfig(
             Map.of(
                 OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "custom", "optimizer",
-                OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "override", "optimizer"));
+                OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "override", "optimizer",
+                OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "spark_master", "local[2]"));
     GravitinoJobSubmitter submitter = new GravitinoJobSubmitter();
     submitter.initialize(new OptimizerEnv(config));
 
@@ -132,16 +133,20 @@ public class TestGravitinoJobSubmitter {
         };
 
     GravitinoJobAdapter adapter =
-        (jobExecutionContext, submitterConfigs, schemaSeparator) ->
-            Map.of("table", "db.table", "options", "map('k','v')", "override", "adapter");
+        (jobExecutionContext, submitterConfigs, schemaSeparator) -> {
+          Assertions.assertEquals("optimizer", submitterConfigs.get("custom"));
+          Assertions.assertEquals("local[2]", submitterConfigs.get("spark_master"));
+          return Map.of("table", "db.table", "options", "map('k','v')", "override", "adapter");
+        };
 
-    Map<String, String> merged =
+    Map<String, String> jobConf =
         GravitinoJobSubmitter.buildJobConfig(
             config, context, adapter, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
 
-    Assertions.assertEquals("optimizer", merged.get("custom"));
-    Assertions.assertEquals("adapter", merged.get("override"));
-    Assertions.assertEquals("db.table", merged.get("table"));
-    Assertions.assertEquals("map('k','v')", merged.get("options"));
+    Assertions.assertFalse(jobConf.containsKey("custom"));
+    Assertions.assertFalse(jobConf.containsKey("spark_master"));
+    Assertions.assertEquals("adapter", jobConf.get("override"));
+    Assertions.assertEquals("db.table", jobConf.get("table"));
+    Assertions.assertEquals("map('k','v')", jobConf.get("options"));
   }
 }

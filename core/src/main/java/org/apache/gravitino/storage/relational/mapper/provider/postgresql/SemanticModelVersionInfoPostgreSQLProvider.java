@@ -68,6 +68,7 @@ public class SemanticModelVersionInfoPostgreSQLProvider
   public String softDeleteSemanticModelVersionsByRetentionLine(
       @Param("semanticModelId") Long semanticModelId,
       @Param("versionRetentionLine") long versionRetentionLine,
+      @Param("activeVersion") int activeVersion,
       @Param("limit") int limit) {
     return "UPDATE "
         + SemanticModelVersionInfoMapper.TABLE_NAME
@@ -75,7 +76,8 @@ public class SemanticModelVersionInfoPostgreSQLProvider
         + " WHERE id IN (SELECT id FROM "
         + SemanticModelVersionInfoMapper.TABLE_NAME
         + " WHERE semantic_model_id = #{semanticModelId}"
-        + " AND version <= #{versionRetentionLine}"
+        + " AND version <= #{versionRetentionLine} AND version <> #{activeVersion}"
+        + " AND publication_status <> 'PUBLISHED_EXPLICITLY'"
         + " AND deleted_at = 0 LIMIT #{limit})";
   }
 

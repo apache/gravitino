@@ -1,0 +1,539 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+version: 0.3.0.dev0
+name: Flights
+description: Ontology of flights into and out of airports.
+requires:
+  - COUNT[Airport] > 0         # there must be at least one Airport
+  - COUNT[Carrier] > 0         # there must be at least one Carrier
+ontology:
+- concept: NrFeet
+  description: "Unit of measure for distance in feet"
+  type: ValueType
+  extends: [ Decimal ]
+- concept: NrPounds
+  description: "Unit of measure for weight in pounds"
+  type: ValueType
+  extends: [ Integer ]
+- concept: NrMiles
+  description: "Unit of measure for distance in miles"
+  type: ValueType
+  extends: [ Decimal ]
+- concept: NrMinutes
+  description: "Unit of measure for time in minutes"
+  type: ValueType
+  extends: [ Decimal ]
+- concept: CancelationCode
+  description: "The single character code that identifies the reason a flight is canceled"
+  type: ValueType
+  extends: [ String ]
+  requires: [ CancelationCode == 'A' OR CancelationCode == 'B' OR CancelationCode == 'C' OR CancelationCode == 'D' ]
+- concept: Capacity
+  description: "The capacity of an aircraft, measured in pounds."
+  type: ValueType
+  extends: [ NrPounds ]
+- concept: DegreesLatitude
+  type: ValueType
+  extends: [ Decimal ]
+  requires: [ DegreesLatitude <= 90, DegreesLatitude >= -90 ]
+- concept: DegreesLongitude
+  type: ValueType
+  extends: [ Decimal ]
+  requires: [ DegreesLongitude <= 180, DegreesLongitude >= -180 ]
+- concept: Polygon
+  description: "A polygon represented as a list of vertices, where each vertex is a pair of latitude and longitude coordinates."
+  type: ValueType
+  extends: [ String ]
+- concept: CityName
+  type: ValueType
+  extends: [ String ]
+- concept: Delay
+  type: ValueType
+  extends: [ NrMinutes ]
+- concept: Distance
+  type: ValueType
+  extends: [ NrMiles ]
+- concept: DistanceGroup
+  description: "A number used to group distances of different lengths, where 1 groups the shortest and 10 the longest."
+  type: ValueType
+  extends: [ Integer ]
+  requires: [ 1 <= DistanceGroup, DistanceGroup <= 10 ]
+- concept: RunwayGeometry
+  description: "A polygon that models the shape of a runway."
+  type: ValueType
+  extends: [ Polygon ]
+- concept: RunwayLength
+  description: "The unit for measuring the lengths of runways in American airports."
+  type: ValueType
+  extends: [ NrFeet ]
+- concept: RunwayDesignator
+  description: "Used to distinguish runways within a given airport."
+  type: ValueType
+  extends: [ String ]
+- concept: SerialNr
+  type: ValueType
+  extends: [ String ]
+- concept: StateCode
+  type: ValueType
+  extends: [ String ]
+- concept: StateName
+  type: ValueType
+  extends: [ String ]
+- concept: TailNr
+  type: ValueType
+  extends: [ String ]
+- concept: Year
+  type: ValueType
+  extends: [ String ]
+- concept: CancelationReason
+  description: "A curated set of reasons that explain why a flight is canceled"
+  type: EntityType
+  identify_by: [ code ]
+  relationships:
+  - name: code
+    roles:
+    - concept: CancelationCode
+    verbalizes: [ '{CancelationReason} is identified by {CancelationCode}']
+    multiplicity: OneToOne
+  - name: description
+    roles:
+    - concept: String
+    verbalizes: [ '{CancelationReason} has description- {String}' ]  # The hyphen after "description" is significant when verbalizing constraints
+    multiplicity: ManyToOne                                          # Each CancelationReason has at most one description String
+- concept: State
+  type: EntityType
+  identify_by: [ code ]
+  relationships:
+  - name: code
+    roles:
+    - concept: StateCode
+    verbalizes:
+    - '{State} is identified by {StateCode}'
+    multiplicity: OneToOne
+  - name: name
+    roles:
+    - concept: StateName
+    verbalizes:
+    - '{State} has {StateName}'
+    multiplicity: ManyToOne
+- concept: City
+  type: EntityType
+  identify_by: [ name, state ]
+  relationships:
+  - name: name
+    roles:
+    - concept: CityName
+    verbalizes:
+    - '{City} has {CityName}'
+    multiplicity: ManyToOne
+  - name: state
+    roles:
+    - concept: State
+    verbalizes:
+    - '{City} is located in {State}'
+    multiplicity: ManyToOne
+- concept: Runway
+  type: EntityType
+  identify_by: [ designator, airport ]
+  relationships:
+  - name: airport
+    roles:
+    - concept: Airport
+    verbalizes:
+    - '{Runway} belongs to {Airport}'
+    multiplicity: ManyToOne
+  - name: designator
+    roles:
+    - concept: RunwayDesignator
+    verbalizes:
+    - '{Runway} uses {RunwayDesignator}'
+    multiplicity: ManyToOne
+  - name: length
+    roles:
+    - concept: RunwayLength
+    verbalizes:
+    - '{Runway} has {RunwayLength}'
+    multiplicity: ManyToOne
+  - name: geometry
+    roles:
+    - concept: RunwayGeometry
+    verbalizes:
+    - '{Runway} has {RunwayGeometry}'
+    multiplicity: ManyToOne
+- concept: ManufacturerName
+  type: ValueType
+  extends: [ String ]
+- concept: Manufacturer
+  type: EntityType
+  identify_by: [ name ]
+  relationships:
+  - name: name
+    roles:
+    - concept: ManufacturerName
+    verbalizes:
+    - '{Manufacturer} is identified by {ManufacturerName}'
+    multiplicity: OneToOne
+- concept: ModelName
+  type: ValueType
+  extends: [ String ]
+- concept: Model
+  type: EntityType
+  identify_by: [ name, manufacturer ]
+  relationships:
+  - name: name
+    roles:
+    - concept: ModelName
+    verbalizes:
+    - '{Model} has {ModelName}'
+    multiplicity: ManyToOne
+  - name: manufacturer
+    roles:
+    - concept: Manufacturer
+    verbalizes:
+    - '{Model} is manufactured by {Manufacturer}'
+    multiplicity: ManyToOne
+- concept: Aircraft
+  type: EntityType
+  identify_by: [ tailnum ]
+  relationships:
+  - name: serial_number
+    roles:
+    - concept: SerialNr
+    verbalizes:
+    - '{Aircraft} has {SerialNr}'
+    multiplicity: ManyToOne
+  - name: name
+    roles:
+    - concept: String
+    verbalizes:
+    - '{Aircraft} has name {String}'
+    multiplicity: ManyToOne
+  - name: number_of_seats
+    roles:
+    - concept: Integer
+    verbalizes:
+    - '{Aircraft} has {Integer} seats'
+    multiplicity: ManyToOne
+  - name: tailnum
+    roles:
+    - concept: TailNr
+    verbalizes:
+    - '{Aircraft} is identified by {TailNr}'
+    multiplicity: OneToOne
+  - name: model
+    roles:
+    - concept: Model
+    verbalizes:
+    - '{Aircraft} has {Model}'
+    multiplicity: ManyToOne
+  - name: year_manufactured
+    roles:
+    - concept: Year
+    verbalizes:
+    - '{Aircraft} was manufactured in {Year}'
+    multiplicity: ManyToOne
+  - name: capacity
+    roles:
+    - concept: Capacity
+    verbalizes:
+    - '{Aircraft} has {Capacity}'
+    multiplicity: ManyToOne
+  - name: carrier
+    roles:
+    - concept: Carrier
+    verbalizes:
+    - '{Aircraft} is operated by {Carrier}'
+    multiplicity: ManyToOne
+- concept: AirportName
+  type: ValueType
+  extends: [ String ]
+- concept: AirportCode
+  description: "The three-letter IATA code for the airport."
+  type: ValueType
+  extends: [ String ]
+- concept: AirportId
+  description: "Five digit number used as an alternate identifier for airports."
+  type: ValueType
+  extends: [ String ]
+- concept: Airport
+  type: EntityType
+  identify_by: [ code ]
+  requires: [ Airport.latitude, Airport.longitude ]
+  relationships:
+  - name: city
+    roles:
+    - concept: City
+    verbalizes:
+    - '{Airport} is located in {City}'
+    multiplicity: ManyToOne
+  - name: serves
+    roles:
+    - concept: Market
+    verbalizes:
+    - '{Airport} serves {Market}'
+    multiplicity: ManyToOne
+  - name: average_departure_delay
+    roles:
+    - concept: Delay
+    verbalizes:
+    - '{Airport} has average- departure {Delay}'    # The hyphen after "average" has significance when verbalizing constraints
+    multiplicity: ManyToOne                         # Each Airport has at most one average departure Delay
+    derived_by: [ 'Delay == AVG[Flight.departure_delay WHERE Airport == Flight.route.departure GROUP BY Airport]' ]
+  - name: longitude
+    roles:
+    - concept: DegreesLongitude
+    verbalizes:
+    - '{Airport} centers at {DegreesLongitude}'
+    multiplicity: ManyToOne
+  - name: average_arrival_delay
+    roles:
+    - concept: Delay
+    verbalizes:
+    - '{Airport} has average- arrival {Delay}'    # The hyphen after "average" has significance when verbalizing constraints
+    multiplicity: ManyToOne                       # Each Airport has at most one average arrival Delay
+    derived_by: [ 'Delay == AVG[Flight.arrival_delay WHERE Airport == Flight.route.destination GROUP BY Airport]' ]
+  - name: name
+    roles:
+    - concept: AirportName
+    verbalizes:
+    - '{Airport} has {AirportName}'
+    multiplicity: ManyToOne
+  - name: code
+    roles:
+    - concept: AirportCode
+    verbalizes:
+    - '{Airport} has {AirportCode}'
+    multiplicity: OneToOne
+  - name: latitude
+    roles:
+    - concept: DegreesLatitude
+    verbalizes:
+    - '{Airport} centers at {DegreesLatitude}'
+    multiplicity: ManyToOne
+- concept: MarketName
+  type: ValueType
+  extends: [ String ]
+- concept: Market
+  type: EntityType
+  identify_by: [name]
+  relationships:
+    - name: name
+      roles: [ { concept: MarketName }]
+      verbalizes: [ '{Market} is identified by {MarketName}' ]
+      multiplicity: OneToOne
+- concept: FlightNr
+  description: "The IATA flight number, which is typically a combination of the airline's IATA code and a numeric code (e.g., 'AA1234')."
+  type: ValueType
+  extends: [ String ]
+- concept: FlightId
+  description: "A unique identifier for an instance of a flight"
+  type: ValueType
+  extends: [ String ]
+- concept: Flight
+  type: EntityType
+  identify_by: [ id ]
+  relationships:
+  - name: departure_delay
+    roles:
+    - concept: Delay
+    verbalizes:
+    - '{Flight} has departure- {Delay}'    # The hyphen after "departure" has significance when verbalizing constraints
+    multiplicity: ManyToOne                # Each Flight has at most one departure Delay
+  - name: number
+    roles:
+    - concept: FlightNr
+    verbalizes:
+    - '{Flight} has {FlightNr}'
+    multiplicity: ManyToOne
+  - name: scheduled_departure
+    roles: [ { concept: DateTime } ]
+    verbalizes:
+    - '{Flight} is scheduled to depart at {DateTime}'
+    multiplicity: ManyToOne
+    requires: [ Flight.scheduled_departure < Flight.scheduled_arrival ]
+  - name: arrival_delay
+    roles:
+    - concept: Delay
+    verbalizes:
+    - '{Flight} has arrival- {Delay}'    # The hyphen after "arrival" has significance when verbalizing constraints
+    multiplicity: ManyToOne              # Each Flight has at most one arrival Delay
+  - name: canceled
+    verbalizes:
+    - '{Flight} was canceled'
+  - name: canceled_due_to
+    roles:
+    - concept: CancelationReason
+    verbalizes:
+    - '{Flight} was canceled due to {CancelationReason}'
+    multiplicity: ManyToOne
+  - name: distance
+    roles:
+    - concept: Distance
+    verbalizes:
+    - '{Flight} spans actual- {Distance}'    # The hyphen after "actual" has significance when verbalizing constraints
+    multiplicity: ManyToOne                  # Each Flight spans at most one actual Distance
+  - name: id
+    roles:
+    - concept: FlightId
+    verbalizes:
+    - '{Flight} is identified by {FlightId}'
+    multiplicity: OneToOne
+  - name: scheduled_arrival
+    roles:
+    - concept: DateTime
+    verbalizes:
+    - '{Flight} is scheduled to arrive at {DateTime}'
+    multiplicity: ManyToOne
+  - name: registers_longitude_series
+    roles:
+    - concept: DateTime
+    - concept: DegreesLongitude
+    verbalizes:
+    - '{Flight} at {DateTime} registers {DegreesLongitude}'
+    multiplicity: ManyToOne
+  - name: registers_latitude_series
+    roles:
+    - concept: DateTime
+    - concept: DegreesLatitude
+    verbalizes:
+    - '{Flight} at {DateTime} registers {DegreesLatitude}'
+    multiplicity: ManyToOne
+  - name: date
+    roles:
+    - concept: Date
+    verbalizes:
+    - '{Flight} is scheduled to depart on {Date}'
+    multiplicity: ManyToOne
+  - name: departs_at
+    roles:
+    - concept: DateTime
+    verbalizes:
+    - '{Flight} departs at {DateTime}'
+    multiplicity: ManyToOne
+    requires: [ Flight.departs_at < Flight.arrives_at ]
+  - name: diverted
+    verbalizes:
+    - '{Flight} was diverted'
+  - name: arrives_at
+    roles:
+    - concept: DateTime
+    verbalizes:
+    - '{Flight} arrives at {DateTime}'
+    multiplicity: ManyToOne
+  - name: route
+    roles:
+    - concept: Route
+    verbalizes:
+    - '{Flight} traverses {Route}'
+    multiplicity: ManyToOne
+  - name: aircraft
+    roles:
+    - concept: Aircraft
+    verbalizes:
+    - '{Flight} uses {Aircraft}'
+    multiplicity: ManyToOne
+    requires: [ Flight.operated_by(Aircraft.carrier) ]
+  - name: operated_by
+    roles:
+    - concept: Carrier
+    verbalizes:
+    - '{Flight} is operated by {Carrier}'
+    multiplicity: ManyToOne
+- concept: CarrierCode
+  description: "The two-letter IATA code for the airline carrier."
+  type: ValueType
+  extends: [ String ]
+- concept: CarrierName
+  type: ValueType
+  extends: [ String ]
+- concept: Carrier
+  type: EntityType
+  identify_by: [ code ]
+  relationships:
+  - name: code
+    roles:
+    - concept: CarrierCode
+    verbalizes:
+    - '{Carrier} uses {CarrierCode}'
+    multiplicity: OneToOne
+  - name: name
+    roles:
+    - concept: CarrierName
+    verbalizes:
+    - '{Carrier} has {CarrierName}'
+    multiplicity: ManyToOne
+- concept: RouteId
+  type: ValueType
+  description: "A unique identifier for a route between two airports. Constructed by concatenating the IATA codes of the departure and destination airports (e.g., 'ATL -> DCA')"
+  extends: [ String ]
+- concept: Route
+  type: EntityType
+  identify_by: [ id ]
+  relationships:
+  - name: average_departure_delay
+    roles:
+    - concept: Delay
+    verbalizes:
+    - '{Route} has average- departure {Delay}'    # The hyphen after "average" has significance when verbalizing constraints
+    multiplicity: ManyToOne                       # Each Route has at most one average departure Delay
+    derived_by: [ 'Delay == AVG[Flight.departure_delay WHERE Flight.route(Route) GROUP BY Route]' ]
+  - name: average_arrival_delay
+    roles:
+    - concept: Delay
+    verbalizes:
+    - '{Route} has average- arrival {Delay}'    # The hyphen after "average" has significance when verbalizing constraints
+    multiplicity: ManyToOne                     # Each Route has at most one average arrival Delay
+    derived_by: [ 'Delay == AVG[Flight.arrival_delay WHERE Flight.route(Route) GROUP BY Route]' ]
+  - name: distance
+    roles:
+    - concept: Distance
+    verbalizes:
+    - '{Route} spans {Distance}'
+    multiplicity: ManyToOne
+  - name: lies_in
+    roles:
+    - concept: DistanceGroup
+    verbalizes:
+    - '{Route} has {DistanceGroup}'
+    multiplicity: ManyToOne
+  - name: id
+    roles:
+    - concept: RouteId
+    verbalizes:
+    - '{Route} is identified by {RouteId}'
+    multiplicity: OneToOne
+  - name: route_name
+    roles:
+    - concept: String
+    verbalizes:
+    - '{Route} has name- {String}'    # The hyphen after "name" has significance when verbalizing constraints
+    multiplicity: ManyToOne
+  - name: destination
+    roles:
+    - concept: Airport
+    verbalizes:
+    - '{Route} connects to destination- {Airport}'  # The hyphen after "destination" has significance when verbalizing constraints
+    multiplicity: ManyToOne                         # Each Route connects to at most one destination Airport
+    requires: [ 'NOT Route.departure(Airport)' ]
+  - name: departure
+    roles:
+    - concept: Airport
+    verbalizes:
+    - '{Route} connects to departure- {Airport}'    # The hyphen after "departure" has significance when verbalizing constraints
+    multiplicity: ManyToOne                         # Each Route connects to at most one departure Airport
+    requires: [ 'NOT Route.destination(Airport)' ]

@@ -191,12 +191,16 @@ public class GravitinoGlueCatalog extends BaseCatalog {
    * Routes Spark table loading to the correct backend.
    *
    * <p>Iceberg tables are loaded from the Iceberg GlueCatalog. Non-Iceberg tables are loaded
-   * directly from {@link HiveTableCatalog}, which reads from Glue via the factory client.
+   * directly from {@link HiveTableCatalog}, which reads from Glue via the factory client. The
+   * routing decision uses the Gravitino table the caller already obtained.
+   *
+   * @param ident the Spark table identifier
+   * @param gravitinoTable the Gravitino table the caller already obtained for this identifier
+   * @return the underlying Spark table
    */
   @Override
-  protected Table loadSparkTable(Identifier ident) {
+  protected Table loadSparkTable(Identifier ident, org.apache.gravitino.rel.Table gravitinoTable) {
     try {
-      org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
       if (isIcebergTable(gravitinoTable)) {
         return getOrCreateIcebergGlueCatalog().loadTable(ident);
       }

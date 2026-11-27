@@ -21,6 +21,8 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.SemanticModelMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.SemanticModelMetaPostgreSQLProvider;
@@ -53,17 +55,20 @@ public class SemanticModelMetaSQLProviderFactory {
   static class SemanticModelMetaH2Provider extends SemanticModelMetaBaseSQLProvider {}
 
   /** Provides SQL for listing Semantic Models by schema ID. */
-  public static String listSemanticModelPOsBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().listSemanticModelPOsBySchemaId(schemaId);
+  public static String listSemanticModelPOsBySchemaId(
+      @Param("schemaId") Long schemaId,
+      @Param("selector") @Nullable SemanticModelRevisionSelector selector) {
+    return getProvider().listSemanticModelPOsBySchemaId(schemaId, selector);
   }
 
   /** Provides SQL for listing Semantic Models by fully qualified schema name. */
   public static String listSemanticModelPOsByFullQualifiedName(
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
-      @Param("schemaName") String schemaName) {
+      @Param("schemaName") String schemaName,
+      @Param("selector") @Nullable SemanticModelRevisionSelector selector) {
     return getProvider()
-        .listSemanticModelPOsByFullQualifiedName(metalakeName, catalogName, schemaName);
+        .listSemanticModelPOsByFullQualifiedName(metalakeName, catalogName, schemaName, selector);
   }
 
   /** Provides SQL for selecting a Semantic Model ID by schema ID and name. */
@@ -74,8 +79,11 @@ public class SemanticModelMetaSQLProviderFactory {
 
   /** Provides SQL for selecting a Semantic Model by schema ID and name. */
   public static String selectSemanticModelMetaBySchemaIdAndName(
-      @Param("schemaId") Long schemaId, @Param("semanticModelName") String semanticModelName) {
-    return getProvider().selectSemanticModelMetaBySchemaIdAndName(schemaId, semanticModelName);
+      @Param("schemaId") Long schemaId,
+      @Param("semanticModelName") String semanticModelName,
+      @Param("selector") @Nullable SemanticModelRevisionSelector selector) {
+    return getProvider()
+        .selectSemanticModelMetaBySchemaIdAndName(schemaId, semanticModelName, selector);
   }
 
   /** Provides SQL for selecting and locking a Semantic Model identity by schema ID and name. */
@@ -86,8 +94,10 @@ public class SemanticModelMetaSQLProviderFactory {
   }
 
   /** Provides SQL for selecting a Semantic Model by stable ID. */
-  public static String selectSemanticModelMetaById(@Param("semanticModelId") Long semanticModelId) {
-    return getProvider().selectSemanticModelMetaById(semanticModelId);
+  public static String selectSemanticModelMetaById(
+      @Param("semanticModelId") Long semanticModelId,
+      @Param("selector") SemanticModelRevisionSelector selector) {
+    return getProvider().selectSemanticModelMetaById(semanticModelId, selector);
   }
 
   /** Provides SQL for selecting and locking a Semantic Model identity by stable ID. */
@@ -101,10 +111,11 @@ public class SemanticModelMetaSQLProviderFactory {
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
       @Param("schemaName") String schemaName,
-      @Param("semanticModelName") String semanticModelName) {
+      @Param("semanticModelName") String semanticModelName,
+      @Param("selector") @Nullable SemanticModelRevisionSelector selector) {
     return getProvider()
         .selectSemanticModelByFullQualifiedName(
-            metalakeName, catalogName, schemaName, semanticModelName);
+            metalakeName, catalogName, schemaName, semanticModelName, selector);
   }
 
   /** Provides SQL for inserting a Semantic Model identity. */
@@ -120,12 +131,12 @@ public class SemanticModelMetaSQLProviderFactory {
     return getProvider().updateSemanticModelMeta(newSemanticModelPO, oldSemanticModelPO);
   }
 
-  /** Provides SQL for soft-deleting a Semantic Model identity by stable ID and current version. */
+  /** Provides SQL for soft-deleting a Semantic Model identity by stable ID and observed name. */
   public static String softDeleteSemanticModelMetasBySemanticModelId(
       @Param("semanticModelId") Long semanticModelId,
-      @Param("currentVersion") Integer currentVersion) {
+      @Param("semanticModelName") String semanticModelName) {
     return getProvider()
-        .softDeleteSemanticModelMetasBySemanticModelId(semanticModelId, currentVersion);
+        .softDeleteSemanticModelMetasBySemanticModelId(semanticModelId, semanticModelName);
   }
 
   /** Provides SQL for soft-deleting Semantic Model identities by metalake ID. */

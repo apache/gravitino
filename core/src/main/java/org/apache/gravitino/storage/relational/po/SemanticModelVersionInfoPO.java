@@ -18,13 +18,20 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
+import java.time.Instant;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.experimental.Accessors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.dto.semantic.SemanticModelRevisionDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.semantic.SemanticModel.Status;
 
 /** The persistent object for a complete Semantic Model version snapshot. */
 @EqualsAndHashCode
@@ -33,13 +40,25 @@ import org.apache.commons.lang3.StringUtils;
 @Accessors(fluent = true)
 public class SemanticModelVersionInfoPO {
 
+  /** Database publication state, including the retention distinction between published states. */
+  public enum PublicationStatus {
+    /** A revision that has not been published. */
+    DRAFT,
+    /** A revision made active at save time. */
+    PUBLISHED_ON_SAVE,
+    /** A revision made active by a separate publication operation. */
+    PUBLISHED_EXPLICITLY
+  }
+
   private Long id;
   private Long metalakeId;
   private Long catalogId;
   private Long schemaId;
   private Long semanticModelId;
   private Integer version;
-  private String semanticModelName;
+  private PublicationStatus publicationStatus;
+  private String publishedBy;
+  private Long publishedAt;
   private String semanticModelComment;
   private String datasets;
   @Nullable private String relationships;
@@ -53,7 +72,7 @@ public class SemanticModelVersionInfoPO {
   /** Creates an empty persistent object for MyBatis. */
   public SemanticModelVersionInfoPO() {}
 
-  @lombok.Builder(setterPrefix = "with")
+  @lombok.Builder(setterPrefix = "with", toBuilder = true)
   private SemanticModelVersionInfoPO(
       Long id,
       Long metalakeId,
@@ -61,7 +80,9 @@ public class SemanticModelVersionInfoPO {
       Long schemaId,
       Long semanticModelId,
       Integer version,
-      String semanticModelName,
+      PublicationStatus publicationStatus,
+      String publishedBy,
+      Long publishedAt,
       String semanticModelComment,
       String datasets,
       @Nullable String relationships,
@@ -77,8 +98,6 @@ public class SemanticModelVersionInfoPO {
     Preconditions.checkArgument(semanticModelId != null, "Semantic Model id is required");
     Preconditions.checkArgument(version != null, "Semantic Model version is required");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(semanticModelName), "Semantic Model name cannot be empty");
-    Preconditions.checkArgument(
         StringUtils.isNotBlank(datasets), "Semantic Model datasets cannot be empty");
     Preconditions.checkArgument(StringUtils.isNotBlank(auditInfo), "Audit info cannot be empty");
     Preconditions.checkArgument(deletedAt != null, "Deleted at is required");
@@ -89,7 +108,9 @@ public class SemanticModelVersionInfoPO {
     this.schemaId = schemaId;
     this.semanticModelId = semanticModelId;
     this.version = version;
-    this.semanticModelName = semanticModelName;
+    this.publicationStatus = publicationStatus;
+    this.publishedBy = publishedBy;
+    this.publishedAt = publishedAt;
     this.semanticModelComment = semanticModelComment;
     this.datasets = datasets;
     this.relationships = relationships;
@@ -99,5 +120,25 @@ public class SemanticModelVersionInfoPO {
     this.properties = properties;
     this.auditInfo = auditInfo;
     this.deletedAt = deletedAt;
+  }
+
+  /** Returns the public metadata for this retained revision, without its definition. */
+  public SemanticModelRevisionDTO revisionInfo() {
+    boolean draft = publicationStatus == PublicationStatus.DRAFT;
+    return new SemanticModelRevisionDTO(
+        version,
+        draft ? Status.DRAFT : Status.PUBLISHED,
+        draft ? null : publishedBy,
+        draft ? null : Instant.ofEpochMilli(publishedAt),
+        DTOConverters.toDTO(writerAudit()));
+  }
+
+  /** Returns the audit information recorded when this snapshot was saved. */
+  public AuditInfo writerAudit() {
+    try {
+      return JsonUtils.anyFieldMapper().readValue(auditInfo, AuditInfo.class);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("Failed to deserialize Semantic Model revision audit", e);
+    }
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.client;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -48,6 +49,10 @@ class GenericSemanticModel
   private final SemanticModelDefinition definition;
   private final Map<String, String> properties;
   private final Audit audit;
+  private final int revision;
+  private final Status status;
+  @Nullable private final String publishedBy;
+  @Nullable private final Instant publishedAt;
   private final MetadataObjectDomainOperations objectDomainOperations;
 
   private final MetadataObjectTagOperations objectTagOperations;
@@ -66,6 +71,10 @@ class GenericSemanticModel
             ? Collections.emptyMap()
             : Collections.unmodifiableMap(new LinkedHashMap<>(sourceProperties));
     this.audit = semanticModel.auditInfo();
+    this.revision = semanticModel.revision();
+    this.status = semanticModel.status();
+    this.publishedBy = semanticModel.publishedBy();
+    this.publishedAt = semanticModel.publishedAt();
     MetadataObject metadataObject =
         MetadataObjects.of(
             Arrays.asList(semanticModelNamespace.level(1), semanticModelNamespace.level(2), name),
@@ -110,6 +119,28 @@ class GenericSemanticModel
   @Override
   public Audit auditInfo() {
     return audit;
+  }
+
+  @Override
+  public int revision() {
+    return revision;
+  }
+
+  @Override
+  public Status status() {
+    return status;
+  }
+
+  @Override
+  @Nullable
+  public String publishedBy() {
+    return publishedBy;
+  }
+
+  @Override
+  @Nullable
+  public Instant publishedAt() {
+    return publishedAt;
   }
 
   /** {@inheritDoc} */
@@ -222,13 +253,18 @@ class GenericSemanticModel
         && Objects.equals(comment, that.comment)
         && definition.equals(that.definition)
         && properties.equals(that.properties)
-        && audit.equals(that.audit);
+        && audit.equals(that.audit)
+        && revision == that.revision
+        && status == that.status
+        && Objects.equals(publishedBy, that.publishedBy)
+        && Objects.equals(publishedAt, that.publishedAt);
   }
 
   /** {@inheritDoc} */
   @Override
   public int hashCode() {
-    return Objects.hash(name, comment, definition, properties, audit);
+    return Objects.hash(
+        name, comment, definition, properties, audit, revision, status, publishedBy, publishedAt);
   }
 
   /** {@inheritDoc} */

@@ -224,15 +224,18 @@
    Guava InternalFutureFailureAccess and InternalFutures
    Guava: Google Core Libraries For Java
    Google Guice Core Library
+   J2ObjC Annotations
    Jackson Annotations
    Jackson Core
    Jackson Databind
    Jackson Datatype Guava
+   JJWT
    Jackson Datatype JDK8
    Jackson Datatype JSR310
    Jackson JAXRS Base
    Jackson JAXRS JSON Provider
    Jackson Module JAXB Annotations
+   JSpecify
    LanceDB Lance Namespace Core
    LanceDB Lance Namespace Apache Client
    Apache Arrow Vector

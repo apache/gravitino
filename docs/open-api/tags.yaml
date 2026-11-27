@@ -222,7 +222,13 @@ paths:
       tags:
         - tag
       summary: Associate tags with metadata object
-      description: Associate and disassociate tags with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, VIEW, SEMANTIC_MODEL, FILESET, TOPIC, COLUMN, MODEL, FUNCTION
+      description: >-
+        Associate and disassociate tags with metadata object, please be aware that supported
+        metadata objects are CATALOG, SCHEMA, TABLE, VIEW, SEMANTIC_MODEL, FILESET, TOPIC, COLUMN,
+        MODEL, FUNCTION. Tag names in `tagsToAdd` or `tagsToRemove` that do not exist in the
+        metalake are ignored instead of failing the request, including tags dropped or renamed
+        while the request runs. The response lists the tags associated with the object after the
+        change, so callers can compare it with the request to find names that took no effect.
       operationId: associateTags
       requestBody:
         content:
@@ -240,7 +246,7 @@ paths:
                 $ref: "#/components/examples/TagValuesAssociate"
       responses:
         "200":
-          description: Returns the list of tag names associated with the specified metadata object
+          description: Returns the list of tag names associated with the specified metadata object after the change; unknown tag names in the request are not included
           content:
             application/vnd.gravitino.v1+json:
               schema:

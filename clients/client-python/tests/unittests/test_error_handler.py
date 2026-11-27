@@ -33,6 +33,7 @@ from gravitino.exceptions.base import (
     IllegalPrivilegeException,
     IllegalRoleException,
     IllegalStatisticNameException,
+    InUseException,
     InternalError,
     MetalakeAlreadyExistsException,
     MetalakeNotInUseException,
@@ -87,6 +88,7 @@ from gravitino.exceptions.handlers.semantic_model_error_handler import (
 from gravitino.exceptions.handlers.permission_error_handler import (
     PERMISSION_ERROR_HANDLER,
 )
+from gravitino.exceptions.handlers.policy_error_handler import POLICY_ERROR_HANDLER
 from gravitino.exceptions.handlers.role_error_handler import ROLE_ERROR_HANDLER
 from gravitino.exceptions.handlers.schema_error_handler import SCHEMA_ERROR_HANDLER
 from gravitino.exceptions.handlers.table_error_handler import TABLE_ERROR_HANDLER
@@ -842,6 +844,11 @@ class TestErrorHandler(unittest.TestCase):
                 )
             )
 
+        with self.assertRaises(InUseException):
+            ROLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(InUseException, "mock error")
+            )
+
         with self.assertRaises(RuntimeError):
             ROLE_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(InternalError, "mock error")
@@ -940,6 +947,22 @@ class TestErrorHandler(unittest.TestCase):
             PERMISSION_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(NotFoundException, "mock error")
             )
+
+    def test_policy_error_handler_keeps_illegal_role(self):
+        with self.assertRaises(IllegalRoleException):
+            POLICY_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    IllegalRoleException, "mock error"
+                )
+            )
+
+        with self.assertRaises(IllegalArgumentException) as context:
+            POLICY_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    IllegalArgumentException, "mock error"
+                )
+            )
+        self.assertIs(type(context.exception), IllegalArgumentException)
 
     def test_semantic_model_error_handler(self):
         with self.assertRaises(IllegalSemanticModelException):

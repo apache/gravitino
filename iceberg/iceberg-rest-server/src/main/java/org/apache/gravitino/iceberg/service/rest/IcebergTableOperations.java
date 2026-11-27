@@ -190,7 +190,6 @@ public class IcebergTableOperations {
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
       @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
       @Context UriInfo uriInfo) {
-    IcebergRESTUtils.validateRequest(createTableRequest, "CreateTableRequest");
     return idempotencyManager.replayOrExecute(
         idempotencyKey,
         IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
@@ -202,19 +201,21 @@ public class IcebergTableOperations {
       String namespace,
       CreateTableRequest createTableRequest,
       String accessDelegation) {
-    boolean isCredentialVending = isCredentialVending(accessDelegation);
-    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS =
-        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
-    LOG.info(
-        "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}, "
-            + "accessDelegation: {}, isCredentialVending: {}",
-        catalogName,
-        icebergNS,
-        createTableRequest,
-        accessDelegation,
-        isCredentialVending);
     try {
+      IcebergRESTUtils.validateRequest(createTableRequest, "CreateTableRequest");
+      boolean isCredentialVending = isCredentialVending(accessDelegation);
+      String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+      Namespace icebergNS =
+          RESTUtil.decodeNamespace(
+              namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+      LOG.info(
+          "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}, "
+              + "accessDelegation: {}, isCredentialVending: {}",
+          catalogName,
+          icebergNS,
+          createTableRequest,
+          accessDelegation,
+          isCredentialVending);
       return Utils.doAs(
           httpRequest,
           () -> {
@@ -247,7 +248,6 @@ public class IcebergTableOperations {
           UpdateTableRequest updateTableRequest,
       @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
       @Context UriInfo uriInfo) {
-    IcebergRESTUtils.validateRequest(updateTableRequest, "UpdateTableRequest");
     return idempotencyManager.replayOrExecute(
         idempotencyKey,
         IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
@@ -256,19 +256,21 @@ public class IcebergTableOperations {
 
   private Response doUpdateTable(
       String prefix, String namespace, String table, UpdateTableRequest updateTableRequest) {
-    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS =
-        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
-    String tableName = RESTUtil.decodeString(table);
-    if (LOG.isInfoEnabled()) {
-      LOG.info(
-          "Update Iceberg table, catalog: {}, namespace: {}, table: {}, updateTableRequest: {}",
-          catalogName,
-          icebergNS,
-          table,
-          SerializeUpdateTableRequest(updateTableRequest));
-    }
     try {
+      IcebergRESTUtils.validateRequest(updateTableRequest, "UpdateTableRequest");
+      String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+      Namespace icebergNS =
+          RESTUtil.decodeNamespace(
+              namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+      String tableName = RESTUtil.decodeString(table);
+      if (LOG.isInfoEnabled()) {
+        LOG.info(
+            "Update Iceberg table, catalog: {}, namespace: {}, table: {}, updateTableRequest: {}",
+            catalogName,
+            icebergNS,
+            table,
+            SerializeUpdateTableRequest(updateTableRequest));
+      }
       return Utils.doAs(
           httpRequest,
           () -> {

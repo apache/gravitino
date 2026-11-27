@@ -120,6 +120,8 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       Map<String, String> optimizerProperties =
           GravitinoClientUtils.normalizeUpdaterConnectionOptions(updaterOptions);
       GravitinoClientUtils.requireGravitinoUri(optimizerProperties);
+      GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded(
+          updateMode.modeName, optimizerProperties);
       String schemaSeparator =
           GravitinoClientUtils.fetchSchemaSeparator(
               optimizerProperties.get(OptimizerConfig.GRAVITINO_URI));
@@ -516,11 +518,25 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
             "                              data-file-mse target size is fixed at 134217728 (128MB)",
             "                              small-file-number threshold is fixed at 33554432 (32MB)",
             "  --updater-options <json>  Updater and repository settings",
+            "                              metrics/all require jdbcUrl, jdbcUser, jdbcDriver;",
+            "                              jdbcPassword may be empty",
             "                              Example: '{\"gravitino_uri\":\"http://localhost:8090\",",
-            "                              \"metalake\":\"test\",\"auth_type\":\"basic\",",
-            "                              \"username\":\"admin\",\"password\":\"...\"}'"),
+            "                              \"metalake\":\"test\",",
+            "                              \"gravitino.optimizer.jdbcMetrics.jdbcUrl\":",
+            "                              \"jdbc:postgresql://localhost:5432/optimizer\",",
+            "                              \"gravitino.optimizer.jdbcMetrics.jdbcUser\":\"postgres\",",
+            "                              \"gravitino.optimizer.jdbcMetrics.jdbcPassword\":\"...\",",
+            "                              \"gravitino.optimizer.jdbcMetrics.jdbcDriver\":",
+            "                              \"org.postgresql.Driver\",",
+            "                              \"auth_type\":\"basic\",\"username\":\"admin\",",
+            "                              \"password\":\"...\"}'"),
         ImmutableList.of(
             "  --catalog rest_catalog --table db.sample --update-mode all \\",
+            "    --updater-options '{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",",
+            "    \"gravitino.optimizer.jdbcMetrics.jdbcUrl\":\"jdbc:postgresql://localhost:5432/optimizer\",",
+            "    \"gravitino.optimizer.jdbcMetrics.jdbcUser\":\"postgres\",",
+            "    \"gravitino.optimizer.jdbcMetrics.jdbcPassword\":\"...\",",
+            "    \"gravitino.optimizer.jdbcMetrics.jdbcDriver\":\"org.postgresql.Driver\"}' \\",
             "    --spark-conf '{\"spark.sql.catalog.rest_catalog\":\"org.apache.iceberg.spark.SparkCatalog\",",
             "    \"spark.sql.catalog.rest_catalog.type\":\"rest\",",
             "    \"spark.sql.catalog.rest_catalog.uri\":\"http://localhost:9001/iceberg\"}'"));

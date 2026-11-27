@@ -152,6 +152,20 @@ map the IRC authenticator to Iceberg `rest.auth.type` as below. Iceberg also def
 | `google`                 | Not supported yet | Iceberg Google REST auth; not a Gravitino IRC authenticator |
 | *(Kerberos)*             | Not supported yet | Documented: IRC does not support Kerberos                   |
 
+`rest.auth.*` only authenticates to Iceberg REST. For object-store tables when IRC withholds
+static keys (for example `s3-token`), also set vended credentials under this prefix yourself —
+TMS does not inject the header:
+
+```properties
+gravitino.maintenance.ircAuth.header.X-Iceberg-Access-Delegation = vended-credentials
+```
+
+That becomes `spark.sql.catalog.<catalog>.header.X-Iceberg-Access-Delegation=vended-credentials`
+in `spark_conf`. The same short key may also sit in policy `jobOptions`. See
+[Secured Gravitino and Iceberg REST](./optimizer.md#secured-gravitino-and-iceberg-rest-object-storage)
+and
+[Requesting vended credentials](../security/credential-vending.md#requesting-vended-credentials).
+
 **1. `none`** — IRC `simple` / no REST auth (default if the prefix is omitted):
 
 ```properties
@@ -234,16 +248,24 @@ Use CLI conf when the optimizer process talks to a secured server; use short nam
 `updater_options` when the update-stats Spark job (or `submit-update-stats-job` `runJob`) must
 authenticate. They are two surfaces for the same fields, not two auth systems.
 
-Iceberg REST catalog authentication is separate: set `rest.auth.*` in `spark-conf` for any built-in
+Iceberg REST catalog authentication is separate: set `rest.auth.*` in `spark_conf` for any built-in
 job that talks to a secured IRC (including update-stats). Expire-snapshots and rewrite-data-files
 do not read these Gravitino client auth fields. For Iceberg REST on object storage, set
 `warehouse_location` to the catalog name and put vended credentials (plus IRC `rest.auth.*` when
-required) in `spark_conf`. See
+required) in `spark_conf`. In-process TMS uses server
+`gravitino.maintenance.ircAuth.*` for the same catalog keys; the CLI /
+`gravitino.optimizer.jobSubmitterConfig` path puts the equivalent entries inside `spark_conf`
+JSON instead. See
+[Iceberg REST / Spark auth](./optimizer-configuration.md#iceberg-rest-spark-auth-gravitinomaintenanceircauth-arbitrary-passthrough)
+and
 [Secured Gravitino and Iceberg REST](./optimizer.md#secured-gravitino-and-iceberg-rest-object-storage).
 
 Passwords and OAuth credentials in `updater_options` (and secrets in `spark_conf`) travel with
-the job command line and `jobConf`; avoid logging raw `jobConf` (the submit-update-stats CLI
-redacts them in DRY-RUN / SUBMIT output).
+the job command line and `jobConf`; avoid logging raw `jobConf`. The submit-update-stats CLI
+redacts credential-like keys in DRY-RUN / SUBMIT output with the same keyword substring matching
+as [`gravitino.secret.sensitiveKeyKeywords`](../gravitino-server-config.md#sensitive-property-key-matching)
+(default keywords include `password`, `token`, and `credential`), so names such as
+`gravitino.optimizer.jdbcMetrics.jdbcPassword` are masked.
 
 Everything under `gravitino.optimizer.jobSubmitterConfig.` becomes the `jobConf` of jobs this CLI submits, so the two layers carry the same keys under different names.
 
@@ -262,7 +284,7 @@ A direct job submission carries its own `jobConf`. This is `builtin-iceberg-upda
   "catalog_name": "rest_catalog",
   "table_identifier": "db.t1",
   "update_mode": "all",
-  "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\",\"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}",
+  "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\",\"gravitino.optimizer.jdbcMetrics.jdbcUrl\":\"jdbc:postgresql://localhost:5432/optimizer\",\"gravitino.optimizer.jdbcMetrics.jdbcUser\":\"postgres\",\"gravitino.optimizer.jdbcMetrics.jdbcPassword\":\"postgres\",\"gravitino.optimizer.jdbcMetrics.jdbcDriver\":\"org.postgresql.Driver\",\"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}",
   "spark_conf": "{\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
   "spark_master": "local[2]",
   "spark_executor_instances": "1",

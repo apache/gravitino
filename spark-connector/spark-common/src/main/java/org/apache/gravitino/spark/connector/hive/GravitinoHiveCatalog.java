@@ -202,6 +202,11 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   }
 
   @Override
+  protected boolean supportsSparkViews() {
+    return true;
+  }
+
+  @Override
   protected org.apache.spark.sql.connector.catalog.Table createSparkView(
       Identifier ident,
       View gravitinoView,

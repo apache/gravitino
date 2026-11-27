@@ -155,7 +155,6 @@ public class IcebergViewOperations {
       CreateViewRequest createViewRequest,
       @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
       @Context UriInfo uriInfo) {
-    IcebergRESTUtils.validateRequest(createViewRequest, "CreateViewRequest");
     return idempotencyManager.replayOrExecute(
         idempotencyKey,
         IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
@@ -164,15 +163,17 @@ public class IcebergViewOperations {
 
   private Response doCreateView(
       String prefix, String namespace, CreateViewRequest createViewRequest) {
-    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS =
-        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
-    LOG.info(
-        "Create Iceberg view, catalog: {}, namespace: {}, createViewRequest: {}",
-        catalogName,
-        icebergNS,
-        createViewRequest);
     try {
+      IcebergRESTUtils.validateRequest(createViewRequest, "CreateViewRequest");
+      String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+      Namespace icebergNS =
+          RESTUtil.decodeNamespace(
+              namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+      LOG.info(
+          "Create Iceberg view, catalog: {}, namespace: {}, createViewRequest: {}",
+          catalogName,
+          icebergNS,
+          createViewRequest);
       return Utils.doAs(
           httpRequest,
           () -> {
@@ -248,7 +249,6 @@ public class IcebergViewOperations {
       UpdateTableRequest replaceViewRequest,
       @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
       @Context UriInfo uriInfo) {
-    IcebergRESTUtils.validateRequest(replaceViewRequest, "UpdateTableRequest");
     return idempotencyManager.replayOrExecute(
         idempotencyKey,
         IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
@@ -257,17 +257,19 @@ public class IcebergViewOperations {
 
   private Response doReplaceView(
       String prefix, String namespace, String view, UpdateTableRequest replaceViewRequest) {
-    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS =
-        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
-    String viewName = RESTUtil.decodeString(view);
-    LOG.info(
-        "Replace Iceberg view, catalog: {}, namespace: {}, view: {}, replaceViewRequest: {}",
-        catalogName,
-        icebergNS,
-        viewName,
-        SerializeReplaceViewRequest(replaceViewRequest));
     try {
+      IcebergRESTUtils.validateRequest(replaceViewRequest, "UpdateTableRequest");
+      String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+      Namespace icebergNS =
+          RESTUtil.decodeNamespace(
+              namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+      String viewName = RESTUtil.decodeString(view);
+      LOG.info(
+          "Replace Iceberg view, catalog: {}, namespace: {}, view: {}, replaceViewRequest: {}",
+          catalogName,
+          icebergNS,
+          viewName,
+          SerializeReplaceViewRequest(replaceViewRequest));
       return Utils.doAs(
           httpRequest,
           () -> {

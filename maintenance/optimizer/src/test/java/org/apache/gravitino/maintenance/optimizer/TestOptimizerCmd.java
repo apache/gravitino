@@ -561,6 +561,29 @@ class TestOptimizerCmd {
   }
 
   @Test
+  void testSubmitUpdateStatsJobRequiresJdbcUrlForMetricsMode() throws Exception {
+    Path confPath = createOptimizerConfForSubmitUpdateStatsJob();
+    String[] output =
+        runCommand(
+            "--type",
+            "submit-update-stats-job",
+            "--identifiers",
+            "rest.ab.t1",
+            "--update-mode",
+            "metrics",
+            "--updater-options",
+            "{\"gravitino_uri\":\""
+                + configsServerUri
+                + "\",\"metrics_updater\":\"custom-metrics-updater\"}",
+            "--dry-run",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(
+        output[1].contains("gravitino.optimizer.jdbcMetrics.jdbcUrl"),
+        "stderr=" + output[1] + ", stdout=" + output[0]);
+  }
+
+  @Test
   void testSubmitUpdateStatsJobRequiresSparkConf() throws Exception {
     Path confPath = createOptimizerConfForSubmitUpdateStatsWithoutSparkConf();
     String[] output =
@@ -590,7 +613,12 @@ class TestOptimizerCmd {
             "--updater-options",
             "{\"gravitino_uri\":\""
                 + configsServerUri
-                + "\",\"metrics_updater\":\"custom-metrics-updater\"}",
+                + "\",\"metrics_updater\":\"custom-metrics-updater\","
+                + "\"gravitino.optimizer.jdbcMetrics.jdbcUrl\":"
+                + "\"jdbc:postgresql://localhost:5432/optimizer\","
+                + "\"gravitino.optimizer.jdbcMetrics.jdbcUser\":\"postgres\","
+                + "\"gravitino.optimizer.jdbcMetrics.jdbcPassword\":\"postgres\","
+                + "\"gravitino.optimizer.jdbcMetrics.jdbcDriver\":\"org.postgresql.Driver\"}",
             "--spark-conf",
             "{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
                 + "\"spark.sql.catalog.rest.type\":\"rest\","

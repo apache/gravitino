@@ -54,7 +54,6 @@ import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.secret.SupportsSecrets;
-import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -203,7 +202,7 @@ public class TestBaseGVFSOperationsSecrets {
   }
 
   @Test
-  public void testOmitsStaticCredentialKeysFromRestProperties() throws Exception {
+  public void testOmitsMaskedPropertyValuesFromRestProperties() throws Exception {
     Configuration conf = new Configuration();
     conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
     conf.set(
@@ -243,10 +242,12 @@ public class TestBaseGVFSOperationsSecrets {
     Map<String, String> all =
         ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
 
-    assertFalse(all.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
-    assertEquals("http://s3.example.com", all.get("s3-endpoint"));
+    // Masked placeholder dropped; local conf supplies the access key.
     assertEquals("local-access-key", all.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertFalse("******".equals(all.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID)));
+    // Plaintext in properties is kept (GVFS does not re-apply the server static-key denylist).
+    assertEquals("secret-from-rest", all.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    assertEquals("http://s3.example.com", all.get("s3-endpoint"));
   }
 
   @Test
@@ -260,9 +261,9 @@ public class TestBaseGVFSOperationsSecrets {
         mockCatalogWithCredentials(
             Map.of(
                 S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
-                CloudStorageCredentialPropertyKeys.MASKED_PROPERTY_VALUE,
+                "******",
                 S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
-                CloudStorageCredentialPropertyKeys.MASKED_PROPERTY_VALUE,
+                "******",
                 "s3-endpoint",
                 "http://s3.example.com"),
             credentials);

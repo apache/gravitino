@@ -41,10 +41,12 @@ export const getSemanticModelsApi = (params, options) => {
   )
 }
 
-export const getSemanticModelDetailsApi = ({ metalake, catalog, schema, semanticModel }, options) => {
+export const getSemanticModelDetailsApi = ({ metalake, catalog, schema, semanticModel, revision }, options) => {
+  const model = Apis.GET_DETAIL({ metalake, catalog, schema, semanticModel })
+
   return defHttp.get(
     {
-      url: `${Apis.GET_DETAIL({ metalake, catalog, schema, semanticModel })}`
+      url: revision ? `${model}/revisions/${encodeURIComponent(revision)}` : model
     },
     options
   )

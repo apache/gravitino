@@ -193,12 +193,16 @@ public class TestSQLScripts extends TestJDBCBackend {
             "(?:iceberg|optimizer)-metrics-schema-([\\d.]+)-"
                 + backendType.toLowerCase()
                 + "\\.sql");
+    Pattern icebergJdbcPattern =
+        Pattern.compile("iceberg-jdbc-schema-" + backendType.toLowerCase() + "\\.sql");
 
     Map<String, List<File>> versionScrips = new HashMap<>();
+    List<File> icebergJdbcScripts = new ArrayList<>();
     for (File scriptFile : scriptFiles) {
       Matcher schemaMatcher = schemaPattern.matcher(scriptFile.getName());
       Matcher upgradeMatcher = upgradePattern.matcher(scriptFile.getName());
       Matcher metricsMatcher = metricsPattern.matcher(scriptFile.getName());
+      Matcher icebergJdbcMatcher = icebergJdbcPattern.matcher(scriptFile.getName());
 
       if (schemaMatcher.matches()) {
         String version = schemaMatcher.group(1);
@@ -213,6 +217,9 @@ public class TestSQLScripts extends TestJDBCBackend {
         String version = metricsMatcher.group(1);
         versionScrips.computeIfAbsent(version, k -> new ArrayList<>()).add(scriptFile);
 
+      } else if (icebergJdbcMatcher.matches()) {
+        icebergJdbcScripts.add(scriptFile);
+
       } else {
         Assertions.fail("Unrecognized script file name: " + scriptFile.getName());
       }
@@ -225,8 +232,18 @@ public class TestSQLScripts extends TestJDBCBackend {
       }
       if ("2.0.0".equals(versionScripts.getKey())) {
         assertCleanupIndexes("schema " + versionScripts.getKey());
+        assertLiveRowIndexes("schema " + versionScripts.getKey());
         assertNameColumnWidths("schema " + versionScripts.getKey());
+        assertIdempotencySchema("schema " + versionScripts.getKey());
       }
+    }
+
+    Assertions.assertFalse(
+        icebergJdbcScripts.isEmpty(),
+        "No standalone Iceberg JDBC schema script found for " + backendType);
+    for (File scriptFile : icebergJdbcScripts) {
+      dropAllTables();
+      executeScript(scriptFile);
     }
   }
 
@@ -259,7 +276,9 @@ public class TestSQLScripts extends TestJDBCBackend {
       executeScript(upgradeScript);
       if ("2.0.0".equals(upgradeMatcher.group(2))) {
         assertCleanupIndexes(upgradeScript.getName());
+        assertLiveRowIndexes(upgradeScript.getName());
         assertNameColumnWidths(upgradeScript.getName());
+        assertIdempotencySchema(upgradeScript.getName());
       }
     }
   }
@@ -840,6 +859,33 @@ public class TestSQLScripts extends TestJDBCBackend {
     }
   }
 
+  private void assertIdempotencySchema(String source) throws SQLException {
+    Map<String, Set<String>> columns = readSchemaColumns();
+    String table =
+        columns.keySet().stream()
+            .filter(name -> name.equalsIgnoreCase("iceberg_idempotency_meta"))
+            .findFirst()
+            .orElseThrow(
+                () -> new AssertionFailedError("Missing idempotency table after " + source));
+    Assertions.assertEquals(
+        Set.of(
+            "idempotency_key",
+            "http_method",
+            "request_uri",
+            "http_status",
+            "response_summary",
+            "audit_info",
+            "created_at",
+            "expires_at"),
+        Set.copyOf(columns.get(table).stream().map(name -> name.toLowerCase(Locale.ROOT)).toList()),
+        "Idempotency columns after " + source);
+    Assertions.assertTrue(
+        readSchemaIndexes(Set.of(table)).stream()
+            .anyMatch(
+                index -> index.equalsIgnoreCase(table + ":idx_iim_expires:1:expires_at:true")),
+        "Missing idempotency expiry index after " + source);
+  }
+
   private void assertCleanupIndexes(String source) throws SQLException {
     Map<String, String> leadingColumns =
         Map.of(
@@ -868,6 +914,52 @@ public class TestSQLScripts extends TestJDBCBackend {
         }
         Assertions.assertTrue(
             indexed, "No index leading with " + column + " on " + table + " after " + source);
+      }
+    }
+  }
+
+  private void assertLiveRowIndexes(String source) throws SQLException {
+    boolean partialIndex = "postgresql".equals(backendType);
+    Map<String, List<String>> lookupColumns =
+        Map.of(
+            "user_meta", List.of("metalake_id"),
+            "role_meta", List.of("metalake_id"),
+            "tag_meta", List.of("metalake_id"),
+            "policy_meta", List.of("metalake_id"),
+            "role_meta_securable_object", List.of("metadata_object_id", "type"),
+            "tag_relation_meta", List.of("metadata_object_id", "metadata_object_type"),
+            "user_role_rel", List.of("role_id"),
+            "policy_tag_relation_meta", List.of("tag_id"));
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection()) {
+      DatabaseMetaData metaData = connection.getMetaData();
+      for (Map.Entry<String, List<String>> entry : lookupColumns.entrySet()) {
+        String table = entry.getKey();
+        String index = "idx_" + table + "_live";
+        String tableName =
+            metaData.storesUpperCaseIdentifiers() ? table.toUpperCase(Locale.ROOT) : table;
+        List<String> expectedKeys = new ArrayList<>(entry.getValue());
+        if (!partialIndex) {
+          expectedKeys.add("deleted_at");
+        }
+        List<String> keys = new ArrayList<>();
+        try (ResultSet rows =
+            metaData.getIndexInfo(
+                connection.getCatalog(), connection.getSchema(), tableName, false, false)) {
+          while (rows.next()) {
+            if (index.equalsIgnoreCase(rows.getString("INDEX_NAME"))) {
+              if (partialIndex) {
+                Assertions.assertEquals(
+                    "(deleted_at = 0)",
+                    rows.getString("FILTER_CONDITION"),
+                    index + " after " + source);
+              }
+              keys.add(rows.getString("COLUMN_NAME").toLowerCase(Locale.ROOT));
+            }
+          }
+        }
+        Assertions.assertEquals(expectedKeys, keys, index + " after " + source);
       }
     }
   }

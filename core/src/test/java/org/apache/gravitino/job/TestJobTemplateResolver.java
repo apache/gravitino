@@ -295,11 +295,21 @@ public class TestJobTemplateResolver {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new JobTemplateResolver(entity).checkJobConf(null));
 
-    // Optional parameters and unused keys don't fail the check.
+    // Optional parameters with a value, including empty string, are fine.
     Assertions.assertDoesNotThrow(
         () ->
             new JobTemplateResolver(entity)
-                .checkJobConf(ImmutableMap.of("table", "t", "target", "", "unused", "x")));
+                .checkJobConf(ImmutableMap.of("table", "t", "target", "")));
+
+    IllegalArgumentException unused =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new JobTemplateResolver(entity)
+                    .checkJobConf(ImmutableMap.of("table", "t", "target", "", "unused", "x")));
+    Assertions.assertTrue(unused.getMessage().contains("[unused]"), unused.getMessage());
+    Assertions.assertTrue(
+        unused.getMessage().contains("[mode, table, target]"), unused.getMessage());
   }
 
   @Test

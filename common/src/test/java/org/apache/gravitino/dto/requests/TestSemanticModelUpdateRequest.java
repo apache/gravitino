@@ -36,71 +36,76 @@ public class TestSemanticModelUpdateRequest {
   @Test
   public void testAllUpdateTypesSerDeValidateAndConvert() throws JsonProcessingException {
     String json =
-        "{\"updates\":["
-            + "{\"@type\":\"rename\",\"newName\":\"sales_v2\"},"
-            + "{\"@type\":\"updateComment\",\"newComment\":null},"
-            + "{\"@type\":\"setProperty\",\"property\":\"owner\",\"value\":\"finance\"},"
-            + "{\"@type\":\"removeProperty\",\"property\":\"legacy\"},"
-            + "{\"@type\":\"replaceDefinition\",\"definition\":{"
-            + "\"datasets\":[{\"name\":\"orders\","
-            + "\"source\":{\"namespace\":[\"sales\",\"mart\"],\"name\":\"orders\"}}],"
-            + "\"relationships\":[],\"metrics\":[],\"customExtensions\":[]}}"
-            + "]}";
-
+        """
+        {"expectedRevision": 4, "updates":[
+          {"@type":"updateComment","newComment":null},
+          {"@type":"setProperty","property":"owner","value":"finance"},
+          {"@type":"removeProperty","property":"legacy"},
+          {"@type":"replaceDefinition","definition":{
+            "datasets":[{"name":"orders","source":{"namespace":["sales","mart"],"name":"orders"}}],
+            "relationships":[],"metrics":[],"customExtensions":[]}}
+        ]}
+        """;
     SemanticModelUpdatesRequest request =
         JsonUtils.objectMapper().readValue(json, SemanticModelUpdatesRequest.class);
     request.validate();
+    assertEquals(4, request.getExpectedRevision());
 
-    assertInstanceOf(
-        SemanticModelUpdateRequest.RenameSemanticModelRequest.class, request.getUpdates().get(0));
-    assertInstanceOf(
-        SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest.class,
-        request.getUpdates().get(1));
-    assertInstanceOf(
-        SemanticModelUpdateRequest.SetSemanticModelPropertyRequest.class,
-        request.getUpdates().get(2));
-    assertInstanceOf(
-        SemanticModelUpdateRequest.RemoveSemanticModelPropertyRequest.class,
-        request.getUpdates().get(3));
-    assertInstanceOf(
-        SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest.class,
-        request.getUpdates().get(4));
-
-    SemanticModelChange.RenameSemanticModel rename =
-        (SemanticModelChange.RenameSemanticModel) request.getUpdates().get(0).semanticModelChange();
-    assertEquals("sales_v2", rename.getNewName());
     SemanticModelChange.UpdateComment updateComment =
-        (SemanticModelChange.UpdateComment) request.getUpdates().get(1).semanticModelChange();
+        assertInstanceOf(
+            SemanticModelChange.UpdateComment.class,
+            request.getUpdates().get(0).semanticModelChange());
     assertNull(updateComment.getNewComment());
     SemanticModelChange.SetProperty setProperty =
-        (SemanticModelChange.SetProperty) request.getUpdates().get(2).semanticModelChange();
+        assertInstanceOf(
+            SemanticModelChange.SetProperty.class,
+            request.getUpdates().get(1).semanticModelChange());
     assertEquals("owner", setProperty.getProperty());
     assertEquals("finance", setProperty.getValue());
     SemanticModelChange.RemoveProperty removeProperty =
-        (SemanticModelChange.RemoveProperty) request.getUpdates().get(3).semanticModelChange();
+        assertInstanceOf(
+            SemanticModelChange.RemoveProperty.class,
+            request.getUpdates().get(2).semanticModelChange());
     assertEquals("legacy", removeProperty.getProperty());
     SemanticModelChange.ReplaceDefinition replaceDefinition =
-        (SemanticModelChange.ReplaceDefinition) request.getUpdates().get(4).semanticModelChange();
+        assertInstanceOf(
+            SemanticModelChange.ReplaceDefinition.class,
+            request.getUpdates().get(3).semanticModelChange());
     assertEquals("orders", replaceDefinition.getDefinition().datasets()[0].name());
     assertEquals(0, replaceDefinition.getDefinition().relationships().length);
 
     JsonNode serialized =
         JsonUtils.objectMapper().readTree(JsonUtils.objectMapper().writeValueAsString(request));
-    assertEquals("rename", serialized.path("updates").get(0).path("@type").textValue());
-    assertEquals("updateComment", serialized.path("updates").get(1).path("@type").textValue());
-    assertEquals("setProperty", serialized.path("updates").get(2).path("@type").textValue());
-    assertEquals("removeProperty", serialized.path("updates").get(3).path("@type").textValue());
-    assertEquals("replaceDefinition", serialized.path("updates").get(4).path("@type").textValue());
+    assertEquals(4, serialized.path("expectedRevision").asInt());
+    assertEquals("updateComment", serialized.path("updates").get(0).path("@type").textValue());
+    assertEquals("setProperty", serialized.path("updates").get(1).path("@type").textValue());
+    assertEquals("removeProperty", serialized.path("updates").get(2).path("@type").textValue());
+    assertEquals("replaceDefinition", serialized.path("updates").get(3).path("@type").textValue());
     assertEquals(
         "orders",
         serialized
             .path("updates")
-            .get(4)
+            .get(3)
             .path("definition")
             .path("datasets")
             .get(0)
             .path("name")
             .textValue());
+  }
+
+  @Test
+  void testRenameRequestRoundTrip() throws JsonProcessingException {
+    String json = "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"sales_v2\"}]}";
+    SemanticModelUpdatesRequest request =
+        JsonUtils.objectMapper().readValue(json, SemanticModelUpdatesRequest.class);
+    request.validate();
+    SemanticModelChange.RenameSemanticModel rename =
+        assertInstanceOf(
+            SemanticModelChange.RenameSemanticModel.class,
+            request.getUpdates().get(0).semanticModelChange());
+    assertEquals("sales_v2", rename.getNewName());
+    assertEquals(
+        JsonUtils.objectMapper().readTree(json), JsonUtils.objectMapper().valueToTree(request));
   }
 
   @Test
@@ -144,7 +149,7 @@ public class TestSemanticModelUpdateRequest {
         ((SemanticModelChange.UpdateComment) emptyComment.semanticModelChange()).getNewComment());
 
     String nullDataset =
-        "{\"updates\":[{\"@type\":\"replaceDefinition\","
+        "{\"expectedRevision\":1,\"updates\":[{\"@type\":\"replaceDefinition\","
             + "\"definition\":{\"datasets\":[null]}}]}";
     SemanticModelUpdatesRequest request =
         JsonUtils.objectMapper().readValue(nullDataset, SemanticModelUpdatesRequest.class);
@@ -156,7 +161,7 @@ public class TestSemanticModelUpdateRequest {
   @Test
   public void testReplaceDefinitionRejectsUnknownNestedFields() {
     String json =
-        "{\"updates\":[{\"@type\":\"replaceDefinition\",\"definition\":{"
+        "{\"expectedRevision\":1,\"updates\":[{\"@type\":\"replaceDefinition\",\"definition\":{"
             + "\"datasets\":[{\"name\":\"orders\","
             + "\"source\":{\"namespace\":[\"sales\",\"mart\"],\"name\":\"orders\"}}],"
             + "\"unknown\":true}}]}";

@@ -72,7 +72,19 @@ public class SparkJdbcTable extends SparkJdbcTableBase {
         () -> {});
   }
 
-  SparkJdbcTable(
+  /**
+   * Creates a JDBC table that validates its catalog connection before building scans and writes or
+   * accessing indexes.
+   *
+   * @param identifier the Spark table identifier
+   * @param gravitinoTable the Gravitino table metadata
+   * @param jdbcTable the physical Spark JDBC table
+   * @param propertiesConverter the catalog property mapping
+   * @param sparkTransformConverter the partition transform mapping
+   * @param sparkTypeConverter the catalog type mapping
+   * @param validateConnection the check for stale JDBC catalog settings
+   */
+  protected SparkJdbcTable(
       Identifier identifier,
       Table gravitinoTable,
       JDBCTable jdbcTable,

@@ -29,6 +29,7 @@ from gravitino.api.semantic.semantic_model_change import (
 )
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
 from gravitino.api.semantic.semantic_model_metric import SemanticModelMetric
+from gravitino.api.semantic.semantic_model_revision import SemanticModelRevision
 from gravitino.client.generic_semantic_model import GenericSemanticModel
 from gravitino.dto.requests.semantic_model_create_request import (
     SemanticModelCreateRequest,
@@ -44,6 +45,9 @@ from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.metric_info_list_response import MetricInfoListResponse
 from gravitino.dto.responses.semantic_model_response import SemanticModelResponse
+from gravitino.dto.responses.semantic_model_revision_list_response import (
+    SemanticModelRevisionListResponse,
+)
 from gravitino.dto.semantic.semantic_model_definition_dto import (
     SemanticModelDefinitionDTO,
 )
@@ -124,15 +128,33 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             for info in response.metrics()
         ]
 
-    def load_semantic_model(self, identifier: NameIdentifier) -> SemanticModel:
+    def load_semantic_model(
+        self, identifier: NameIdentifier, revision: Optional[int | str] = None
+    ) -> SemanticModel:
         self._check_semantic_model_name_identifier(identifier)
         full_namespace = self._get_semantic_model_full_namespace(identifier.namespace())
         resp = self._rest_client.get(
             f"{self._format_semantic_model_request_path(full_namespace)}"
-            f"/{encode_string(identifier.name())}",
+            f"/{encode_string(identifier.name())}{self._revision_path(revision)}",
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
         )
         return self._to_semantic_model(resp, full_namespace)
+
+    def list_semantic_model_revisions(
+        self, identifier: NameIdentifier
+    ) -> list[SemanticModelRevision]:
+        self._check_semantic_model_name_identifier(identifier)
+        full_namespace = self._get_semantic_model_full_namespace(identifier.namespace())
+        resp = self._rest_client.get(
+            f"{self._format_semantic_model_request_path(full_namespace)}"
+            f"/{encode_string(identifier.name())}/revisions",
+            error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
+        )
+        history = SemanticModelRevisionListResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        history.validate()
+        return list(history.revisions())
 
     def create_semantic_model(
         self,
@@ -178,14 +200,17 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
         return self._to_semantic_model(resp, full_namespace)
 
     def export_ossie_document(
-        self, identifier: NameIdentifier, document_format: str = "yaml"
+        self,
+        identifier: NameIdentifier,
+        document_format: str = "yaml",
+        revision: Optional[int | str] = None,
     ) -> str:
         self._check_semantic_model_name_identifier(identifier)
         media_type = self._ossie_media_type(document_format)
         full_namespace = self._get_semantic_model_full_namespace(identifier.namespace())
         resp = self._rest_client.get(
             f"{self._format_semantic_model_request_path(full_namespace)}"
-            f"/{encode_string(identifier.name())}/ossie",
+            f"/{encode_string(identifier.name())}{self._revision_path(revision)}/ossie",
             params={"format": document_format},
             headers={"Accept": media_type},
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
@@ -193,13 +218,17 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
         return resp.body.decode("utf-8")
 
     def alter_semantic_model(
-        self, identifier: NameIdentifier, *changes: SemanticModelChange
+        self,
+        identifier: NameIdentifier,
+        *changes: SemanticModelChange,
+        expected_revision: Optional[int] = None,
     ) -> SemanticModel:
         self._check_semantic_model_name_identifier(identifier)
         updates_request = SemanticModelUpdatesRequest(
             _updates=[
                 self._to_semantic_model_update_request(change) for change in changes
-            ]
+            ],
+            _expected_revision=expected_revision,
         )
         updates_request.validate()
 
@@ -223,6 +252,20 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
         drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
         drop_resp.validate()
         return drop_resp.dropped()
+
+    @classmethod
+    def _revision_path(cls, revision: Optional[int | str]) -> str:
+        if revision is None:
+            return ""
+        if revision == cls.LATEST_REVISION or (
+            isinstance(revision, int)
+            and not isinstance(revision, bool)
+            and revision > 0
+        ):
+            return f"/revisions/{revision}"
+        raise IllegalArgumentException(
+            "Revision must be a positive integer or 'latest'"
+        )
 
     @staticmethod
     def _ossie_media_type(document_format: str) -> str:

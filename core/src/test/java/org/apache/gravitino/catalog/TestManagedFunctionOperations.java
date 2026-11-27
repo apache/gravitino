@@ -505,10 +505,15 @@ public class TestManagedFunctionOperations {
     functionOperations.registerFunction(
         funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
 
-    // Try to remove the only definition - should fail
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> functionOperations.alterFunction(funcIdent, FunctionChange.removeDefinition(params)));
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                functionOperations.alterFunction(
+                    funcIdent, FunctionChange.removeDefinition(params)));
+    Assertions.assertEquals(
+        "Cannot remove the only definition. Use dropFunction to remove the entire function.",
+        error.getMessage());
   }
 
   @Test
@@ -525,11 +530,15 @@ public class TestManagedFunctionOperations {
     FunctionParam[] nonExistingParams =
         new FunctionParam[] {FunctionParams.of("x", Types.StringType.get())};
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            functionOperations.alterFunction(
-                funcIdent, FunctionChange.removeDefinition(nonExistingParams)));
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                functionOperations.alterFunction(
+                    funcIdent, FunctionChange.removeDefinition(nonExistingParams)));
+    Assertions.assertEquals(
+        "Cannot remove definition: no definition found with the specified parameters",
+        error.getMessage());
   }
 
   @Test

@@ -18,20 +18,25 @@
  */
 package org.apache.gravitino.server.authorization.jcasbin;
 
+import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Function;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
@@ -39,9 +44,13 @@ import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tag.TagAssignmentAuthorization;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -49,6 +58,76 @@ import org.mockito.MockedStatic;
 
 /** Tests for {@link JcasbinAuthorizationLookups}. */
 public class TestJcasbinAuthorizationLookups {
+
+  @Test
+  void testTableIdColdWarmAndInvalidatedCacheAvoidFullReads() throws Exception {
+    RelationalEntityStore store = mock(RelationalEntityStore.class);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.entityStore()).thenReturn(store);
+    NameIdentifier ident = NameIdentifier.of("ml", "cat", "sch", "tbl");
+    MetadataObject table = MetadataObjects.parse("cat.sch.tbl", MetadataObject.Type.TABLE);
+    when(store.getTableId(ident)).thenReturn(42L, 43L);
+    try (CaffeineGravitinoCache<String, Long> ids = new CaffeineGravitinoCache<>(60_000L, 100L);
+        CaffeineGravitinoCache<Long, Optional<OwnerInfo>> owners =
+            new CaffeineGravitinoCache<>(60_000L, 100L);
+        MockedStatic<GravitinoEnv> mockedEnv = mockStatic(GravitinoEnv.class);
+        MockedStatic<MetadataIdConverter> converter =
+            mockStatic(MetadataIdConverter.class, CALLS_REAL_METHODS)) {
+      mockedEnv.when(GravitinoEnv::getInstance).thenReturn(env);
+      converter
+          .when(() -> MetadataIdConverter.normalizeMetadataObject(table, "ml"))
+          .thenReturn(table);
+      JcasbinAuthorizationLookups lookups = new JcasbinAuthorizationLookups(ids, owners);
+      AuthorizationRequestContext first = new AuthorizationRequestContext();
+      Assertions.assertEquals(Optional.of(42L), lookups.resolveMetadataId(table, "ml", first));
+      Assertions.assertEquals(Optional.of(42L), lookups.resolveMetadataId(table, "ml", first));
+      Assertions.assertEquals(
+          Optional.of(42L),
+          lookups.resolveMetadataId(table, "ml", new AuthorizationRequestContext()));
+      verify(store, times(1)).getTableId(ident);
+      ids.invalidateAll();
+      Assertions.assertEquals(
+          Optional.of(43L),
+          lookups.resolveMetadataId(table, "ml", new AuthorizationRequestContext()));
+      verify(store, times(2)).getTableId(ident);
+      verifyNoMoreInteractions(store);
+    }
+  }
+
+  @Test
+  void testScopedSchemaAncestorIdentity() {
+    MetadataObject schema = MetadataObjects.parse("cat1.outer", MetadataObject.Type.SCHEMA);
+    NameIdentifier schemaIdentifier = NameIdentifier.of("ml1", "cat1", "outer");
+    CountingCache<String, Long> metadataIdCache = new CountingCache<>(100L);
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(metadataIdCache, new CountingCache<>());
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.catalogManager()).thenReturn(catalogs);
+    try (MockedStatic<GravitinoEnv> envMock = mockStatic(GravitinoEnv.class);
+        TagAssignmentAuthorization scope = TagAssignmentAuthorization.open()) {
+      envMock.when(GravitinoEnv::getInstance).thenReturn(env);
+      TagAssignmentAuthorization.recordTarget(
+          NameIdentifier.of("ml1", "cat1", "outer:inner"), Entity.EntityType.SCHEMA, null);
+      TagAssignmentAuthorization.recordSchemaAncestor(
+          schemaIdentifier, new NamespacedEntityId(100L, 1L, 2L));
+      Assertions.assertEquals(
+          Optional.of(100L),
+          lookups.resolveMetadataId(schema, "ml1", new AuthorizationRequestContext()));
+      assertScopedSchemaLookupFails(
+          lookups, schema, schemaIdentifier, new NamespacedEntityId(101L, 1L, 2L));
+      assertScopedSchemaLookupFails(lookups, schema, schemaIdentifier, null);
+    }
+  }
 
   @Test
   void testResolveMetadataIdUsesAtomicSharedCacheAndRequestDedup() {
@@ -208,6 +287,22 @@ public class TestJcasbinAuthorizationLookups {
     }
 
     verify(ownerMetaMapper, times(1)).selectOwnerByMetadataObjectIdAndType(100L, "TABLE");
+  }
+
+  private static void assertScopedSchemaLookupFails(
+      JcasbinAuthorizationLookups lookups,
+      MetadataObject schema,
+      NameIdentifier schemaIdentifier,
+      @Nullable NamespacedEntityId recordedAncestor) {
+    try (TagAssignmentAuthorization nested = TagAssignmentAuthorization.open()) {
+      TagAssignmentAuthorization.recordTarget(
+          NameIdentifier.of("ml1", "cat1", "outer:inner"), Entity.EntityType.SCHEMA, null);
+      TagAssignmentAuthorization.recordSchemaAncestor(schemaIdentifier, recordedAncestor);
+      JcasbinAuthorizationLookups.MetadataIdResolution resolution =
+          lookups.resolveMetadataIdResult(schema, "ml1", new AuthorizationRequestContext());
+      Assertions.assertEquals(Optional.empty(), resolution.metadataId());
+      Assertions.assertTrue(resolution.normalizationFailed());
+    }
   }
 
   private static class CountingCache<K, V> implements GravitinoCache<K, V> {

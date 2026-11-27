@@ -196,11 +196,12 @@ public class FilesetCatalogAuthorizationCredentialIT extends BaseIT {
     GravitinoMetalake normalUserMetalake = normalUserClient.loadMetalake(metalakeName);
     Catalog catalog = normalUserMetalake.loadCatalog(catalogName);
     MetadataObject object = MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG);
-    assertThrows(ForbiddenException.class, () -> catalog.supportsCredentials().getCredentials());
+    // Metadata access alone soft-filters static catalog credentials to empty (not 403).
+    Assertions.assertEquals(0, catalog.supportsCredentials().getCredentials().length);
     try {
       metalake.grantPrivilegesToRole(
           ROLE_NAME, object, ImmutableSet.of(Privileges.UseSecrets.allow()));
-      assertThrows(ForbiddenException.class, () -> catalog.supportsCredentials().getCredentials());
+      Assertions.assertEquals(0, catalog.supportsCredentials().getCredentials().length);
       metalake.grantPrivilegesToRole(
           ROLE_NAME, object, ImmutableSet.of(Privileges.IncludeCredentialSecrets.allow()));
       Assertions.assertTrue(catalog.supportsCredentials().getCredentials().length > 0);

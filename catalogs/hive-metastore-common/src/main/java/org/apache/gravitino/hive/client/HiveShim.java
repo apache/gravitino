@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.hive.client;
 
+import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.hive.client.Util.updateConfigurationFromProperties;
 
 import java.lang.reflect.Constructor;
@@ -27,6 +28,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import javax.annotation.Nullable;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
@@ -183,6 +185,40 @@ public abstract class HiveShim {
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.table(tableName));
     }
+  }
+
+  /**
+   * Reads the identifier using a single metastore table request, without resolving the schema.
+   *
+   * @param catalogName the Hive catalog name
+   * @param databaseName the database name
+   * @param tableName the table name
+   * @return the identifier property, or null if the existing table has none
+   */
+  @Nullable
+  public String getTableIdentifier(String catalogName, String databaseName, String tableName) {
+    Table table;
+    try {
+      table = client.getTable(databaseName, tableName);
+    } catch (Exception e) {
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.table(tableName));
+    }
+    return tableIdentifier(table, tableName);
+  }
+
+  /**
+   * Extracts the identifier from a table and rejects views, as the table load path does.
+   *
+   * @param table the live metastore table
+   * @param tableName the requested table name
+   * @return the identifier property, or null if absent
+   */
+  @Nullable
+  protected String tableIdentifier(Table table, String tableName) {
+    if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(table.getTableType())) {
+      throw new NoSuchTableException("Table %s is a view, not a table", tableName);
+    }
+    return table.getParameters() == null ? null : table.getParameters().get(ID_KEY);
   }
 
   public void alterTable(

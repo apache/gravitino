@@ -264,7 +264,6 @@ public class IcebergNamespaceOperations {
           CreateNamespaceRequest createNamespaceRequest,
       @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
       @Context UriInfo uriInfo) {
-    IcebergRESTUtils.validateRequest(createNamespaceRequest, "CreateNamespaceRequest");
     return idempotencyManager.replayOrExecute(
         idempotencyKey,
         IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
@@ -272,12 +271,13 @@ public class IcebergNamespaceOperations {
   }
 
   private Response doCreateNamespace(String prefix, CreateNamespaceRequest createNamespaceRequest) {
-    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    LOG.info(
-        "Create Iceberg namespace, catalog: {}, createNamespaceRequest: {}",
-        catalogName,
-        createNamespaceRequest);
     try {
+      IcebergRESTUtils.validateRequest(createNamespaceRequest, "CreateNamespaceRequest");
+      String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+      LOG.info(
+          "Create Iceberg namespace, catalog: {}, createNamespaceRequest: {}",
+          catalogName,
+          createNamespaceRequest);
       return Utils.doAs(
           httpRequest,
           () -> {
@@ -307,8 +307,6 @@ public class IcebergNamespaceOperations {
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest,
       @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
       @Context UriInfo uriInfo) {
-    IcebergRESTUtils.validateRequest(
-        updateNamespacePropertiesRequest, "UpdateNamespacePropertiesRequest");
     return idempotencyManager.replayOrExecute(
         idempotencyKey,
         IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
@@ -319,15 +317,18 @@ public class IcebergNamespaceOperations {
       String prefix,
       String namespace,
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
-    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS =
-        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
-    LOG.info(
-        "Update Iceberg namespace, catalog: {}, namespace: {}, updateNamespacePropertiesRequest: {}",
-        catalogName,
-        icebergNS,
-        SerializeUpdateNamespacePropertiesRequest(updateNamespacePropertiesRequest));
     try {
+      IcebergRESTUtils.validateRequest(
+          updateNamespacePropertiesRequest, "UpdateNamespacePropertiesRequest");
+      String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+      Namespace icebergNS =
+          RESTUtil.decodeNamespace(
+              namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+      LOG.info(
+          "Update Iceberg namespace, catalog: {}, namespace: {}, updateNamespacePropertiesRequest: {}",
+          catalogName,
+          icebergNS,
+          SerializeUpdateNamespacePropertiesRequest(updateNamespacePropertiesRequest));
       return Utils.doAs(
           httpRequest,
           () -> {
@@ -363,7 +364,6 @@ public class IcebergNamespaceOperations {
       @HeaderParam(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
       @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
       @Context UriInfo uriInfo) {
-    IcebergRESTUtils.validateRequest(registerTableRequest, "RegisterTableRequest");
     return idempotencyManager.replayOrExecute(
         idempotencyKey,
         IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
@@ -375,19 +375,21 @@ public class IcebergNamespaceOperations {
       String namespace,
       RegisterTableRequest registerTableRequest,
       String accessDelegation) {
-    boolean isCredentialVending = IcebergTableOperations.isCredentialVending(accessDelegation);
-    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS =
-        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
-    LOG.info(
-        "Register Iceberg table, catalog: {}, namespace: {}, registerTableRequest: {}, "
-            + "accessDelegation: {}, isCredentialVending: {}",
-        catalogName,
-        icebergNS,
-        registerTableRequest,
-        accessDelegation,
-        isCredentialVending);
     try {
+      IcebergRESTUtils.validateRequest(registerTableRequest, "RegisterTableRequest");
+      boolean isCredentialVending = IcebergTableOperations.isCredentialVending(accessDelegation);
+      String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+      Namespace icebergNS =
+          RESTUtil.decodeNamespace(
+              namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+      LOG.info(
+          "Register Iceberg table, catalog: {}, namespace: {}, registerTableRequest: {}, "
+              + "accessDelegation: {}, isCredentialVending: {}",
+          catalogName,
+          icebergNS,
+          registerTableRequest,
+          accessDelegation,
+          isCredentialVending);
       return Utils.doAs(
           httpRequest,
           () -> {
@@ -418,7 +420,6 @@ public class IcebergNamespaceOperations {
       RegisterViewRequest registerViewRequest,
       @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
       @Context UriInfo uriInfo) {
-    IcebergRESTUtils.validateRequest(registerViewRequest, "RegisterViewRequest");
     return idempotencyManager.replayOrExecute(
         idempotencyKey,
         IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
@@ -427,15 +428,17 @@ public class IcebergNamespaceOperations {
 
   private Response doRegisterView(
       String prefix, String namespace, RegisterViewRequest registerViewRequest) {
-    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS =
-        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
-    LOG.info(
-        "Register Iceberg view, catalog: {}, namespace: {}, registerViewRequest: {}",
-        catalogName,
-        icebergNS,
-        registerViewRequest);
     try {
+      IcebergRESTUtils.validateRequest(registerViewRequest, "RegisterViewRequest");
+      String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+      Namespace icebergNS =
+          RESTUtil.decodeNamespace(
+              namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+      LOG.info(
+          "Register Iceberg view, catalog: {}, namespace: {}, registerViewRequest: {}",
+          catalogName,
+          icebergNS,
+          registerViewRequest);
       return Utils.doAs(
           httpRequest,
           () -> {

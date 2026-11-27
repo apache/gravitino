@@ -24,6 +24,7 @@ import org.apache.gravitino.dto.responses.BulkError;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
 
@@ -70,6 +71,8 @@ public class BulkManager {
       return ErrorConstants.FORBIDDEN_CODE;
     } else if (e instanceof NotInUseException) {
       return ErrorConstants.NOT_IN_USE_CODE;
+    } else if (e instanceof InUseException) {
+      return ErrorConstants.IN_USE_CODE;
     }
     return ErrorConstants.INTERNAL_ERROR_CODE;
   }

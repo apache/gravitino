@@ -24,7 +24,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.lang3.StringUtils;
@@ -65,13 +64,8 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
       submitterConfigs = Collections.emptyMap();
     }
     String catalogName = sparkCatalogName(submitterConfigs, jobContext);
-    Map<String, String> config = new LinkedHashMap<>();
-    config.putAll(
-        IcebergSparkConfigUtils.resolveTemplateSparkPlaceholders(
-            catalogName,
-            IcebergSparkConfigUtils.parseFlatJsonMap(
-                submitterConfigs.get("spark_conf"), "spark-conf"),
-            submitterConfigs));
+    Map<String, String> config =
+        IcebergSparkConfigUtils.buildIcebergTemplateSubmitterParams(catalogName, submitterConfigs);
     config.put(
         "table_identifier",
         IdentifierUtils.toSparkTableIdentifier(jobContext.nameIdentifier(), schemaSeparator));
