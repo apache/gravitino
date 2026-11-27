@@ -354,5 +354,14 @@ public class TestPolicyDTO {
     IllegalArgumentException updateEx =
         Assertions.assertThrows(IllegalArgumentException.class, update::validate);
     Assertions.assertTrue(updateEx.getMessage().contains("mutually exclusive"));
+
+    String updateMinWithoutCommit =
+        "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_compaction\","
+            + "\"newContent\":{\"timeTrigger\":\"0 0 2 * * ?\",\"minIntervalMs\":1000}}";
+    PolicyUpdateRequest updateMin =
+        JsonUtils.objectMapper().readValue(updateMinWithoutCommit, PolicyUpdateRequest.class);
+    IllegalArgumentException updateMinEx =
+        Assertions.assertThrows(IllegalArgumentException.class, updateMin::validate);
+    Assertions.assertTrue(updateMinEx.getMessage().contains("minIntervalMs"));
   }
 }
