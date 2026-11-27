@@ -112,9 +112,10 @@ tasks {
     finalizedBy(copyDepends)
   }
 
-  // Jars not shipped in root libs/, plus the CLI modules. Shared deps are named
-  // explicitly in bin/gravitino-optimizer.sh and loaded from ${GRAVITINO_HOME}/libs.
-  register("copyLibs", Sync::class) {
+  // Same shape as idp-basic / k8s-job-executor: copyDepends fills build/libs, then
+  // copyLibs includes only the jars that stay under optimizer/libs. Shared deps are
+  // loaded from ${GRAVITINO_HOME}/libs by gravitino-optimizer.sh.
+  register("copyLibs", Copy::class) {
     dependsOn(copyDepends, "build")
     from("build/libs") {
       include(
@@ -127,6 +128,7 @@ tasks {
       exclude("*-javadoc.jar", "*-sources.jar", "*-empty.jar", "*-tests.jar")
     }
     into("$rootDir/distribution/package/optimizer/libs")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   }
 
   register("copyLibAndConfigs", Copy::class) {
