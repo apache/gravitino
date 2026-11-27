@@ -80,7 +80,7 @@ public class TestPropertiesMetadata {
         Session.DEFAULT_METADATA_CACHE_SIZE_BYTES,
         metadata.getOrDefault(Map.of(), LANCE_SESSION_METADATA_CACHE_SIZE_BYTES));
     Assertions.assertEquals(
-        Session.DEFAULT_INDEX_CACHE_SIZE_BYTES,
+        GenericCatalogPropertiesMetadata.DEFAULT_LANCE_SESSION_INDEX_CACHE_SIZE_BYTES,
         metadata.getOrDefault(Map.of(), LANCE_SESSION_INDEX_CACHE_SIZE_BYTES));
     Assertions.assertEquals(
         12345L,
@@ -116,6 +116,14 @@ public class TestPropertiesMetadata {
                 LANCE_SESSION_INDEX_CACHE_SIZE_BYTES));
     Assertions.assertFalse(metadata.isImmutableProperty(LANCE_SESSION_METADATA_CACHE_SIZE_BYTES));
     Assertions.assertFalse(metadata.isImmutableProperty(LANCE_SESSION_INDEX_CACHE_SIZE_BYTES));
+    Assertions.assertEquals(
+        123L, GenericCatalogPropertiesMetadata.parseNonNegativeLong("prop", " 123 "));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> GenericCatalogPropertiesMetadata.parseNonNegativeLong("prop", " "));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> GenericCatalogPropertiesMetadata.parseNonNegativeLong("prop", null));
   }
 
   @Test

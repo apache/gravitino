@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -51,6 +52,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
+import org.apache.gravitino.catalog.lakehouse.generic.GenericCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.GenericColumn;
 import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.SupportsSchemas;
@@ -152,7 +154,9 @@ public class LanceTableOperations extends ManagedTableOperations implements Clos
 
   private final IdGenerator idGenerator;
 
-  private final Object sessionLock = new Object();
+  private final ReentrantReadWriteLock sessionLock = new ReentrantReadWriteLock();
+
+  private final Object sessionInitLock = new Object();
 
   private volatile Map<String, String> catalogProperties = Map.of();
 
@@ -202,7 +206,8 @@ public class LanceTableOperations extends ManagedTableOperations implements Clos
   /** Closes the Lance session cache and releases associated native memory. */
   @Override
   public void close() {
-    synchronized (sessionLock) {
+    sessionLock.writeLock().lock();
+    try {
       isClosed = true;
       if (lanceSession != null && !lanceSession.isClosed()) {
         try {
@@ -211,6 +216,8 @@ public class LanceTableOperations extends ManagedTableOperations implements Clos
           LOG.warn("Failed to close Lance session", e);
         }
       }
+    } finally {
+      sessionLock.writeLock().unlock();
     }
   }
 
@@ -1041,14 +1048,21 @@ public class LanceTableOperations extends ManagedTableOperations implements Clos
     // Do not pass an explicit allocator: OpenDatasetBuilder then sets selfManagedAllocator=true
     // so Dataset.close() will release the off-heap memory. Passing new RootAllocator() sets
     // selfManagedAllocator=false and leaks the allocator on every call.
-    return Dataset.open()
-        .uri(location)
-        .readOptions(
-            new ReadOptions.Builder()
-                .setSession(session())
-                .setStorageOptions(storageOptions)
-                .build())
-        .build();
+    // Hold the read lock across session lookup and Dataset.open() so close() cannot free the
+    // native session handle before Dataset.open() retains its own reference.
+    sessionLock.readLock().lock();
+    try {
+      return Dataset.open()
+          .uri(location)
+          .readOptions(
+              new ReadOptions.Builder()
+                  .setSession(getOrCreateSession())
+                  .setStorageOptions(storageOptions)
+                  .build())
+          .build();
+    } finally {
+      sessionLock.readLock().unlock();
+    }
   }
 
   /**
@@ -1069,23 +1083,12 @@ public class LanceTableOperations extends ManagedTableOperations implements Clos
    */
   @VisibleForTesting
   public Session session() {
-    if (isClosed) {
-      throw new IllegalStateException("LanceTableOperations is closed");
+    sessionLock.readLock().lock();
+    try {
+      return getOrCreateSession();
+    } finally {
+      sessionLock.readLock().unlock();
     }
-    if (lanceSession == null) {
-      synchronized (sessionLock) {
-        if (isClosed) {
-          throw new IllegalStateException("LanceTableOperations is closed");
-        }
-        if (lanceSession == null) {
-          lanceSession = createSession();
-        }
-      }
-    }
-    if (isClosed) {
-      throw new IllegalStateException("LanceTableOperations is closed");
-    }
-    return lanceSession;
   }
 
   @VisibleForTesting
@@ -1168,6 +1171,23 @@ public class LanceTableOperations extends ManagedTableOperations implements Clos
     }
   }
 
+  private Session getOrCreateSession() {
+    if (isClosed) {
+      throw new IllegalStateException("LanceTableOperations is closed");
+    }
+    if (lanceSession == null) {
+      synchronized (sessionInitLock) {
+        if (isClosed) {
+          throw new IllegalStateException("LanceTableOperations is closed");
+        }
+        if (lanceSession == null) {
+          lanceSession = createSession();
+        }
+      }
+    }
+    return lanceSession;
+  }
+
   private Session createSession() {
     long metadataCacheSizeBytes =
         parseCacheSizeBytes(
@@ -1176,7 +1196,7 @@ public class LanceTableOperations extends ManagedTableOperations implements Clos
     long indexCacheSizeBytes =
         parseCacheSizeBytes(
             LanceConstants.LANCE_SESSION_INDEX_CACHE_SIZE_BYTES,
-            Session.DEFAULT_INDEX_CACHE_SIZE_BYTES);
+            GenericCatalogPropertiesMetadata.DEFAULT_LANCE_SESSION_INDEX_CACHE_SIZE_BYTES);
 
     LOG.info(
         "Initializing Lance session cache with metadataCacheSizeBytes={}, indexCacheSizeBytes={}",
@@ -1193,17 +1213,6 @@ public class LanceTableOperations extends ManagedTableOperations implements Clos
     if (StringUtils.isBlank(propValue)) {
       return defaultValue;
     }
-    try {
-      long parsed = Long.parseLong(propValue.trim());
-      Preconditions.checkArgument(
-          parsed >= 0,
-          "Property %s must be greater than or equal to 0, got %s",
-          propertyKey,
-          parsed);
-      return parsed;
-    } catch (NumberFormatException e) {
-      throw new IllegalArgumentException(
-          String.format("Invalid long value '%s' for property %s", propValue, propertyKey), e);
-    }
+    return GenericCatalogPropertiesMetadata.parseNonNegativeLong(propertyKey, propValue);
   }
 }

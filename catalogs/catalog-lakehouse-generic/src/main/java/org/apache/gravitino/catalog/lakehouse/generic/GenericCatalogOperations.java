@@ -22,7 +22,6 @@ import static org.apache.gravitino.Entity.EntityType.TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Suppliers;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Maps;
@@ -34,8 +33,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.EntityStore;
@@ -80,10 +77,9 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
   private final ManagedSchemaOperations schemaOps;
 
-  private final Map<String, Supplier<ManagedTableOperations>> tableOpsCache;
+  private final Map<String, LakehouseTableDelegator> tableDelegators;
 
-  private final Map<String, ManagedTableOperations> instantiatedTableOps =
-      new ConcurrentHashMap<>();
+  private final Map<String, ManagedTableOperations> tableOpsCache = new ConcurrentHashMap<>();
 
   private volatile TableLocationProvider tableLocationProvider;
 
@@ -93,6 +89,8 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
   private final EntityStore store;
 
+  private final IdGenerator idGenerator;
+
   public GenericCatalogOperations() {
     this(GravitinoEnv.getInstance().entityStore(), GravitinoEnv.getInstance().idGenerator());
   }
@@ -100,6 +98,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   @VisibleForTesting
   GenericCatalogOperations(EntityStore store, IdGenerator idGenerator) {
     this.store = store;
+    this.idGenerator = idGenerator;
 
     this.schemaOps =
         new ManagedSchemaOperations() {
@@ -111,29 +110,14 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
     this.tableFormatCache = CacheBuilder.newBuilder().maximumSize(1000).build();
 
-    // Initialize all the table operations for different table formats.
-    Map<String, LakehouseTableDelegator> tableDelegators =
+    // Register all table delegators for different table formats; table operations are created
+    // lazily on first access.
+    Map<String, LakehouseTableDelegator> delegators =
         LakehouseTableDelegatorFactory.tableDelegators();
-    tableOpsCache =
-        Collections.unmodifiableMap(
-            tableDelegators.entrySet().stream()
-                .collect(
-                    Collectors.toMap(
-                        Map.Entry::getKey,
-                        // Lazy initialize the table operations when needed.
-                        e -> {
-                          LakehouseTableDelegator delegator = e.getValue();
-                          return Suppliers.memoize(
-                              () -> {
-                                ManagedTableOperations ops =
-                                    delegator.createTableOps(store, schemaOps, idGenerator);
-                                instantiatedTableOps.put(e.getKey(), ops);
-                                return ops;
-                              });
-                        })));
-    if (tableOpsCache.isEmpty()) {
+    if (delegators.isEmpty()) {
       throw new IllegalArgumentException("No table delegators found, this is unexpected.");
     }
+    this.tableDelegators = Collections.unmodifiableMap(delegators);
   }
 
   @Override
@@ -166,7 +150,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   @Override
   public void close() {
     tableFormatCache.cleanUp();
-    for (ManagedTableOperations ops : instantiatedTableOps.values()) {
+    for (ManagedTableOperations ops : tableOpsCache.values()) {
       if (ops instanceof Closeable closeable) {
         try {
           closeable.close();
@@ -175,12 +159,12 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
         }
       }
     }
-    instantiatedTableOps.clear();
+    tableOpsCache.clear();
   }
 
   @VisibleForTesting
   Map<String, ManagedTableOperations> instantiatedTableOps() {
-    return Collections.unmodifiableMap(instantiatedTableOps);
+    return Collections.unmodifiableMap(tableOpsCache);
   }
 
   @Override
@@ -262,7 +246,8 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     // We get the table operations from any cached table ops, since listing tables is not
     // format-specific.
-    ManagedTableOperations tableOps = tableOpsCache.values().iterator().next().get();
+    String defaultFormat = tableDelegators.keySet().iterator().next();
+    ManagedTableOperations tableOps = getOrCreateTableOps(defaultFormat);
     return tableOps.listTables(namespace);
   }
 
@@ -298,9 +283,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     format = format.toLowerCase(Locale.ROOT);
 
     // Get the table operations for the specified table format.
-    Supplier<ManagedTableOperations> tableOpsSupplier = tableOpsCache.get(format);
-    Preconditions.checkArgument(tableOpsSupplier != null, "Unsupported table format: %s", format);
-    ManagedTableOperations tableOps = configureTableOps(tableOpsSupplier.get());
+    ManagedTableOperations tableOps = configureTableOps(getOrCreateTableOps(format));
 
     // The provider is consulted only once the request is known to be one this catalog can serve.
     // A provider that allocates real storage has no compensating callback, so every check that can
@@ -509,8 +492,9 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
    */
   private ManagedTableOperations tableOps(
       NameIdentifier tableIdent, @Nullable Map<String, String> knownProperties) {
+    String tableFormat;
     try {
-      String tableFormat =
+      tableFormat =
           tableFormatCache.get(
               tableIdent,
               () -> {
@@ -524,12 +508,6 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
                 return format.toLowerCase(Locale.ROOT);
               });
-
-      ManagedTableOperations ops = configureTableOps(tableOpsCache.get(tableFormat).get());
-      Preconditions.checkArgument(
-          ops != null, "No table operations found for table format %s", tableFormat);
-      return ops;
-
     } catch (Exception e) {
       Throwable t = e.getCause();
 
@@ -543,6 +521,19 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
         throw ExceptionMessages.wrap("Unexpected exception when loading table " + tableIdent, t);
       }
     }
+
+    return configureTableOps(getOrCreateTableOps(tableFormat));
+  }
+
+  private ManagedTableOperations getOrCreateTableOps(String format) {
+    LakehouseTableDelegator delegator = tableDelegators.get(format);
+    Preconditions.checkArgument(delegator != null, "Unsupported table format: %s", format);
+    ManagedTableOperations ops =
+        tableOpsCache.computeIfAbsent(
+            format, k -> delegator.createTableOps(store, schemaOps, idGenerator));
+    Preconditions.checkArgument(
+        ops != null, "No table operations found for table format %s", format);
+    return ops;
   }
 
   private ManagedTableOperations configureTableOps(ManagedTableOperations ops) {

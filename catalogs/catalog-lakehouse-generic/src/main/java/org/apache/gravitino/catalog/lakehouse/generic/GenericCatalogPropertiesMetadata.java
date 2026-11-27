@@ -34,6 +34,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.lance.LanceTableOperations;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
@@ -48,6 +49,9 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
    * once the catalog is created.
    */
   public static final String TABLE_LOCATION_PROVIDER = "table-location-provider";
+
+  /** Default index cache size in bytes for the catalog-scoped Lance session (128 MiB). */
+  public static final long DEFAULT_LANCE_SESSION_INDEX_CACHE_SIZE_BYTES = 128L * 1024 * 1024;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -104,7 +108,7 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 LANCE_SESSION_INDEX_CACHE_SIZE_BYTES,
                 "The index cache size in bytes for the Lance session.",
                 false /* immutable */,
-                Session.DEFAULT_INDEX_CACHE_SIZE_BYTES,
+                DEFAULT_LANCE_SESSION_INDEX_CACHE_SIZE_BYTES,
                 false /* hidden */));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
@@ -113,6 +117,32 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
     return PROPERTIES_METADATA;
+  }
+
+  /**
+   * Parses a string property value as a non-negative {@code long}.
+   *
+   * @param propertyKey the property name, used in error messages
+   * @param propValue the raw string value
+   * @return the parsed non-negative value
+   * @throws IllegalArgumentException if {@code propValue} is blank, not a valid {@code long}, or
+   *     less than 0
+   */
+  public static long parseNonNegativeLong(String propertyKey, String propValue) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(propValue), "Property %s must not be null or blank", propertyKey);
+    try {
+      long parsed = Long.parseLong(propValue.trim());
+      Preconditions.checkArgument(
+          parsed >= 0,
+          "Property %s must be greater than or equal to 0, got %s",
+          propertyKey,
+          parsed);
+      return parsed;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid long value '%s' for property %s", propValue, propertyKey), e);
+    }
   }
 
   private static PropertyEntry<Long> nonNegativeLongOptionalPropertyEntry(
@@ -124,12 +154,7 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
         .withJavaType(Long.class)
         .withDefaultValue(defaultValue)
         .withHidden(hidden)
-        .withDecoder(
-            value -> {
-              long parsed = Long.parseLong(value.trim());
-              Preconditions.checkArgument(parsed >= 0, "Must be a non negative value");
-              return parsed;
-            })
+        .withDecoder(value -> parseNonNegativeLong(name, value))
         .withEncoder(String::valueOf)
         .build();
   }

@@ -41,16 +41,26 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -58,6 +68,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.ipc.ArrowReader;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
@@ -95,9 +110,19 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.lance.CacheStats;
 import org.lance.Dataset;
+import org.lance.Fragment;
+import org.lance.FragmentMetadata;
 import org.lance.Session;
+import org.lance.SourcedTransaction;
 import org.lance.Version;
+import org.lance.WriteParams;
 import org.lance.index.IndexOptions;
+import org.lance.index.IndexParams;
+import org.lance.index.IndexType;
+import org.lance.index.scalar.ScalarIndexParams;
+import org.lance.ipc.LanceScanner;
+import org.lance.ipc.ScanOptions;
+import org.lance.operation.Append;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
@@ -2623,6 +2648,54 @@ public class TestLanceTableOperations {
   }
 
   @Test
+  void testStorageOptionsIsolationAcrossEndpointsAtSameUri() throws Exception {
+    Path dirA = tempDir.resolve("endpoint_a_dataset");
+    Path dirB = tempDir.resolve("endpoint_b_dataset");
+    Column[] colsA = {Column.of("col_a", Types.IntegerType.get())};
+    Column[] colsB = {Column.of("col_b", Types.StringType.get())};
+    try (Dataset ignoredA = lanceTableOps.createDataset(dirA.toString(), colsA, Map.of());
+        Dataset ignoredB = lanceTableOps.createDataset(dirB.toString(), colsB, Map.of())) {}
+
+    String bucket = "test-bucket";
+    String tableKey = "shared_table";
+    String sharedUri = "s3://" + bucket + "/" + tableKey;
+
+    List<String> reqsA = new CopyOnWriteArrayList<>();
+    List<String> reqsB = new CopyOnWriteArrayList<>();
+    HttpServer serverA = startS3EndpointServer(dirA, bucket, tableKey, reqsA);
+    HttpServer serverB = startS3EndpointServer(dirB, bucket, tableKey, reqsB);
+    try {
+      Map<String, String> optsA = s3StorageOptions(serverA.getAddress().getPort());
+      Map<String, String> optsB = s3StorageOptions(serverB.getAddress().getPort());
+
+      try (Dataset dsA = lanceTableOps.openDataset(sharedUri, optsA);
+          Dataset dsB = lanceTableOps.openDataset(sharedUri, optsB);
+          Dataset dsAAgain = lanceTableOps.openDataset(sharedUri, optsA)) {
+        Assertions.assertEquals("col_a", dsA.getSchema().getFields().get(0).getName());
+        Assertions.assertEquals(optsA, dsA.getLatestStorageOptions());
+        Assertions.assertEquals("col_b", dsB.getSchema().getFields().get(0).getName());
+        Assertions.assertEquals(optsB, dsB.getLatestStorageOptions());
+        Assertions.assertEquals("col_a", dsAAgain.getSchema().getFields().get(0).getName());
+        Assertions.assertEquals(optsA, dsAAgain.getLatestStorageOptions());
+
+        Session sharedSession = lanceTableOps.session();
+        try (Session sA = dsA.session();
+            Session sB = dsB.session();
+            Session sAAgain = dsAAgain.session()) {
+          Assertions.assertTrue(sharedSession.isSameAs(sA));
+          Assertions.assertTrue(sharedSession.isSameAs(sB));
+          Assertions.assertTrue(sharedSession.isSameAs(sAAgain));
+        }
+      }
+      Assertions.assertFalse(reqsA.isEmpty(), "Expected requests to endpoint A");
+      Assertions.assertFalse(reqsB.isEmpty(), "Expected requests to endpoint B");
+    } finally {
+      serverA.stop(0);
+      serverB.stop(0);
+    }
+  }
+
+  @Test
   void testMultiCatalogSessionIsolation() throws Exception {
     String location = tempDir.resolve("multi_catalog_table").toString();
     Column[] cols = {Column.of("id", Types.IntegerType.get())};
@@ -2653,50 +2726,118 @@ public class TestLanceTableOperations {
   @Test
   void testCustomSessionCacheSizeProperties() throws Exception {
     String location = tempDir.resolve("custom_props_table").toString();
-    Column[] cols = {Column.of("id", Types.IntegerType.get())};
-    try (Dataset ignored = lanceTableOps.createDataset(location, cols, Map.of())) {}
+    createIndexedDataset(location, 32);
 
-    LanceTableOperations ops = new LanceTableOperations(store, schemaOps, idGenerator);
-    ops.setCatalogProperties(
-        Map.of(
-            LANCE_SESSION_METADATA_CACHE_SIZE_BYTES, "10485760",
-            LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "20971520"));
-
-    try (Dataset ds = ops.openDataset(location)) {
-      Assertions.assertNotNull(ds);
+    long emptySessionBytes;
+    try (Session emptySession =
+        Session.builder().metadataCacheSizeBytes(0).indexCacheSizeBytes(0).build()) {
+      emptySessionBytes = emptySession.sizeBytes();
     }
-    Session session = ops.session();
-    Assertions.assertNotNull(session);
-    Assertions.assertFalse(session.isClosed());
-    ops.close();
 
-    // Valid zero value (allowed by Lance to disable cache)
-    LanceTableOperations opsZero = new LanceTableOperations(store, schemaOps, idGenerator);
-    opsZero.setCatalogProperties(
-        Map.of(
-            LANCE_SESSION_METADATA_CACHE_SIZE_BYTES, "0",
-            LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "0"));
-    try (Dataset ds = opsZero.openDataset(location)) {
-      Assertions.assertNotNull(ds);
+    // Default properties (omitted): both metadata and index caches are active.
+    try (LanceTableOperations opsDefault =
+        new LanceTableOperations(store, schemaOps, idGenerator)) {
+      try (Dataset ds1 = opsDefault.openDataset(location);
+          Dataset ds2 = opsDefault.openDataset(location)) {
+        Assertions.assertNotNull(ds1);
+        Assertions.assertNotNull(ds2);
+        scanIndexedFilter(ds2, "id = 5");
+      }
+      Session defaultSession = opsDefault.session();
+      CacheStats defaultMetaStats = defaultSession.metadataCacheStats();
+      Assertions.assertTrue(defaultMetaStats.getHits() > 0);
+      Assertions.assertTrue(defaultMetaStats.getSizeBytes() > 0);
+      Assertions.assertTrue(
+          defaultSession.sizeBytes() - defaultMetaStats.getSizeBytes() > emptySessionBytes,
+          "Expected default index cache bytes > 0 above baseline " + emptySessionBytes);
     }
-    opsZero.close();
+
+    // Zero metadata & zero index cache: caching is disabled for both.
+    try (LanceTableOperations opsZero = new LanceTableOperations(store, schemaOps, idGenerator)) {
+      opsZero.setCatalogProperties(
+          Map.of(
+              LANCE_SESSION_METADATA_CACHE_SIZE_BYTES, "0",
+              LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "0"));
+      try (Dataset ds1 = opsZero.openDataset(location);
+          Dataset ds2 = opsZero.openDataset(location)) {
+        Assertions.assertNotNull(ds1);
+        Assertions.assertNotNull(ds2);
+        scanIndexedFilter(ds2, "id = 5");
+      }
+      Session zeroSession = opsZero.session();
+      CacheStats zeroMetaStats = zeroSession.metadataCacheStats();
+      Assertions.assertEquals(0L, zeroMetaStats.getHits());
+      Assertions.assertEquals(0L, zeroMetaStats.getSizeBytes());
+      Assertions.assertEquals(emptySessionBytes, zeroSession.sizeBytes());
+    }
+
+    // Non-zero metadata cache (1 MiB), zero index cache: metadata cache hits on second open while
+    // index cache stays empty during an indexed scan.
+    try (LanceTableOperations opsMetaOnly =
+        new LanceTableOperations(store, schemaOps, idGenerator)) {
+      opsMetaOnly.setCatalogProperties(
+          Map.of(
+              LANCE_SESSION_METADATA_CACHE_SIZE_BYTES, "1048576",
+              LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "0"));
+      try (Dataset ds1 = opsMetaOnly.openDataset(location);
+          Dataset ds2 = opsMetaOnly.openDataset(location)) {
+        Assertions.assertNotNull(ds1);
+        Assertions.assertNotNull(ds2);
+        scanIndexedFilter(ds2, "id = 5");
+      }
+      Session metaSession = opsMetaOnly.session();
+      CacheStats metaStats = metaSession.metadataCacheStats();
+      Assertions.assertTrue(
+          metaStats.getHits() > 0, "Expected metadata cache hits > 0, got: " + metaStats.getHits());
+      Assertions.assertTrue(
+          metaStats.getSizeBytes() > 0,
+          "Expected metadata cache bytes > 0, got: " + metaStats.getSizeBytes());
+      Assertions.assertEquals(
+          emptySessionBytes, metaSession.sizeBytes() - metaStats.getSizeBytes());
+    }
+
+    // Zero metadata cache, non-zero index cache (10 MiB): index cache holds data after indexed
+    // scan while metadata cache stays at 0 bytes.
+    try (LanceTableOperations opsIndexOnly =
+        new LanceTableOperations(store, schemaOps, idGenerator)) {
+      opsIndexOnly.setCatalogProperties(
+          Map.of(
+              LANCE_SESSION_METADATA_CACHE_SIZE_BYTES, "0",
+              LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "10485760"));
+      try (Dataset ds1 = opsIndexOnly.openDataset(location)) {
+        scanIndexedFilter(ds1, "id = 5");
+        scanIndexedFilter(ds1, "id = 10");
+      }
+      Session indexSession = opsIndexOnly.session();
+      CacheStats indexOnlyMetaStats = indexSession.metadataCacheStats();
+      Assertions.assertEquals(0L, indexOnlyMetaStats.getHits());
+      Assertions.assertEquals(0L, indexOnlyMetaStats.getSizeBytes());
+      Assertions.assertTrue(
+          indexSession.sizeBytes() > emptySessionBytes,
+          "Expected index cache bytes > emptySessionBytes ("
+              + emptySessionBytes
+              + "), got: "
+              + indexSession.sizeBytes());
+    }
 
     // Invalid negative value
-    LanceTableOperations opsInvalid = new LanceTableOperations(store, schemaOps, idGenerator);
-    opsInvalid.setCatalogProperties(Map.of(LANCE_SESSION_METADATA_CACHE_SIZE_BYTES, "-1"));
-    IllegalArgumentException ex =
-        Assertions.assertThrows(
-            IllegalArgumentException.class, () -> opsInvalid.openDataset(location));
-    Assertions.assertTrue(ex.getMessage().contains("must be greater than or equal to 0"));
-    opsInvalid.close();
+    try (LanceTableOperations opsInvalid =
+        new LanceTableOperations(store, schemaOps, idGenerator)) {
+      opsInvalid.setCatalogProperties(Map.of(LANCE_SESSION_METADATA_CACHE_SIZE_BYTES, "-1"));
+      IllegalArgumentException ex =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> opsInvalid.openDataset(location));
+      Assertions.assertTrue(ex.getMessage().contains("must be greater than or equal to 0"));
+    }
 
     // Invalid string
-    LanceTableOperations opsNan = new LanceTableOperations(store, schemaOps, idGenerator);
-    opsNan.setCatalogProperties(Map.of(LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "not_a_number"));
-    IllegalArgumentException ex2 =
-        Assertions.assertThrows(IllegalArgumentException.class, () -> opsNan.openDataset(location));
-    Assertions.assertTrue(ex2.getMessage().contains("Invalid long value"));
-    opsNan.close();
+    try (LanceTableOperations opsNan = new LanceTableOperations(store, schemaOps, idGenerator)) {
+      opsNan.setCatalogProperties(Map.of(LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "not_a_number"));
+      IllegalArgumentException ex2 =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> opsNan.openDataset(location));
+      Assertions.assertTrue(ex2.getMessage().contains("Invalid long value"));
+    }
   }
 
   @Test
@@ -2742,5 +2883,265 @@ public class TestLanceTableOperations {
     Session session = lanceTableOps.session();
     Assertions.assertNotNull(session, "Session must be initialized after concurrent opens");
     Assertions.assertTrue(session.metadataCacheStats().getHits() > 0);
+  }
+
+  @Test
+  void testConcurrentOpenAndCloseWithReadWriteLock() throws Exception {
+    String location = tempDir.resolve("concurrent_open_close").toString();
+    Column[] cols = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(location, cols, Map.of())) {}
+
+    int readerThreads = 4;
+    ExecutorService executor = Executors.newFixedThreadPool(readerThreads + 1);
+    try {
+      List<Callable<Void>> tasks = new ArrayList<>();
+      for (int i = 0; i < readerThreads; i++) {
+        tasks.add(
+            () -> {
+              for (int j = 0; j < 20; j++) {
+                try (Dataset ds = lanceTableOps.openDataset(location)) {
+                  Assertions.assertEquals(1, ds.getSchema().getFields().size());
+                } catch (IllegalStateException closedEx) {
+                  Assertions.assertTrue(
+                      closedEx.getMessage().contains("LanceTableOperations is closed"));
+                  break;
+                }
+              }
+              return null;
+            });
+      }
+      tasks.add(
+          () -> {
+            Thread.sleep(5);
+            lanceTableOps.close();
+            return null;
+          });
+
+      List<Future<Void>> futures = executor.invokeAll(tasks, 30, TimeUnit.SECONDS);
+      for (Future<Void> f : futures) {
+        f.get();
+      }
+    } finally {
+      executor.shutdownNow();
+    }
+
+    Assertions.assertTrue(lanceTableOps.isClosed());
+    IllegalStateException ex =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> lanceTableOps.openDataset(location));
+    Assertions.assertTrue(ex.getMessage().contains("LanceTableOperations is closed"));
+  }
+
+  private void createIndexedDataset(String location, int rowCount) throws Exception {
+    Column[] cols = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset emptyDs = lanceTableOps.createDataset(location, cols, Map.of());
+        RootAllocator allocator = new RootAllocator();
+        VectorSchemaRoot root = VectorSchemaRoot.create(emptyDs.getSchema(), allocator)) {
+      IntVector idVector = (IntVector) root.getVector("id");
+      idVector.allocateNew(rowCount);
+      for (int i = 0; i < rowCount; i++) {
+        idVector.setSafe(i, i);
+      }
+      root.setRowCount(rowCount);
+      List<FragmentMetadata> fragments =
+          Fragment.write()
+              .datasetUri(location)
+              .allocator(allocator)
+              .data(root)
+              .writeParams(new WriteParams.Builder().build())
+              .execute();
+      try (SourcedTransaction tx =
+              emptyDs
+                  .newTransactionBuilder()
+                  .operation(Append.builder().fragments(fragments).build())
+                  .build();
+          Dataset committed = tx.commit()) {
+        committed.createIndex(
+            IndexOptions.builder(
+                    List.of("id"),
+                    IndexType.BTREE,
+                    IndexParams.builder()
+                        .setScalarIndexParams(ScalarIndexParams.create("btree"))
+                        .build())
+                .withIndexName("id_btree_idx")
+                .build());
+      }
+    }
+  }
+
+  private static void scanIndexedFilter(Dataset dataset, String filter) throws Exception {
+    try (LanceScanner scanner =
+            dataset.newScan(new ScanOptions.Builder().filter(filter).useScalarIndex(true).build());
+        ArrowReader reader = scanner.scanBatches()) {
+      int matched = 0;
+      while (reader.loadNextBatch()) {
+        matched += reader.getVectorSchemaRoot().getRowCount();
+      }
+      Assertions.assertEquals(1, matched);
+    }
+  }
+
+  private static Map<String, String> s3StorageOptions(int port) {
+    return Map.of(
+        "endpoint", "http://127.0.0.1:" + port,
+        "allow_http", "true",
+        "access_key_id", "test-access-key",
+        "secret_access_key", "test-secret-key",
+        "region", "us-east-1",
+        "virtual_hosted_style_request", "false");
+  }
+
+  private static HttpServer startS3EndpointServer(
+      Path datasetRoot, String bucket, String tableKey, List<String> requestLog)
+      throws IOException {
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          requestLog.add(exchange.getRequestMethod() + " " + exchange.getRequestURI());
+          try {
+            handleS3Request(exchange, datasetRoot, bucket, tableKey);
+          } catch (Exception e) {
+            byte[] err = e.toString().getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(500, err.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+              os.write(err);
+            }
+          }
+        });
+    server.start();
+    return server;
+  }
+
+  private static void handleS3Request(
+      HttpExchange exchange, Path datasetRoot, String bucket, String tableKey) throws IOException {
+    String method = exchange.getRequestMethod();
+    String rawPath = exchange.getRequestURI().getPath();
+    String rawQuery = exchange.getRequestURI().getRawQuery();
+    String bucketPrefix = "/" + bucket;
+
+    if ("GET".equals(method) && rawQuery != null && rawQuery.contains("list-type=2")) {
+      String prefix = "";
+      for (String param : rawQuery.split("&")) {
+        int eq = param.indexOf('=');
+        if (eq > 0 && "prefix".equals(param.substring(0, eq))) {
+          prefix = URLDecoder.decode(param.substring(eq + 1), StandardCharsets.UTF_8);
+        }
+      }
+      List<Path> files;
+      try (Stream<Path> walk = Files.walk(datasetRoot)) {
+        files = walk.filter(Files::isRegularFile).sorted().collect(Collectors.toList());
+      }
+      StringBuilder xml = new StringBuilder();
+      xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+          .append("<ListBucketResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">")
+          .append("<Name>")
+          .append(bucket)
+          .append("</Name>")
+          .append("<Prefix>")
+          .append(prefix)
+          .append("</Prefix>")
+          .append("<MaxKeys>1000</MaxKeys>")
+          .append("<IsTruncated>false</IsTruncated>");
+      int count = 0;
+      for (Path file : files) {
+        String rel = datasetRoot.relativize(file).toString().replace('\\', '/');
+        String key = tableKey + "/" + rel;
+        if (key.startsWith(prefix)) {
+          count++;
+          String etag = md5Hex(Files.readAllBytes(file));
+          xml.append("<Contents>")
+              .append("<Key>")
+              .append(key)
+              .append("</Key>")
+              .append("<LastModified>2026-01-01T00:00:00.000Z</LastModified>")
+              .append("<ETag>\"")
+              .append(etag)
+              .append("\"</ETag>")
+              .append("<Size>")
+              .append(Files.size(file))
+              .append("</Size>")
+              .append("</Contents>");
+        }
+      }
+      xml.append("<KeyCount>").append(count).append("</KeyCount></ListBucketResult>");
+      byte[] body = xml.toString().getBytes(StandardCharsets.UTF_8);
+      exchange.getResponseHeaders().set("Content-Type", "application/xml");
+      exchange.sendResponseHeaders(200, body.length);
+      try (OutputStream os = exchange.getResponseBody()) {
+        os.write(body);
+      }
+      return;
+    }
+
+    String objectKey =
+        rawPath.startsWith(bucketPrefix + "/")
+            ? rawPath.substring(bucketPrefix.length() + 1)
+            : rawPath.startsWith("/") ? rawPath.substring(1) : rawPath;
+    String keyPrefix = tableKey + "/";
+    if (!objectKey.startsWith(keyPrefix)) {
+      exchange.sendResponseHeaders(404, -1);
+      exchange.close();
+      return;
+    }
+    Path target = datasetRoot.resolve(objectKey.substring(keyPrefix.length())).normalize();
+    if (!target.startsWith(datasetRoot) || !Files.isRegularFile(target)) {
+      exchange.sendResponseHeaders(404, -1);
+      exchange.close();
+      return;
+    }
+
+    byte[] allBytes = Files.readAllBytes(target);
+    exchange.getResponseHeaders().set("Accept-Ranges", "bytes");
+    exchange.getResponseHeaders().set("ETag", "\"" + md5Hex(allBytes) + "\"");
+    if ("HEAD".equals(method)) {
+      exchange.getResponseHeaders().set("Content-Length", String.valueOf(allBytes.length));
+      exchange.sendResponseHeaders(200, -1);
+      exchange.close();
+      return;
+    }
+
+    String rangeHeader = exchange.getRequestHeaders().getFirst("Range");
+    if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+      String spec = rangeHeader.substring("bytes=".length()).trim();
+      int dash = spec.indexOf('-');
+      String startStr = spec.substring(0, dash);
+      String endStr = spec.substring(dash + 1);
+      int start =
+          startStr.isEmpty()
+              ? Math.max(0, allBytes.length - Integer.parseInt(endStr))
+              : Integer.parseInt(startStr);
+      int end =
+          startStr.isEmpty() || endStr.isEmpty()
+              ? allBytes.length - 1
+              : Math.min(allBytes.length - 1, Integer.parseInt(endStr));
+      byte[] slice = Arrays.copyOfRange(allBytes, start, end + 1);
+      exchange
+          .getResponseHeaders()
+          .set("Content-Range", String.format("bytes %d-%d/%d", start, end, allBytes.length));
+      exchange.sendResponseHeaders(206, slice.length);
+      try (OutputStream os = exchange.getResponseBody()) {
+        os.write(slice);
+      }
+      return;
+    }
+
+    exchange.sendResponseHeaders(200, allBytes.length);
+    try (OutputStream os = exchange.getResponseBody()) {
+      os.write(allBytes);
+    }
+  }
+
+  private static String md5Hex(byte[] bytes) {
+    try {
+      byte[] digest = MessageDigest.getInstance("MD5").digest(bytes);
+      StringBuilder sb = new StringBuilder(digest.length * 2);
+      for (byte b : digest) {
+        sb.append(String.format("%02x", b));
+      }
+      return sb.toString();
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
+    }
   }
 }
