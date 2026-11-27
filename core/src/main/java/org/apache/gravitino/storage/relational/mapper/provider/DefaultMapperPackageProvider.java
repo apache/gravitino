@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider;
 
 import com.google.common.collect.ImmutableList;
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.ArticleSummaryMapper;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
@@ -114,6 +115,7 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         GlossaryTermRelMapper.class,
         GlossaryTermDomainRelMapper.class,
         GlossaryTermBindingMapper.class,
+        ArticleSummaryMapper.class,
         KnowledgeBaseArticleMapper.class,
         TopicMetaMapper.class,
         UserMetaMapper.class,

@@ -95,7 +95,7 @@ public class TestArticleDomainMembership extends TestJDBCBackend {
               mapper -> {
                 for (var rows :
                     List.of(
-                        mapper.joined("lake", "guide", null),
+                        mapper.joined("lake", "guide", null, true),
                         mapper.joinedBatch("lake", List.of("guide", "absent")))) {
                   assertEquals(1, rows.stream().filter(row -> row.getProperties() != null).count());
                   assertEquals(66, rows.size());
