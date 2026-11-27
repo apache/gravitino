@@ -54,7 +54,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
  * Reverse glossary binding reads and writes. Target authorization runs before child enumeration.
  */
 @Path("/metalakes/{metalake}/objects/{type}/{fullName}")
-@Produces({"application/json", TermOperations.BINDING_V1_JSON})
+@Produces({"application/json", TermOperations.V1_JSON})
 public class MetadataObjectTermOperations {
   private final GlossaryTermViews views;
   @Context private HttpServletRequest httpRequest;

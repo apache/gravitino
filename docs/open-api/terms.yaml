@@ -221,7 +221,9 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
-          description: The metalake does not exist. An absent or hidden term returns HTTP 200 with dropped=false.
+          description: With authorization disabled, a missing metalake returns 404. With authorization
+            enabled, the metalake membership check returns 403 for a missing metalake. An absent
+            or hidden term in an accessible metalake returns HTTP 200 with dropped=false.
           content:
             application/json:
               schema:
@@ -1031,7 +1033,8 @@ components:
           schema:
             $ref: ./openapi.yaml#/components/schemas/ErrorModel
     Forbidden:
-      description: The caller lacks the required privilege.
+      description: The caller lacks the required privilege. When authorization is enabled,
+        the metalake membership check also returns 403 for a missing metalake.
       content:
         application/json:
           schema:

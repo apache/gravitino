@@ -21,7 +21,7 @@
 
 The domain, hierarchy and concurrency files call the Gravitino REST API directly
 (31 cases). Only `test_mcp.py` calls the MCP endpoint (one case). The separate
-[REST contract checks and open findings](../../../../dev/validation/glossary/README.md)
+[REST contract checks and fixes](../../../../dev/validation/glossary/README.md)
 cover request types, media negotiation, missing metalakes and a MySQL deadlock.
 
 Run these tests against two Gravitino servers that share an initialized relational

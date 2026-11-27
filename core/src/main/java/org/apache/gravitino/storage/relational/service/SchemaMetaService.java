@@ -390,7 +390,9 @@ public class SchemaMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
-                  mapper -> mapper.softDeleteOwnerRelBySchemaIds(schemaIds.get())),
+                  mapper ->
+                      mapper.softDeleteOwnerRelBySchemaIds(
+                          schemaPO.getMetalakeId(), schemaIds.get())),
           () ->
               SessionUtils.doWithoutCommit(
                   SecurableObjectMapper.class,

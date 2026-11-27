@@ -99,7 +99,7 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteOwnerRelByCatalogId(Long catalogId) {
+  public String softDeleteOwnerRelByCatalogId(Long metalakeId, Long catalogId) {
     String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
@@ -107,7 +107,7 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
         + now
         + ", updated_at = "
         + now
-        + " WHERE ot.deleted_at = 0 AND EXISTS ("
+        + " WHERE ot.metalake_id = #{metalakeId} AND ot.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
         + " ct WHERE ct.catalog_id = #{catalogId} AND"
@@ -176,7 +176,8 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+  public String softDeleteOwnerRelBySchemaIds(
+      @Param("metalakeId") Long metalakeId, @Param("schemaIds") List<Long> schemaIds) {
     String now = currentTimestampMillisExpression();
     return "<script>"
         + "UPDATE "
@@ -185,7 +186,7 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
         + now
         + ", updated_at = "
         + now
-        + " WHERE ot.deleted_at = 0 AND EXISTS ("
+        + " WHERE ot.metalake_id = #{metalakeId} AND ot.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.schema_id IN "

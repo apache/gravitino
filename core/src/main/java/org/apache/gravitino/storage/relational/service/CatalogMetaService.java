@@ -328,7 +328,9 @@ public class CatalogMetaService {
                   mapper -> mapper.softDeleteFunctionVersionMetasByCatalogId(catalogId)),
           () ->
               SessionUtils.doWithoutCommit(
-                  OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelByCatalogId(catalogId)),
+                  OwnerMetaMapper.class,
+                  mapper ->
+                      mapper.softDeleteOwnerRelByCatalogId(catalogPO.getMetalakeId(), catalogId)),
           () ->
               SessionUtils.doWithoutCommit(
                   SecurableObjectMapper.class,

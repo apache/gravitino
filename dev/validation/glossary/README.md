@@ -19,7 +19,7 @@
 
 # Glossary REST API validation
 
-Four open findings came out of the validation of #14913 on
+The baseline for the four regression cases below was
 `glossary-term-dev` at `5b9bbc0d2e` with the MCP tools from #15402.
 The REST sweep covered all 11 glossary operations on H2 2.2.224, MySQL 8.0.35
 and PostgreSQL 15.19. All 1,896 recorded response bodies passed their OpenAPI
@@ -27,7 +27,7 @@ schema checks (632 per backend). Separate checks of the request types, response
 headers, error semantics and concurrent writes exposed the following issues.
 See the [glossary OpenAPI specification](../../../docs/open-api/terms.yaml).
 
-## 1. Creating or altering a term coerces numbers and booleans into strings
+## 1. Create and alter require JSON strings
 
 In a new metalake, `POST /terms` with `{"name":123}` returned 200 and created
 the approved term `"123"`. For an existing term with definition `"original"`
@@ -45,9 +45,11 @@ require JSON strings for these inputs. The checks expect HTTP 400, verify that
 a rejected term cannot be read back, and compare the entire term after a
 failed edit, including its revision token. Five create cases cover the name,
 definition, synonym, property value and source reference. Three edit cases cover
-the definition, synonym and property value.
+the definition, synonym and property value. These checks now pass. The request
+DTOs use strict string deserialization for scalar fields, collection elements
+and map values. An explicit null still clears a nullable definition or source reference.
 
-## 2. Six operations ignore the requested v1 response media type
+## 2. Term operations honor the requested v1 response media type
 
 With a term named `Wire`, send `GET /terms/Wire` with
 `Accept: application/vnd.gravitino.v1+json`. The response was 200 with
@@ -55,9 +57,10 @@ With a term named `Wire`, send `GET /terms/Wire` with
 all returned this header. The OpenAPI success responses declare
 `application/vnd.gravitino.v1+json`. All five binding operations returned
 the requested type in the same environment. The runnable checks exercise the
-six affected operations and use `GET /terms/Wire/objects` as a control.
+six affected operations and use `GET /terms/Wire/objects` as a control. The term
+resource now lets Jersey negotiate the response type, including plain JSON.
 
-## 3. The missing-metalake documentation omits the authorization-dependent 403
+## 3. Missing-metalake responses depend on authorization
 
 Create a metalake and a term, drop the metalake, and repeat the glossary
 requests as the same principal. With authorization enabled, all 11 operations
@@ -65,12 +68,11 @@ returned 403 `ForbiddenException` on all three backends. With authorization
 disabled, all 11 returned 404 `NoSuchMetalakeException` on H2. As a control,
 dropping an absent term in a live metalake returned 200 with `dropped: false`.
 
-The OpenAPI entry for `dropTerm` describes a missing metalake under 404 and
-describes 403 as an insufficient privilege. Document the membership check that
-can return 403 for a missing metalake. The checks verify both configurations
-so the documentation can be updated without changing the authorization behavior.
+The OpenAPI entry for `dropTerm` and the shared 403 description now document the
+metalake membership check. The tests assert both the HTTP status and the typed
+error returned for each operation.
 
-## 4. Concurrent cleanup in different metalakes can deadlock on MySQL
+## 4. MySQL owner cleanup is scoped to the metalake
 
 Two test suites overlapped on the same MySQL store. In one metalake a term
 update adding a domain returned 200, while a concurrent delete of that domain
@@ -85,12 +87,20 @@ InnoDB identified the two transactions that took locks on `owner_meta`:
   Its domain ID belonged to the metalake running the term update. InnoDB rolled
   back the domain cleanup.
 
-The [concurrent domain-delete case](../../../mcp-server/tests/integration/glossary/test_concurrency.py)
-expects either a successful update and a 409 on deleting a nonempty domain, or a
-successful deletion and a 404 on adding the removed domain. It failed in the
-overlapping run (31/32 passed). All 32 passed when rerun alone on the same
-MySQL store. Reproduction depends on the overlap with a separate metalake
-teardown. Capture `SHOW ENGINE INNODB STATUS` immediately after a failure.
+Schema and catalog cascades now pass the metalake ID to the owner cleanup query.
+On MySQL these cascades and metalake deletion use the index on
+`owner_meta.metalake_id`. Fresh installs and the 1.3.0-to-2.0.0 migration both
+create the index. The storage regression holds an owner row lock in another
+metalake while schema, catalog and metalake cleanup each remove their own owners.
+With the same unrelated row locked on MySQL, the baseline schema cleanup timed
+out and the fixed query updated exactly one target owner. Two overlapping
+two-server runs on one MySQL database passed all 64 cases with zero InnoDB
+deadlocks.
+
+The [two-server concurrency test](../../../mcp-server/tests/integration/glossary/test_concurrency.py)
+also verifies both legal outcomes of a domain deletion racing a term edit: a
+successful edit followed by a 409 on deletion, or a successful deletion and a
+404 on adding the removed domain.
 
 ## Run the REST checks
 
@@ -108,9 +118,8 @@ authorization-disabled control, point the command at a server started with
 `gravitino.authorization.enable=false` and set
 `GRAVITINO_AUTHORIZATION_ENABLED=false`.
 
-At the tested revision, each run produced **14 failures and 12 passes**. Eight
-failures identify accepted malformed inputs, and six identify response headers.
-The binding control and all 11 missing-metalake checks passed. The command
-exits nonzero while the two wire contract bugs remain. It requires one Gravitino
-endpoint. For domain bindings, graph traversal, and cross-server concurrency,
-run the separate [two-server suite](../../../mcp-server/tests/integration/glossary/README.md).
+All 26 cases pass on H2, PostgreSQL and MySQL with authorization enabled,
+and on H2 with authorization disabled. Before the fixes, the same checks
+reported eight failures for accepted inputs and six for success response headers.
+For domain bindings, graph traversal and cross-server concurrency, run the
+[two-server suite](../../../mcp-server/tests/integration/glossary/README.md).
