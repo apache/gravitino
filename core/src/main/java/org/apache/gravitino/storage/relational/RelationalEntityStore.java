@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -131,10 +131,10 @@ public class RelationalEntityStore
   // while a value is being published and may still be rolled back.
   private final ConcurrentHashMap<String, AtomicInteger> cacheBlocks = new ConcurrentHashMap<>();
 
-  // Writes whose cache block waits for the owner's outermost SQL session to close. Other threads
-  // read this queue and drop an entry when that thread is gone.
-  private final ConcurrentLinkedQueue<DeferredPendingWrite> deferredWrites =
-      new ConcurrentLinkedQueue<>();
+  // A session close claims only its owner's writes. Append under compute so shutdown cannot
+  // detach a list while its owner is adding a key. Repeated keys each own a block.
+  private final ConcurrentMap<Thread, List<EntityCacheKey>> deferredWrites =
+      new ConcurrentHashMap<>();
 
   private final Runnable sessionClosedListener = this::endDeferredWrites;
 
@@ -588,9 +588,8 @@ public class RelationalEntityStore
   @Override
   public void close() throws IOException {
     SqlSessions.removeClosedListener(sessionClosedListener);
-    DeferredPendingWrite pending;
-    while ((pending = deferredWrites.poll()) != null) {
-      releasePendingWrite(pending.ident, pending.entityType);
+    for (Thread owner : deferredWrites.keySet()) {
+      releaseDeferredWrites(owner);
     }
     // Keep shutting the remaining components down even if one of them fails, and tolerate a
     // half-finished initialize() that left some of them null.
@@ -1093,7 +1092,18 @@ public class RelationalEntityStore
     if (!deferRelease) {
       return;
     }
-    deferredWrites.add(new DeferredPendingWrite(Thread.currentThread(), ident, entityType));
+    try {
+      deferredWrites.compute(
+          Thread.currentThread(),
+          (owner, writes) -> {
+            List<EntityCacheKey> pending = writes == null ? new ArrayList<>() : writes;
+            pending.add(EntityCacheKey.of(ident, entityType));
+            return pending;
+          });
+    } catch (RuntimeException | Error e) {
+      releasePendingWrite(ident, entityType);
+      throw e;
+    }
   }
 
   /**
@@ -1120,25 +1130,19 @@ public class RelationalEntityStore
 
   /** Ends this thread's deferred writes after its outermost SQL session has closed. */
   private void endDeferredWrites() {
-    Thread current = Thread.currentThread();
-    List<DeferredPendingWrite> mine = new ArrayList<>();
-    for (DeferredPendingWrite pending : deferredWrites) {
-      if (pending.owner == current) {
-        mine.add(pending);
-      }
+    List<EntityCacheKey> writes = deferredWrites.remove(Thread.currentThread());
+    if (writes == null) {
+      return;
     }
-    for (DeferredPendingWrite pending : mine) {
-      if (!deferredWrites.remove(pending)) {
-        continue;
-      }
+    for (EntityCacheKey key : writes) {
       try {
-        endPendingWrite(pending.ident, pending.entityType);
+        endPendingWrite(key.identifier(), key.entityType());
       } catch (RuntimeException | Error e) {
         SqlSessions.recordCloseFailure(e);
         LOGGER.warn(
             "Failed to release a cache block deferred until the SQL session closed for {} {}",
-            pending.entityType,
-            pending.ident,
+            key.entityType(),
+            key.identifier(),
             e);
       }
     }
@@ -1150,13 +1154,18 @@ public class RelationalEntityStore
    * dropped the entry.
    */
   private void releaseDeadPending() {
-    Thread current = Thread.currentThread();
-    for (DeferredPendingWrite pending : deferredWrites) {
-      if (pending.owner == current || pending.owner.isAlive()) {
-        continue;
+    for (Thread owner : deferredWrites.keySet()) {
+      if (!owner.isAlive()) {
+        releaseDeferredWrites(owner);
       }
-      if (deferredWrites.remove(pending)) {
-        releasePendingWrite(pending.ident, pending.entityType);
+    }
+  }
+
+  private void releaseDeferredWrites(Thread owner) {
+    List<EntityCacheKey> writes = deferredWrites.remove(owner);
+    if (writes != null) {
+      for (EntityCacheKey key : writes) {
+        releasePendingWrite(key.identifier(), key.entityType());
       }
     }
   }
@@ -1263,18 +1272,5 @@ public class RelationalEntityStore
     // release them; clearing the map would let readers refill while a write is still committing.
     cacheInvalidationEpoch.incrementAndGet();
     cache.clear();
-  }
-
-  /** A pending write that stays blocked until the owner's outermost SQL session closes. */
-  private static final class DeferredPendingWrite {
-    private final Thread owner;
-    private final NameIdentifier ident;
-    private final Entity.EntityType entityType;
-
-    private DeferredPendingWrite(Thread owner, NameIdentifier ident, Entity.EntityType entityType) {
-      this.owner = owner;
-      this.ident = ident;
-      this.entityType = entityType;
-    }
   }
 }

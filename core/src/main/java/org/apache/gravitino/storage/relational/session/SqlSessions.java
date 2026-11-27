@@ -109,7 +109,9 @@ public final class SqlSessions {
    *
    * <p>The listener runs after the commit, rollback, or close, including when the session count was
    * already wrong and had to be reset. An inner close only decrements the count and does not run
-   * it. Listeners must not throw; a failure is logged and the remaining listeners still run.
+   * it. Opening another SQL session in the listener can recursively notify the same listener when
+   * that session closes. Listeners must avoid SQL work and must not throw. A listener failure is
+   * logged and the remaining listeners still run.
    *
    * @param listener work to run on the thread that closed the session
    */

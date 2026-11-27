@@ -36,7 +36,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Queue;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -117,7 +117,7 @@ public class TestPolicyBindingMigration extends TestJDBCBackend {
     assertEquals(1, migration.migrate());
     // The migrator has committed the policy on JDBC but keeps the same SqlSession for the run.
     assertTrue(SqlSessions.hasActiveSession());
-    Queue<?> deferred = (Queue<?>) FieldUtils.readField(entityStore, "deferredWrites", true);
+    Map<?, ?> deferred = (Map<?, ?>) FieldUtils.readField(entityStore, "deferredWrites", true);
     assertTrue(deferred.isEmpty(), "the uncached migration must not retain per-policy writes");
     assertEquals(0, activeLegacyBindings());
     assertEquals(1, count("tag_meta"));
