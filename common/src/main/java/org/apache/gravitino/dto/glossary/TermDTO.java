@@ -19,11 +19,14 @@
 package org.apache.gravitino.dto.glossary;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.Getter;
@@ -53,6 +56,15 @@ public class TermDTO {
   private final String revisionToken;
   private final AuditDTO audit;
 
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final @Nullable List<TermMatchDTO> matchedBy;
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final @Nullable List<TermBindingDTO> bindings;
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final @Nullable Boolean bindingsTruncated;
+
   /**
    * Creates a snapshot from one glossary revision.
    *
@@ -72,6 +84,66 @@ public class TermDTO {
    * @param revisionToken The opaque identity and revision token.
    * @param audit The audit metadata.
    */
+  public TermDTO(
+      String name,
+      @Nullable String definition,
+      String[] synonyms,
+      GlossaryTerm.Status status,
+      String[] domains,
+      String[] broader,
+      String[] narrower,
+      String[] related,
+      TermLinkDTO[] links,
+      @Nullable OwnerDTO owner,
+      @Nullable String sourceRef,
+      Map<String, String> properties,
+      long version,
+      String revisionToken,
+      AuditDTO audit) {
+    this(
+        name,
+        definition,
+        synonyms,
+        status,
+        domains,
+        broader,
+        narrower,
+        related,
+        links,
+        owner,
+        sourceRef,
+        properties,
+        version,
+        revisionToken,
+        audit,
+        null,
+        null,
+        null);
+  }
+
+  /**
+   * Creates a snapshot from one glossary revision.
+   *
+   * @param name The term name.
+   * @param definition The optional definition.
+   * @param synonyms The term synonyms.
+   * @param status The term status.
+   * @param domains The visible domain memberships.
+   * @param broader The visible direct broader term names.
+   * @param narrower The visible direct narrower term names.
+   * @param related The visible direct related term names.
+   * @param links The documentation links.
+   * @param owner The optional owner.
+   * @param sourceRef The optional source reference.
+   * @param properties The term properties.
+   * @param version The numeric revision version.
+   * @param revisionToken The opaque identity and revision token.
+   * @param audit The audit metadata.
+   * @param matchedBy The matched words, or null outside a lookup.
+   * @param bindings The visible binding preview, or null when omitted.
+   * @param bindingsTruncated Whether the preview omits further visible bindings, or null when
+   *     omitted.
+   */
   @JsonCreator
   public TermDTO(
       @JsonProperty("name") String name,
@@ -88,7 +160,10 @@ public class TermDTO {
       @JsonProperty("properties") Map<String, String> properties,
       @JsonProperty("version") long version,
       @JsonProperty("revisionToken") String revisionToken,
-      @JsonProperty("audit") AuditDTO audit) {
+      @JsonProperty("audit") AuditDTO audit,
+      @JsonProperty("matchedBy") @Nullable List<TermMatchDTO> matchedBy,
+      @JsonProperty("bindings") @Nullable List<TermBindingDTO> bindings,
+      @JsonProperty("bindingsTruncated") @Nullable Boolean bindingsTruncated) {
     this.name = name;
     this.definition = definition;
     this.synonyms = cloneArray(synonyms);
@@ -105,6 +180,9 @@ public class TermDTO {
     this.version = version;
     this.revisionToken = revisionToken;
     this.audit = audit;
+    this.matchedBy = matchedBy == null ? null : ImmutableList.copyOf(matchedBy);
+    this.bindings = bindings == null ? null : ImmutableList.copyOf(bindings);
+    this.bindingsTruncated = bindingsTruncated;
   }
 
   /**

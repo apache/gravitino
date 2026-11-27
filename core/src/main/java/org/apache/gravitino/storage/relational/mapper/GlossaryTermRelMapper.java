@@ -108,7 +108,9 @@ public interface GlossaryTermRelMapper {
       @Param("metalakeId") long metalakeId,
       @Param("ids") Collection<Long> ids,
       @Param("type") String type,
-      @Param("reverse") boolean reverse);
+      @Param("reverse") boolean reverse,
+      @Param("status") @Nullable String status,
+      @Param("limit") @Nullable Integer limit);
 
   /** Selects a bounded batch of expired generations. */
   @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)

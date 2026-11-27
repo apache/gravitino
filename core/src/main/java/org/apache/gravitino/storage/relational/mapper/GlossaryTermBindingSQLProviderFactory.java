@@ -135,6 +135,16 @@ public class GlossaryTermBindingSQLProviderFactory {
     return getProvider().purge(row);
   }
 
+  /** Delegates {@link GlossaryTermBindingBaseSQLProvider#listTermsWithBindings}. */
+  public static String listTermsWithBindings() {
+    return getProvider().listTermsWithBindings();
+  }
+
+  /** Delegates {@link GlossaryTermBindingBaseSQLProvider#listBindingCandidates}. */
+  public static String listBindingCandidates() {
+    return getProvider().listBindingCandidates();
+  }
+
   private static GlossaryTermBindingBaseSQLProvider getProvider() {
     String databaseId =
         SqlSessionFactoryHelper.getInstance()
