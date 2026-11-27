@@ -150,6 +150,9 @@ public final class KnowledgeBaseArticleMetaService {
   /** Body and stable revision identity read from the same live row. */
   public record StoredContent(ArticleBody body, ExpectedRevision revision, ArticleStatus status) {}
 
+  /** Live Article identity and visibility status read from one row. */
+  public record ArticleIdentityAndStatus(long articleId, long metalakeId, ArticleStatus status) {}
+
   private KnowledgeBaseArticleMetaService() {}
 
   /** Returns the shared Article service. */
@@ -261,6 +264,17 @@ public final class KnowledgeBaseArticleMetaService {
 
   /** Resolves the stable ID without fetching the Article body. */
   public NamespacedEntityId getIds(NameIdentifier ident) {
+    ArticleIdentityAndStatus article = getIdentityAndStatus(ident);
+    return new NamespacedEntityId(article.articleId(), article.metalakeId());
+  }
+
+  /**
+   * Reads the live Article identity and status in the caller's transaction.
+   *
+   * @param ident the Article identifier
+   * @return the identity and status used for visibility checks
+   */
+  public ArticleIdentityAndStatus getIdentityAndStatus(NameIdentifier ident) {
     String metalake = metalakeName(ident.namespace());
     String name = KnowledgeBaseArticle.normalizeName(ident.name());
     KnowledgeBaseArticlePO ids =
@@ -269,7 +283,8 @@ public final class KnowledgeBaseArticleMetaService {
     if (ids == null) {
       throw missing(ident);
     }
-    return new NamespacedEntityId(ids.getArticleId(), ids.getMetalakeId());
+    return new ArticleIdentityAndStatus(
+        ids.getArticleId(), ids.getMetalakeId(), ArticleStatus.valueOf(ids.getStatus()));
   }
 
   /**
@@ -682,8 +697,16 @@ public final class KnowledgeBaseArticleMetaService {
 
   /** Runs an owner transfer under the parent fence and the current Article's row lock. */
   public <T> T withLockedArticleId(NameIdentifier ident, LongFunction<T> operation) {
-    return withLockedRow(
-        ident, missing -> missing, (mapper, row) -> operation.apply(row.getArticleId()));
+    String name = KnowledgeBaseArticle.normalizeName(ident.name());
+    return write(
+        mapper -> {
+          long lake = lockMetalake(ident.namespace());
+          Long id = mapper.lockArticleId(lake, name);
+          if (id == null) {
+            throw missing(ident);
+          }
+          return operation.apply(id);
+        });
   }
 
   /** Retires a live Article and its bindings atomically. */

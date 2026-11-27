@@ -77,6 +77,7 @@ public class OwnerManager implements OwnerDispatcher {
     try {
       OwnerImpl newOwner = new OwnerImpl(ownerName, ownerType, null);
       OwnerImpl originOwner;
+      Long metadataId = null;
       if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM) {
         // The owner route authorized a name. Recheck the current term and caller under the
         // term lock so a rename, recreation or transfer cannot change the assignment target.
@@ -95,14 +96,18 @@ public class OwnerManager implements OwnerDispatcher {
                       return replaceOwner(metalake, metadataObject, objectIdent, newOwner);
                     });
       } else if (metadataObject.type() == MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE) {
-        originOwner =
+        record Transfer(long articleId, @Nullable OwnerImpl previous) {}
+        Transfer transfer =
             KnowledgeBaseArticleMetaService.getInstance()
                 .withLockedArticleId(
                     objectIdent,
                     id -> {
                       checkDefinitionOwnerTransfer(metalake, metadataObject.type(), id);
-                      return replaceOwner(metalake, metadataObject, objectIdent, newOwner);
+                      return new Transfer(
+                          id, replaceOwner(metalake, metadataObject, objectIdent, newOwner));
                     });
+        originOwner = transfer.previous();
+        metadataId = transfer.articleId();
       } else {
         originOwner = replaceOwner(metalake, metadataObject, objectIdent, newOwner);
       }
@@ -112,7 +117,7 @@ public class OwnerManager implements OwnerDispatcher {
           metadataObject,
           authorizationPlugin ->
               authorizationPlugin.onOwnerSet(metadataObject, originOwner, newOwner));
-      notifyOwnerChange(originOwner, metalake, metadataObject);
+      notifyOwnerChange(originOwner, metalake, metadataObject, metadataId);
     } catch (NoSuchEntityException nse) {
       // The object existed when getOwner ran, so it can have been dropped since then. This
       // owner-exists check is a heuristic: if the owner is also removed between the failure and
@@ -196,7 +201,7 @@ public class OwnerManager implements OwnerDispatcher {
               metalake,
               mo,
               authorizationPlugin -> authorizationPlugin.onOwnerSet(mo, originOwner, newOwner));
-          notifyOwnerChange(originOwner, metalake, mo);
+          notifyOwnerChange(originOwner, metalake, mo, null);
         } catch (RuntimeException re) {
           LOG.warn(
               "Failed to notify authorization plugin for metadata object {} during batch setOwners",
@@ -218,7 +223,10 @@ public class OwnerManager implements OwnerDispatcher {
   }
 
   private void notifyOwnerChange(
-      @Nullable OwnerImpl oldOwner, String metalake, MetadataObject metadataObject) {
+      @Nullable OwnerImpl oldOwner,
+      String metalake,
+      MetadataObject metadataObject,
+      @Nullable Long metadataId) {
     GravitinoAuthorizer gravitinoAuthorizer = authorizer();
     if (gravitinoAuthorizer == null) {
       return;
@@ -226,11 +234,14 @@ public class OwnerManager implements OwnerDispatcher {
 
     Long oldOwnerId = oldOwner == null ? null : oldOwner.id;
     try {
-      gravitinoAuthorizer.handleMetadataOwnerChange(
-          metalake,
-          oldOwnerId,
-          MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
-          Entity.EntityType.valueOf(metadataObject.type().name()));
+      NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+      Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
+      if (metadataId == null) {
+        gravitinoAuthorizer.handleMetadataOwnerChange(metalake, oldOwnerId, ident, type);
+      } else {
+        gravitinoAuthorizer.handleMetadataOwnerChange(
+            metalake, oldOwnerId, ident, type, metadataId);
+      }
     } catch (RuntimeException e) {
       // Best-effort hook: a failing authorizer must not fail the owner-change operation itself.
       LOG.warn(
