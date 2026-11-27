@@ -52,6 +52,21 @@ public class DomainMemberBaseSQLProvider {
       """;
   }
 
+  /** Lists current names of direct definitions after filtering retired relations and targets. */
+  public String liveMembers() {
+    return """
+      SELECT r.member_type, COALESCE(t.name, a.article_name) AS member_name
+      FROM domain_member_rel r
+      LEFT JOIN glossary_term_meta t ON r.member_type='GLOSSARY_TERM'
+        AND t.term_id=r.member_id AND t.metalake_id=r.metalake_id AND t.deleted_at=0
+      LEFT JOIN kb_article_meta a ON r.member_type='KNOWLEDGE_BASE_ARTICLE'
+        AND a.article_id=r.member_id AND a.metalake_id=r.metalake_id AND a.deleted_at=0
+      WHERE r.metalake_id=#{lake} AND r.domain_id=#{domain} AND r.deleted_at=0
+        AND (t.term_id IS NOT NULL OR a.article_id IS NOT NULL)
+      ORDER BY r.member_type, r.member_id LIMIT #{limit} OFFSET #{offset}
+      """;
+  }
+
   /** Adds a verified live member and Domain pair. */
   public String add() {
     return """

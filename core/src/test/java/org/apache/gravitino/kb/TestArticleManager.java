@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.service.GlossaryDomainFixt
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -142,6 +143,31 @@ class TestArticleManager extends TestJDBCBackend {
     assertThrows(
         ArticleRevisionConflictException.class,
         () -> manager.alterArticle(LAKE, "café", created.revisionToken()));
+  }
+
+  @TestTemplate
+  void staleBodySavePreservesTheFirstEditorsContent() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    var created = manager.createArticle(LAKE, request().build());
+    assertNull(created.article().owner());
+    var first = manager.getArticleContent(LAKE, "guide");
+    var second = manager.getArticleContent(LAKE, "guide");
+    var body = ArticleBody.of(ArticleBody.Format.MARKDOWN, "First edit");
+    var saved =
+        manager.alterArticle(
+            LAKE, "guide", first.revisionToken(), KnowledgeBaseArticleChange.updateBody(body));
+    assertThrows(
+        ArticleRevisionConflictException.class,
+        () ->
+            manager.alterArticle(
+                LAKE,
+                "guide",
+                second.revisionToken(),
+                KnowledgeBaseArticleChange.updateBody(
+                    ArticleBody.of(ArticleBody.Format.MARKDOWN, "Second edit"))));
+    var retained = manager.getArticleContent(LAKE, "guide");
+    assertEquals(body, retained.body());
+    assertEquals(saved.revisionToken(), retained.revisionToken());
   }
 
   @TestTemplate
@@ -492,7 +518,13 @@ class TestArticleManager extends TestJDBCBackend {
     var edited =
         manager.alterArticle(
             LAKE, "guide", null, KnowledgeBaseArticleChange.updateStatus(ArticleStatus.DEPRECATED));
-    assertEquals(bindings, edited.article().bindings());
+    assertEquals(Set.of(), edited.article().bindings());
+    assertEquals(
+        bindings,
+        KnowledgeBaseArticleMetaService.getInstance()
+            .getScoped(edited.article().nameIdentifier())
+            .article()
+            .bindings());
     assertEquals(3, edited.article().revision());
   }
 
