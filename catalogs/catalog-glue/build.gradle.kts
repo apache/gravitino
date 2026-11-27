@@ -74,6 +74,9 @@ dependencies {
   implementation(project(":bundles:aws"))
   implementation(libs.slf4j.api)
 
+  // Iceberg's http-client.type=apache loads the AWS SDK's Apache 4 client at runtime.
+  runtimeOnly(libs.aws.apache.client)
+
   annotationProcessor(libs.lombok)
 
   testImplementation(project(":api"))
