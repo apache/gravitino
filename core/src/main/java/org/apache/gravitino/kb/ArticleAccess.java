@@ -29,6 +29,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.authorization.GravitinoAuthorizer.ArticleOwnerIds;
 import org.apache.gravitino.authorization.Privilege.Name;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -91,6 +92,16 @@ public final class ArticleAccess {
 
   boolean canView() {
     return allowed(Name.VIEW_DEFINITION);
+  }
+
+  boolean canManage() {
+    return allowed(Name.MANAGE_DEFINITIONS);
+  }
+
+  ArticleOwnerIds draftOwnerIds() {
+    return allowed(Name.CREATE_DEFINITION)
+        ? authorizer.articleOwnerIds(principal, metalake, context)
+        : ArticleOwnerIds.NONE;
   }
 
   void requireCreate() {
@@ -162,7 +173,7 @@ public final class ArticleAccess {
   }
 
   private boolean canEdit(long id) {
-    return allowed(Name.MANAGE_DEFINITIONS)
+    return canManage()
         || (allowed(Name.CREATE_DEFINITION)
             && authorizer.isArticleOwner(principal, metalake, id, context));
   }

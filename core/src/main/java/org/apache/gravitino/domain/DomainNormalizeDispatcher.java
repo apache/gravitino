@@ -129,6 +129,13 @@ public final class DomainNormalizeDispatcher implements DomainDispatcher {
   }
 
   @Override
+  public DefinitionMemberPage listDefinitionMembers(
+      String metalake, String name, int limit, int offset, Consumer<DomainEntity> authorize) {
+    NameValidationUtils.validateName("domain", name);
+    return dispatcher.listDefinitionMembers(metalake, name, limit, offset, authorize);
+  }
+
+  @Override
   public DomainMember[] listMembers(String metalake, String name, DomainMemberFilter filter) {
     NameValidationUtils.validateName("domain", name);
     NameValidationUtils.validateDomainNames(filter.domains());

@@ -17,6 +17,7 @@
 
 import unittest
 
+from gravitino.api.authorization.securable_objects import SecurableObjects
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.dto.authorization.securable_object_dto import SecurableObjectDTO
@@ -26,6 +27,23 @@ from gravitino.rest.rest_utils import encode_metadata_object_name
 
 
 class TestMetadataObjects(unittest.TestCase):
+    def test_article_is_a_normalized_metalake_level_object(self):
+        article_type = MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE
+        for obj in (
+            MetadataObjects.of("Cafe\u0301", article_type),
+            MetadataObjects.of(["Cafe\u0301"], article_type),
+            MetadataObjectDTO(article_type, "Cafe\u0301"),
+        ):
+            self.assertEqual("Café", obj.full_name())
+            self.assertIsNone(MetadataObjects.parent(obj))
+            self.assertEqual("Caf%C3%A9", encode_metadata_object_name(obj))
+        with self.assertRaises(IllegalArgumentException):
+            MetadataObjects.of("article", article_type, "parent")
+        with self.assertRaises(IllegalArgumentException):
+            MetadataObjects.parse("parent.article", article_type)
+        with self.assertRaises(IllegalArgumentException):
+            SecurableObjects.parse("article", article_type, [])
+
     def test_dotted_glossary_term_is_one_name(self):
         name = "finance.net.revenue"
         term_type = MetadataObject.Type.GLOSSARY_TERM
@@ -42,7 +60,9 @@ class TestMetadataObjects(unittest.TestCase):
             encode_metadata_object_name(MetadataObjects.of("a.b/c", term_type)),
         )
         for invalid in [".", "..", "   "]:
-            with self.subTest(name=invalid), self.assertRaises(IllegalArgumentException):
+            with self.subTest(name=invalid), self.assertRaises(
+                IllegalArgumentException
+            ):
                 encode_metadata_object_name(MetadataObjectDTO(term_type, invalid))
         with self.assertRaises(IllegalArgumentException):
             MetadataObjects.of(name, term_type, "finance")

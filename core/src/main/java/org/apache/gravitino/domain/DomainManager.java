@@ -279,6 +279,21 @@ public class DomainManager implements DomainDispatcher {
   }
 
   @Override
+  public DefinitionMemberPage listDefinitionMembers(
+      String metalake, String name, int limit, int offset, Consumer<DomainEntity> authorize) {
+    checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
+    try {
+      return domainOperations()
+          .listDefinitionMembers(
+              NameIdentifierUtil.ofDomain(metalake, name), limit, offset, authorize);
+    } catch (NoSuchEntityException e) {
+      throw noSuchDomain(e, metalake, name);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to list definition members of Domain " + name, ioe);
+    }
+  }
+
+  @Override
   public DomainMember[] listMembers(String metalake, String name, DomainMemberFilter filter) {
     // getDomain validates that the metalake exists before loading the domain.
     DomainEntity queriedDomain = getDomain(metalake, name);

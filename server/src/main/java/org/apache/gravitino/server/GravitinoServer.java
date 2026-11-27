@@ -44,6 +44,7 @@ import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.glossary.GlossaryTermViews;
 import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.kb.ArticleManager;
 import org.apache.gravitino.lineage.LineageConfig;
 import org.apache.gravitino.lineage.LineageDispatcher;
 import org.apache.gravitino.lineage.LineageService;
@@ -181,6 +182,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.filesetDispatcher()).to(FilesetDispatcher.class).ranked(1);
             bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
             bind(gravitinoEnv.tagDispatcher()).to(TagDispatcher.class).ranked(1);
+            bind(gravitinoEnv.articleManager()).to(ArticleManager.class).ranked(1);
             bind(new GlossaryTermViews(gravitinoEnv.glossaryManager()))
                 .to(GlossaryTermViews.class)
                 .ranked(1);

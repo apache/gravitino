@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import org.apache.gravitino.domain.DefinitionMember;
 import org.apache.ibatis.annotations.Arg;
 import org.apache.ibatis.annotations.ConstructorArgs;
 import org.apache.ibatis.annotations.DeleteProvider;
@@ -44,6 +45,9 @@ public interface DomainMemberMapper {
 
   /** Stable member and Domain identities for reverse lookups and bulk reads. */
   record Membership(MemberType memberType, long memberId, long domainId) {}
+
+  /** A direct member's type and current display name. */
+  record NamedMember(DefinitionMember.Type type, String name) implements DefinitionMember {}
 
   /** Checks all member types after the caller has acquired the exclusive Domain lock. */
   @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
@@ -75,6 +79,19 @@ public interface DomainMemberMapper {
     @Arg(column = "domain_id", javaType = long.class)
   })
   List<Membership> members(
+      @Param("lake") long lake,
+      @Param("domain") long domain,
+      @Param("limit") int limit,
+      @Param("offset") int offset);
+
+  /** Lists current names of direct definitions after filtering retired relations and targets. */
+  @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
+  @SelectProvider(type = DomainMemberSQLProviderFactory.class, method = "liveMembers")
+  @ConstructorArgs({
+    @Arg(column = "member_type", javaType = DefinitionMember.Type.class),
+    @Arg(column = "member_name", javaType = String.class)
+  })
+  List<NamedMember> liveMembers(
       @Param("lake") long lake,
       @Param("domain") long domain,
       @Param("limit") int limit,
