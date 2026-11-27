@@ -763,3 +763,7 @@ COMMENT ON COLUMN kb_article_relation_meta.deleted_at IS 'Soft deletion time in 
 CREATE INDEX IF NOT EXISTS idx_kba_target ON kb_article_relation_meta (target_id, target_type, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_kba_relation_metalake ON kb_article_relation_meta (metalake_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_kba_relation_deleted ON kb_article_relation_meta (deleted_at, id);
+
+CREATE INDEX IF NOT EXISTS idx_column_liveness ON table_column_version_info (column_id, deleted_at, table_id, table_version);
+
+CREATE INDEX IF NOT EXISTS idx_kba_binding_scan ON kb_article_relation_meta (target_type, deleted_at, id);

@@ -44,7 +44,16 @@ import org.apache.gravitino.meta.AuditInfo;
  */
 @Getter
 @Accessors(fluent = true)
-@EqualsAndHashCode(exclude = {"auditInfo", "bodyUpdate", "domains"})
+@EqualsAndHashCode(
+    exclude = {
+      "auditInfo",
+      "bodyUpdate",
+      "domains",
+      "terms",
+      "termsHasMore",
+      "objects",
+      "objectsHasMore"
+    })
 public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, Auditable {
   /** Stable identity of a bound Term or asset. */
   public record Binding(String targetType, long targetId) {
@@ -61,12 +70,15 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
             "SEMANTIC_MODEL",
             "COLUMN");
 
+    /** Returns whether an Article can bind to this stored target type. */
+    public static boolean supportsTargetType(String type) {
+      return type != null && TYPES.contains(type);
+    }
+
     /** Validates the stored target type. */
     public Binding {
       Preconditions.checkArgument(
-          targetType != null && TYPES.contains(targetType),
-          "Unsupported Article target type: %s",
-          targetType);
+          supportsTargetType(targetType), "Unsupported Article target type: %s", targetType);
     }
   }
 
@@ -104,6 +116,16 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
   /** Current Domain names visible to the caller in manager results. */
   private final List<String> domains;
 
+  /** Visible Term binding window in manager responses. */
+  private final List<ArticleTermBinding> terms;
+
+  private final boolean termsHasMore;
+
+  /** Readable asset binding window in manager responses. */
+  private final List<ArticleObjectIdentifier> objects;
+
+  private final boolean objectsHasMore;
+
   private final Set<Binding> bindings;
   private final AuditInfo auditInfo;
 
@@ -122,6 +144,10 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
       long revision,
       Set<Long> domainIds,
       List<String> domains,
+      List<ArticleTermBinding> terms,
+      boolean termsHasMore,
+      List<ArticleObjectIdentifier> objects,
+      boolean objectsHasMore,
       Set<Binding> bindings,
       AuditInfo auditInfo) {
     Preconditions.checkArgument(
@@ -145,6 +171,10 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
     this.revision = revision == 0 ? 1 : revision;
     this.domainIds = domainIds == null ? Set.of() : Set.copyOf(domainIds);
     this.domains = domains == null ? List.of() : List.copyOf(domains);
+    this.terms = terms == null ? List.of() : List.copyOf(terms);
+    this.termsHasMore = termsHasMore;
+    this.objects = objects == null ? List.of() : List.copyOf(objects);
+    this.objectsHasMore = objectsHasMore;
     this.bindings = bindings == null ? Set.of() : Set.copyOf(bindings);
     this.auditInfo = Preconditions.checkNotNull(auditInfo, "auditInfo");
   }

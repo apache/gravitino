@@ -48,6 +48,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
@@ -60,17 +61,29 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTermException;
+import org.apache.gravitino.exceptions.UnapprovedTermException;
+import org.apache.gravitino.glossary.GlossaryManager;
+import org.apache.gravitino.glossary.GlossaryTerm;
+import org.apache.gravitino.glossary.TermChange;
+import org.apache.gravitino.glossary.TermSpec;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.PolicyManager;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
@@ -81,6 +94,7 @@ import org.apache.gravitino.storage.relational.service.DomainMetaService;
 import org.apache.gravitino.storage.relational.service.DomainRelService;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.TransactionHook;
+import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
@@ -90,6 +104,7 @@ import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.plugin.Interceptor;
@@ -903,6 +918,124 @@ class TestArticleAuthorization extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void createChecksDomainPermissionBeforeTermApproval() throws Exception {
+    insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    role(
+        "salesReader",
+        SecurableObjects.parse(
+            "Sales", MetadataObject.Type.DOMAIN, List.of(Privileges.allow("USE_DOMAIN"))));
+    user("author", "create", "salesReader");
+    var glossary = new GlossaryManager(ids::incrementAndGet, true);
+    as(
+        "lakeOwner",
+        () ->
+            glossary.createTerm(
+                LAKE, TermSpec.builder("Old").withStatus(GlossaryTerm.Status.DEPRECATED).build()));
+    var request =
+        ArticleCreate.builder()
+            .withTitle("Guide")
+            .withName("guide")
+            .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+            .addTerms("Old")
+            .addDomains("Sales")
+            .build();
+    as(
+        "author",
+        () -> assertThrows(ForbiddenException.class, () -> manager.createArticle(LAKE, request)));
+    as(
+        "lakeOwner",
+        () ->
+            assertThrows(
+                UnapprovedTermException.class, () -> manager.createArticle(LAKE, request)));
+    as(
+        "lakeOwner",
+        () ->
+            assertThrows(
+                NoSuchKnowledgeBaseArticleException.class,
+                () -> manager.loadArticle(LAKE, "guide")));
+  }
+
+  @TestTemplate
+  void hiddenTermBindingsAreFilteredBeforePagingAndStatusConflicts() throws Exception {
+    var glossary = new GlossaryManager(ids::incrementAndGet, true);
+    as("writer2", () -> glossary.createTerm(LAKE, TermSpec.builder("First").build()));
+    as("writer2", () -> glossary.createTerm(LAKE, TermSpec.builder("Second").build()));
+    as(
+        "writer",
+        () ->
+            manager.createArticle(
+                LAKE,
+                ArticleCreate.builder()
+                    .withTitle("Guide")
+                    .withName("guide")
+                    .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+                    .addTerms("First", "Second")
+                    .build()));
+    var token = as("viewer", () -> manager.loadArticle(LAKE, "guide")).revisionToken();
+    as(
+        "writer2",
+        () -> glossary.alterTerm(LAKE, "First", TermChange.setStatus(GlossaryTerm.Status.DRAFT)));
+    as(
+        "writer",
+        () -> {
+          var page = manager.listTermBindings(LAKE, "guide", 1, 0);
+          assertEquals("Second", page.terms().get(0).name());
+          assertFalse(page.hasMore());
+          var loaded = manager.loadArticle(LAKE, "guide", 1, 0);
+          assertEquals(1, loaded.article().bindings().size());
+          assertFalse(loaded.article().termsHasMore());
+          assertTrue(manager.listTermBindings(LAKE, "guide", 1, 1).terms().isEmpty());
+          assertThrows(
+              NoSuchTermException.class,
+              () ->
+                  manager.alterArticle(
+                      LAKE, "guide", token, KnowledgeBaseArticleChange.addTerms("First")));
+          assertThrows(
+              NoSuchTermException.class,
+              () ->
+                  manager.alterArticle(
+                      LAKE, "guide", "malformed", KnowledgeBaseArticleChange.addTerms("First")));
+          assertThrows(
+              NoSuchTermException.class,
+              () -> manager.listArticlesForTerm(LAKE, "First", true, 1, 0));
+          var summary = manager.listArticlesForTerm(LAKE, "Second", false, 10, 0).articles().get(0);
+          assertEquals("writer", summary.owner().name());
+          assertEquals("Second", summary.terms()[0].name());
+          assertEquals(1, summary.terms().length);
+          return null;
+        });
+    as(
+        "writer2",
+        () -> {
+          assertEquals(
+              ArticleTermBinding.Status.DRAFT,
+              manager.listTermBindings(LAKE, "guide", 1, 0).terms().get(0).status());
+          assertThrows(
+              UnapprovedTermException.class,
+              () ->
+                  manager.createArticle(
+                      LAKE,
+                      ArticleCreate.builder()
+                          .withTitle("Other")
+                          .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+                          .addTerms("First")
+                          .build()));
+          return null;
+        });
+    as(
+        "outsider",
+        () -> {
+          assertThrows(
+              NoSuchKnowledgeBaseArticleException.class,
+              () -> manager.listTermBindings(LAKE, "guide", 1, 0));
+          assertThrows(
+              NoSuchTermException.class,
+              () -> manager.listArticlesForTerm(LAKE, "Second", false, 1, 0));
+          return null;
+        });
+  }
+
+  @TestTemplate
   void domainVisibilityAndOrderedReplacements() throws Exception {
     insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
     long retail = insertDomain(LAKE, "Retail", Domain.Status.PUBLISHED, "Sales", AUDIT_INFO);
@@ -1144,6 +1277,269 @@ class TestArticleAuthorization extends TestJDBCBackend {
       assertEquals(
           "body", as("lakeOwner", () -> manager.getArticleContent(LAKE, name)).body().content());
     }
+  }
+
+  @TestTemplate
+  void assetPrivilegesFilterBindingsBeforeOffsetAndRecheckNoOps() throws Exception {
+    installAssetCatalog();
+    createAndInsertCatalog(LAKE, "warehouse");
+    createAndInsertSchema(LAKE, "warehouse", "sales");
+    var ns = Namespace.of(LAKE, "warehouse", "sales");
+    var names = List.of("first", "hidden", "last");
+    List<ArticleObjectIdentifier> targets = new ArrayList<>();
+    for (String name : names) {
+      backend.insert(createTableEntity(ids.incrementAndGet(), ns, name, AUDIT_INFO), false);
+      targets.add(
+          ArticleObjectIdentifier.of(
+              MetadataObject.Type.TABLE, List.of("warehouse", "sales"), name));
+    }
+    role("useCatalog", Privileges.allow("USE_CATALOG"));
+    role("useSchema", Privileges.allow("USE_SCHEMA"));
+    role("allTables", Privileges.allow("SELECT_TABLE"));
+    role(
+        "hideTable",
+        SecurableObjects.parse(
+            "warehouse.sales.hidden",
+            MetadataObject.Type.TABLE,
+            List.of(Privileges.deny("SELECT_TABLE"))));
+    user("assetEditor", "manage", "useCatalog", "useSchema", "allTables", "hideTable");
+    var created =
+        as(
+            "lakeOwner",
+            () ->
+                manager.createArticle(
+                    LAKE,
+                    ArticleCreate.builder()
+                        .withTitle("Guide")
+                        .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+                        .addObjects(targets.toArray(ArticleObjectIdentifier[]::new))
+                        .build()));
+    as(
+        "assetEditor",
+        () -> {
+          var first = manager.listAssetBindings(LAKE, "guide", 1, 0);
+          assertEquals(List.of(targets.get(0)), first.objects());
+          assertTrue(first.hasMore());
+          var last = manager.loadArticle(LAKE, "guide", 1, 1).article();
+          assertEquals(List.of(targets.get(2)), last.objects());
+          assertFalse(last.objectsHasMore());
+          assertThrows(
+              NoSuchMetadataObjectException.class,
+              () -> manager.listArticlesForObject(LAKE, targets.get(1), true, 1, 0));
+          assertThrows(
+              NoSuchMetadataObjectException.class,
+              () ->
+                  manager.alterArticle(
+                      LAKE,
+                      "guide",
+                      null,
+                      KnowledgeBaseArticleChange.updateTitle("Changed"),
+                      KnowledgeBaseArticleChange.addObjects(targets.get(1))));
+          assertThrows(
+              NoSuchMetadataObjectException.class,
+              () ->
+                  manager.alterArticle(
+                      LAKE,
+                      "guide",
+                      null,
+                      KnowledgeBaseArticleChange.removeObjects(targets.get(1))));
+          assertEquals(created.revisionToken(), manager.loadArticle(LAKE, "guide").revisionToken());
+          return null;
+        });
+    assertTrue(
+        as("viewer", () -> manager.listAssetBindings(LAKE, "guide", 1, 0)).objects().isEmpty());
+  }
+
+  @TestTemplate
+  void assetBindingsRespectInheritedSchemaGrantsAndDenies() throws Exception {
+    installAssetCatalog();
+    String previousSeparator = env.config().get(Configs.SCHEMA_SEPARATOR);
+    try {
+      Mockito.when(env.config().get(Configs.SCHEMA_SEPARATOR)).thenReturn("/");
+      createAndInsertCatalog(LAKE, "warehouse");
+      createAndInsertSchema(LAKE, "warehouse", "sales/retail");
+      createAndInsertTableEntity(Namespace.of(LAKE, "warehouse", "sales/retail"), "orders");
+      var table =
+          ArticleObjectIdentifier.of(
+              MetadataObject.Type.TABLE, List.of("warehouse", "sales/retail"), "orders");
+      role("useCatalog", Privileges.allow("USE_CATALOG"));
+      role("useSchema", Privileges.allow("USE_SCHEMA"));
+      role("readTables", Privileges.allow("SELECT_TABLE"));
+      role(
+          "readSales",
+          SecurableObjects.parse(
+              "warehouse.sales",
+              MetadataObject.Type.SCHEMA,
+              List.of(Privileges.allow("SELECT_TABLE"))));
+      role(
+          "denySales",
+          SecurableObjects.parse(
+              "warehouse.sales",
+              MetadataObject.Type.SCHEMA,
+              List.of(Privileges.deny("SELECT_TABLE"))));
+      user("salesReader", "view", "useCatalog", "useSchema", "readSales");
+      user("otherReader", "view", "useCatalog", "useSchema", "readTables", "denySales");
+      as(
+          "lakeOwner",
+          () ->
+              manager.createArticle(
+                  LAKE,
+                  ArticleCreate.builder()
+                      .withTitle("Guide")
+                      .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+                      .addObjects(table)
+                      .build()));
+      as(
+          "salesReader",
+          () -> {
+            assertEquals(
+                "guide",
+                manager.listArticlesForObject(LAKE, table, false, 1, 0).articles().get(0).name());
+            assertEquals(List.of(table), manager.listAssetBindings(LAKE, "guide", 1, 0).objects());
+            return null;
+          });
+      as(
+          "otherReader",
+          () -> {
+            assertThrows(
+                NoSuchMetadataObjectException.class,
+                () -> manager.listArticlesForObject(LAKE, table, false, 1, 0));
+            var page = manager.listAssetBindings(LAKE, "guide", 1, 0);
+            assertTrue(page.objects().isEmpty());
+            assertFalse(page.hasMore());
+            return null;
+          });
+    } finally {
+      Mockito.when(env.config().get(Configs.SCHEMA_SEPARATOR)).thenReturn(previousSeparator);
+    }
+  }
+
+  @TestTemplate
+  void columnUsesTableReadPermissionAndChecksTheCurrentTableId() throws Exception {
+    installAssetCatalog();
+    createAndInsertCatalog(LAKE, "warehouse");
+    createAndInsertSchema(LAKE, "warehouse", "sales");
+    var ns = Namespace.of(LAKE, "warehouse", "sales");
+    var table =
+        TableEntity.builder()
+            .withId(ids.incrementAndGet())
+            .withNamespace(ns)
+            .withName("orders")
+            .withColumns(
+                List.of(
+                    ColumnEntity.builder()
+                        .withId(ids.incrementAndGet())
+                        .withName("total.amount")
+                        .withDataType(Types.IntegerType.get())
+                        .withPosition(0)
+                        .withNullable(true)
+                        .withAutoIncrement(false)
+                        .withAuditInfo(AUDIT_INFO)
+                        .build()))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(table, false);
+    role("useCatalog", Privileges.allow("USE_CATALOG"));
+    role("useSchema", Privileges.allow("USE_SCHEMA"));
+    role(
+        "ordersReader",
+        SecurableObjects.parse(
+            "warehouse.sales.orders",
+            MetadataObject.Type.TABLE,
+            List.of(Privileges.allow("SELECT_TABLE"))));
+    user("ordersReaderUser", "view", "useCatalog", "useSchema", "ordersReader");
+    var column =
+        ArticleObjectIdentifier.of(
+            MetadataObject.Type.COLUMN, List.of("warehouse", "sales", "orders"), "total.amount");
+    as(
+        "lakeOwner",
+        () ->
+            manager.createArticle(
+                LAKE,
+                ArticleCreate.builder()
+                    .withTitle("Guide")
+                    .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+                    .addObjects(column)
+                    .build()));
+    assertEquals(
+        List.of(column),
+        as("ordersReaderUser", () -> manager.loadArticle(LAKE, "guide")).article().objects());
+    assertEquals(
+        "guide",
+        as("ordersReaderUser", () -> manager.listArticlesForObject(LAKE, column, false, 1, 0))
+            .articles()
+            .get(0)
+            .name());
+    backend.delete(table.nameIdentifier(), Entity.EntityType.TABLE, false);
+    createAndInsertTableEntity(ns, "orders");
+    var replacement =
+        ArticleObjectIdentifier.of(
+            MetadataObject.Type.TABLE, List.of("warehouse", "sales"), "orders");
+    as(
+        "lakeOwner",
+        () ->
+            manager.alterArticle(
+                LAKE, "guide", null, KnowledgeBaseArticleChange.addObjects(replacement)));
+    as(
+        "ordersReaderUser",
+        () -> {
+          assertTrue(manager.loadArticle(LAKE, "guide").article().objects().isEmpty());
+          assertThrows(
+              NoSuchMetadataObjectException.class,
+              () -> manager.listArticlesForObject(LAKE, replacement, false, 1, 0));
+          return null;
+        });
+  }
+
+  @TestTemplate
+  void sweepPreservesLiveBindingHiddenFromCaller() throws Exception {
+    installAssetCatalog();
+    createAndInsertCatalog(LAKE, "warehouse");
+    createAndInsertSchema(LAKE, "warehouse", "sales");
+    var ns = Namespace.of(LAKE, "warehouse", "sales");
+    backend.insert(createTableEntity(ids.incrementAndGet(), ns, "orders", AUDIT_INFO), false);
+    var orders =
+        ArticleObjectIdentifier.of(
+            MetadataObject.Type.TABLE, List.of("warehouse", "sales"), "orders");
+    var created =
+        as(
+            "lakeOwner",
+            () ->
+                manager.createArticle(
+                    LAKE,
+                    ArticleCreate.builder()
+                        .withTitle("Guide")
+                        .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+                        .addObjects(orders)
+                        .build()));
+    as(
+        "viewer",
+        () -> {
+          assertTrue(manager.listAssetBindings(LAKE, "guide", 1, 0).objects().isEmpty());
+          assertEquals(
+              0,
+              OrphanedMetadataObjectRelationService.getInstance()
+                  .softDeleteOrphanedRelations(MetadataObject.Type.TABLE, 10));
+          return null;
+        });
+    var loaded = as("lakeOwner", () -> manager.loadArticle(LAKE, "guide"));
+    assertEquals(List.of(orders), loaded.article().objects());
+    assertEquals(created.revisionToken(), loaded.revisionToken());
+  }
+
+  private void installAssetCatalog() throws Exception {
+    // Role loading resolves the catalog's case and table-name rules for its securable objects.
+    var manager = Mockito.mock(CatalogManager.class);
+    var catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(new Capability() {});
+    Mockito.doAnswer(
+            call -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = call.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(manager)
+        .doWithCatalog(Mockito.any(), Mockito.any());
+    FieldUtils.writeField(env, "catalogManager", manager, true);
   }
 
   private static KnowledgeBaseArticleChange domains(String... names) {

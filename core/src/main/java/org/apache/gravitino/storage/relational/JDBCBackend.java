@@ -606,6 +606,11 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public void sweepOrphanedRelations(MetadataObject.Type type, int limit) {
+    OrphanedMetadataObjectRelationService.getInstance().sweepOrphanedRelations(type, limit);
+  }
+
+  @Override
   public int deleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount)
       throws IOException {
     switch (entityType) {
