@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -157,17 +158,18 @@ public final class ArticleManager {
                   if (!request.objects().isEmpty()) {
                     bindings = assets.lock(terms.lake(), assetPlan.get());
                   }
+                  Collection<ArticleTerms.CheckedEdit> checkedTerms = List.of();
                   if (!request.terms().isEmpty()) {
                     long lake = terms.lake();
                     ArticleTerms.Plan resolved = termPlan.get();
                     articles.lockTermTargets(lake, resolved.targets());
-                    bindings = ArticleTerms.apply(terms.check(lake, resolved), bindings);
+                    checkedTerms = terms.check(lake, resolved);
                   }
                   Set<Long> initial = domains.check(plan.get(), Set.of(), true);
                   return edits
                       .create(metalake, articleId, ident.name(), request, initial)
                       .toBuilder()
-                      .withBindings(bindings)
+                      .withBindings(ArticleTerms.apply(checkedTerms, bindings))
                       .build();
                 },
                 expectedMetalakeId,
