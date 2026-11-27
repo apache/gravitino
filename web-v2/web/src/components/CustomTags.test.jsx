@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   dispatch: vi.fn(),
   blur: null,
   change: null,
+  list: null,
   tagsData: [{ name: 'classification', allowedValues: null }]
 }))
 vi.mock('next/navigation', () => ({
@@ -38,6 +39,7 @@ vi.mock('@/lib/hooks/useStore', () => ({
 }))
 vi.mock('@/lib/store/tags', () => ({ associateTag: args => ({ kind: 'associate', args }) }))
 vi.mock('@/lib/store/metalakes', () => ({ getCurrentEntityTags: args => ({ kind: 'getTags', args }) }))
+vi.mock('./MetadataObjectListsProvider', () => ({ useMetadataObjectList: () => mocks.list }))
 vi.mock('@ant-design/icons', () => ({ LockOutlined: () => null, PlusOutlined: () => null }))
 vi.mock('antd', () => ({
   Cascader: props => {
@@ -64,6 +66,7 @@ afterEach(async () => {
   vi.clearAllMocks()
   mocks.blur = null
   mocks.change = null
+  mocks.list = null
   mocks.tagsData = [{ name: 'classification', allowedValues: null }]
 })
 
@@ -142,6 +145,31 @@ it('closes the picker without requesting an already-associated value', async () 
 
   expect(container.querySelector('[data-testid="cascader"]')).toBeNull()
   expect(mocks.dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'associate' }))
+})
+
+it('refreshes the bulk list after associating a value', async () => {
+  mocks.list = { data: { tags: [] }, refresh: vi.fn() }
+  mocks.tagsData = [{ name: 'classification', allowedValues: ['private'] }]
+  mocks.dispatch.mockResolvedValue({})
+  container = document.createElement('div')
+  document.body.appendChild(container)
+  root = createRoot(container)
+
+  await act(async () => root.render(<Tags metadataObjectType='table' metadataObjectFullName='sales.orders' />))
+  await act(async () => container.querySelector('button').click())
+  await act(async () => mocks.change(['classification', 'private']))
+  await act(async () => mocks.blur())
+
+  expect(mocks.dispatch).toHaveBeenCalledExactlyOnceWith({
+    kind: 'associate',
+    args: {
+      metalake: 'demo',
+      metadataObjectType: 'table',
+      metadataObjectFullName: 'sales.orders',
+      data: { tagsToAdd: [{ name: 'classification', value: 'private' }] }
+    }
+  })
+  expect(mocks.list.refresh).toHaveBeenCalledTimes(1)
 })
 
 it.each(['__no_value__', '__custom_value__'])(

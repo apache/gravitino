@@ -34,7 +34,8 @@ const Apis = {
   METADATA_PATH_TAG: ({ metalake, tag }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/tags/${encodeURIComponent(tag)}/objects`,
   METADATA_PATH_POLICY: ({ metalake, policy }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/policies/${encodeURIComponent(policy)}/objects`
+    `/api/metalakes/${encodeURIComponent(metalake)}/policies/${encodeURIComponent(policy)}/objects`,
+  BULK_OBJECT_TAGS_PATH: ({ metalake }) => `/api/bulk/metalakes/${encodeURIComponent(metalake)}/objects/tags`
 }
 
 export const getMetalakesApi = () => {
@@ -118,5 +119,12 @@ export const getMetadataObjectsForTagApi = (metalake, tag) => {
 export const getMetadataObjectsForPolicyApi = (metalake, policy) => {
   return defHttp.get({
     url: Apis.METADATA_PATH_POLICY({ metalake, policy })
+  })
+}
+
+export const getMetadataObjectTagsApi = (metalake, metadataObjects) => {
+  return defHttp.post({
+    url: Apis.BULK_OBJECT_TAGS_PATH({ metalake }),
+    data: { metadataObjects }
   })
 }

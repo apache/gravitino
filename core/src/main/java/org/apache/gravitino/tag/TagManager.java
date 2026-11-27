@@ -21,13 +21,13 @@ package org.apache.gravitino.tag;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +38,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
@@ -75,17 +76,7 @@ public class TagManager implements TagDispatcher {
 
   /** Metadata object types that support tag assignments. */
   public static final Set<MetadataObject.Type> SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS =
-      ImmutableSet.of(
-          MetadataObject.Type.CATALOG,
-          MetadataObject.Type.SCHEMA,
-          MetadataObject.Type.TABLE,
-          MetadataObject.Type.VIEW,
-          MetadataObject.Type.FILESET,
-          MetadataObject.Type.TOPIC,
-          MetadataObject.Type.COLUMN,
-          MetadataObject.Type.MODEL,
-          MetadataObject.Type.FUNCTION,
-          MetadataObject.Type.SEMANTIC_MODEL);
+      MetadataObjects.TAGGABLE_METADATA_OBJECT_TYPES;
 
   private final IdGenerator idGenerator;
 
@@ -353,6 +344,21 @@ public class TagManager implements TagDispatcher {
       LOG.error("Failed to list tags for metadata object {}", metadataObject, e);
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public Map<MetadataObject, Tag[]> listEffectiveTagsForDisplay(
+      String metalake, List<MetadataObject> metadataObjects) {
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    Map<MetadataObject, Tag[]> result = new LinkedHashMap<>();
+    new EffectiveTagResolver(entityStore)
+        .resolveWithSourcesForDisplay(metalake, metadataObjects)
+        .forEach(
+            (object, tags) ->
+                result.put(
+                    object,
+                    Arrays.stream(tags).map(resolved -> resolved.tag()).toArray(Tag[]::new)));
+    return result;
   }
 
   public Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name)

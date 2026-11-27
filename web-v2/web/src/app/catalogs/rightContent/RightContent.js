@@ -26,6 +26,7 @@ import Link from 'next/link'
 import useResizeObserver from 'use-resize-observer'
 import dynamic from 'next/dynamic'
 import Loading from '@/components/Loading'
+import MetadataObjectListsProvider from '@/components/MetadataObjectListsProvider'
 
 const CatalogDetailsPage = dynamic(() => import('./entitiesContent/CatalogDetailsPage'), {
   loading: () => <Loading height={'200px'} />,
@@ -268,7 +269,9 @@ const RightContent = () => {
             : [])
         ]}
       />
-      {renderEntity()}
+      <MetadataObjectListsProvider key={searchParams.toString()} metalake={currentMetalake}>
+        {renderEntity()}
+      </MetadataObjectListsProvider>
     </div>
   )
 }

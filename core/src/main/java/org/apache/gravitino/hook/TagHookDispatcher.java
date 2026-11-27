@@ -18,6 +18,7 @@
 package org.apache.gravitino.hook;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -167,5 +168,11 @@ public class TagHookDispatcher implements TagDispatcher {
   @Override
   public Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name) {
     return dispatcher.getTagForMetadataObject(metalake, metadataObject, name);
+  }
+
+  @Override
+  public Map<MetadataObject, Tag[]> listEffectiveTagsForDisplay(
+      String metalake, List<MetadataObject> metadataObjects) {
+    return dispatcher.listEffectiveTagsForDisplay(metalake, metadataObjects);
   }
 }

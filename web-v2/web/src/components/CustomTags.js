@@ -22,11 +22,12 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { LockOutlined, PlusOutlined } from '@ant-design/icons'
-import { Cascader, Flex, Input, Space, Tag, Tooltip, theme } from 'antd'
+import { Button, Cascader, Flex, Input, Space, Spin, Tag, Tooltip, theme } from 'antd'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { associateTag } from '@/lib/store/tags'
 import { getCurrentEntityTags } from '@/lib/store/metalakes'
 import { useSearchParams } from 'next/navigation'
+import { useMetadataObjectList } from './MetadataObjectListsProvider'
 
 const tagInputStyle = {
   width: 100,
@@ -47,7 +48,10 @@ export default function Tags({ ...props }) {
   const router = useRouter()
   const store = useAppSelector(state => state.tags)
   const dispatch = useAppDispatch()
-  const [tagsForEntity, setTagsForEntity] = useState([])
+  const [loadedTags, setTagsForEntity] = useState([])
+  const list = useMetadataObjectList('tags', metadataObjectType, metadataObjectFullName)
+  const bulk = list !== null
+  const tagsForEntity = list?.data?.tags || loadedTags
   const searchParams = useSearchParams()
   const currentMetalake = searchParams.get('metalake')
 
@@ -64,10 +68,10 @@ export default function Tags({ ...props }) {
       const tags = await getTagsForEntity()
       setTagsForEntity(tags)
     }
-    if (currentMetalake && metadataObjectType && metadataObjectFullName) {
+    if (!bulk && currentMetalake && metadataObjectType && metadataObjectFullName) {
       initLoad()
     }
-  }, [metadataObjectType, metadataObjectFullName])
+  }, [bulk, currentMetalake, metadataObjectType, metadataObjectFullName])
 
   useEffect(() => {
     if (inputVisible) {
@@ -108,6 +112,15 @@ export default function Tags({ ...props }) {
     )
   }
 
+  const refreshTags = async () => {
+    if (bulk) {
+      list.refresh()
+    } else {
+      const tags = await getTagsForEntity()
+      setTagsForEntity(tags)
+    }
+  }
+
   const associateSelectedTag = async (tag, value) => {
     if (!tag || associatingRef.current) return
     if (tagsForEntity.some(item => item.name === tag.name && (!value || item.assignmentValues?.includes(value)))) {
@@ -128,8 +141,7 @@ export default function Tags({ ...props }) {
     )
     setSelectedTag(null)
     setSelectedValue(undefined)
-    const tags = await getTagsForEntity()
-    setTagsForEntity(tags)
+    await refreshTags()
     setInputVisible(false)
     associatingRef.current = false
   }
@@ -145,8 +157,7 @@ export default function Tags({ ...props }) {
         }
       })
     )
-    const tags = await getTagsForEntity()
-    setTagsForEntity(tags)
+    await refreshTags()
   }
 
   const handleClick = name => () => {
@@ -157,6 +168,19 @@ export default function Tags({ ...props }) {
     height: 22,
     background: token.colorBgContainer,
     borderStyle: 'dashed'
+  }
+
+  if (bulk && !list.data) {
+    return list.error ? (
+      <span>
+        Unable to load tags.{' '}
+        <Button type='link' size='small' onClick={list.retry}>
+          Retry
+        </Button>
+      </span>
+    ) : (
+      <Spin size='small' aria-label='Loading tags' />
+    )
   }
 
   return (

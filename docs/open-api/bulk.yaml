@@ -19,6 +19,58 @@
 
 paths:
 
+  /bulk/metalakes/{metalake}/objects/tags:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+    post:
+      tags:
+        - tag
+      summary: List effective tags in bulk
+      operationId: listMetadataObjectTags
+      description: >-
+        Returns effective tags for each requested object, including inherited
+        tags. Results follow request order and omit tags the caller
+        cannot view. Each result indicates whether tags were omitted. Each requested
+        object is checked for access before loading. Results use only stored metadata without
+        validating or importing external objects; out-of-band changes are not checked.
+        Unregistered objects have no direct assignments but can inherit from registered ancestors.
+        Names are matched exactly as sent; they are not case-normalized by the catalog. A request
+        containing duplicate objects is rejected with HTTP 400.
+        Object-level failures, including denied access, are returned in errors with their
+        zero-based request index and full object name. Successful objects remain in results,
+        in request order. An accepted request returns HTTP 200 even if every object fails.
+        The maximum request size is controlled by gravitino.server.bulk.maxItems,
+        which defaults to 100. This operation does not modify tag assignments.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkMetadataObjectsRequest"
+      responses:
+        "200":
+          description: Successful tag results and per-object errors, including empty successful results
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/BulkMetadataObjectTagListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          description: The caller cannot access the metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "404":
+          description: A required request-level resource does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
   /bulk/metalakes/{metalake}/users/add:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -274,6 +326,56 @@ paths:
 components:
 
   schemas:
+    BulkMetadataObjectsRequest:
+      type: object
+      required: [metadataObjects]
+      properties:
+        metadataObjects:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          description: Distinct metadata objects to load, bounded by the server bulk item limit
+          items:
+            type: object
+            required: [type, fullName]
+            properties:
+              type:
+                type: string
+                enum: [CATALOG, SCHEMA, TABLE, VIEW, COLUMN, FILESET, TOPIC, MODEL, FUNCTION, SEMANTIC_MODEL]
+              fullName:
+                type: string
+                minLength: 1
+                description: Fully qualified object name within the metalake
+          example:
+            - type: SCHEMA
+              fullName: catalog.schema1
+            - type: SCHEMA
+              fullName: catalog.schema2
+
+    BulkMetadataObjectTagListResponse:
+      type: object
+      required: [code, results, errors]
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        results:
+          type: array
+          items:
+            type: object
+            required: [metadataObject, tags]
+            properties:
+              metadataObject:
+                $ref: "./tags.yaml#/components/schemas/MetadataObject"
+              tags:
+                $ref: "./tags.yaml#/components/responses/MetadataObjectTagListResponse"
+        errors:
+          type: array
+          description: Failures identified by their original request index and full object name
+          items:
+            $ref: "#/components/schemas/BulkError"
+
     BulkUserAddRequest:
       type: object
       required:

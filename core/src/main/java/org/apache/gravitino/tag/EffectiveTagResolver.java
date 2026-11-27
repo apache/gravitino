@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -40,8 +42,10 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -192,6 +196,39 @@ public class EffectiveTagResolver {
       return new LinkedHashMap<>();
     }
     MetadataObjectUtil.checkMetadataObjects(metalake, metadataObjects);
+    return resolveValidated(metalake, metadataObjects, false);
+  }
+
+  /**
+   * Resolves assignments for display using only stored metadata.
+   *
+   * <p>Unregistered objects have no direct assignments but can inherit from registered ancestors.
+   * External metadata is neither validated nor imported. This method must not be used for policy
+   * enforcement.
+   *
+   * @param metalake the metalake name
+   * @param metadataObjects the objects to resolve
+   * @return effective tags with their contributing sources
+   */
+  public Map<MetadataObject, ResolvedTag[]> resolveWithSourcesForDisplay(
+      String metalake, List<MetadataObject> metadataObjects) {
+    if (metadataObjects.isEmpty()) {
+      return new LinkedHashMap<>();
+    }
+    for (MetadataObject object : metadataObjects) {
+      Entity.EntityType type = MetadataObjectUtil.toEntityType(object);
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+      // Validate the identifier without loading the external object.
+      NameIdentifierUtil.toMetadataObject(identifier, type);
+      if (type == Entity.EntityType.METALAKE && !metalake.equals(object.name())) {
+        throw new IllegalMetadataObjectException("The metalake object name must be %s", metalake);
+      }
+    }
+    return resolveValidated(metalake, metadataObjects, true);
+  }
+
+  private Map<MetadataObject, ResolvedTag[]> resolveValidated(
+      String metalake, List<MetadataObject> metadataObjects, boolean storedOnly) {
     Map<MetadataObject, List<MetadataObject>> resolutionOrders = new LinkedHashMap<>();
     Map<MetadataObject, MetadataObject> normalizedObjects = new LinkedHashMap<>();
     Map<Entity.EntityType, Set<MetadataObject>> objectsByType =
@@ -203,7 +240,8 @@ public class EffectiveTagResolver {
       resolutionOrders.put(requested, order);
       for (MetadataObject object : order) {
         MetadataObject normalized =
-            normalizedObjects.computeIfAbsent(object, key -> normalizeForLookup(metalake, key));
+            normalizedObjects.computeIfAbsent(
+                object, key -> storedOnly ? key : normalizeForLookup(metalake, key));
         objectsByType
             .computeIfAbsent(
                 MetadataObjectUtil.toEntityType(object), ignored -> new LinkedHashSet<>())
@@ -212,15 +250,23 @@ public class EffectiveTagResolver {
     }
 
     Map<MetadataObject, List<TagEntity>> directTags = new LinkedHashMap<>();
+    // Stored column names per table, so many columns of one table load that table only once.
+    Map<NameIdentifier, Set<String>> tableColumns = new HashMap<>();
     for (Map.Entry<Entity.EntityType, Set<MetadataObject>> entry : objectsByType.entrySet()) {
       List<NameIdentifier> identifiers = new ArrayList<>();
       Map<NameIdentifier, MetadataObject> objectsByIdentifier = new LinkedHashMap<>();
-      for (MetadataObject object : entry.getValue()) {
-        NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
-        identifiers.add(identifier);
-        objectsByIdentifier.put(identifier, object);
-      }
       try {
+        for (MetadataObject object : entry.getValue()) {
+          NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+          if (storedOnly && !existsInStore(identifier, entry.getKey(), tableColumns)) {
+            continue;
+          }
+          identifiers.add(identifier);
+          objectsByIdentifier.put(identifier, object);
+        }
+        if (identifiers.isEmpty()) {
+          continue;
+        }
         for (RelationalEntity<?> relation :
             entityStore
                 .relationOperations()
@@ -259,6 +305,34 @@ public class EffectiveTagResolver {
           result.put(requested, effectiveTags.values().toArray(new ResolvedTag[0]));
         });
     return result;
+  }
+
+  private boolean existsInStore(
+      NameIdentifier identifier,
+      Entity.EntityType type,
+      Map<NameIdentifier, Set<String>> tableColumns)
+      throws IOException {
+    if (type != Entity.EntityType.COLUMN) {
+      return entityStore.exists(identifier, type);
+    }
+    // Columns are stored with their table rather than as standalone entities.
+    NameIdentifier tableIdentifier = NameIdentifier.of(identifier.namespace().levels());
+    Set<String> columns = tableColumns.get(tableIdentifier);
+    if (columns == null) {
+      try {
+        columns =
+            entityStore
+                .get(tableIdentifier, Entity.EntityType.TABLE, TableEntity.class)
+                .columns()
+                .stream()
+                .map(column -> column.name())
+                .collect(Collectors.toSet());
+      } catch (NoSuchEntityException e) {
+        columns = Collections.emptySet();
+      }
+      tableColumns.put(tableIdentifier, columns);
+    }
+    return columns.contains(identifier.name());
   }
 
   /**

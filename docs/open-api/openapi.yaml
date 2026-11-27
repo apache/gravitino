@@ -240,6 +240,9 @@ paths:
   /metalakes/{metalake}/roles/{role}:
     $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1roles~1%7Brole%7D"
 
+  /bulk/metalakes/{metalake}/objects/tags:
+    $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1objects~1tags"
+
   /bulk/metalakes/{metalake}/users/add:
     $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1users~1add"
 

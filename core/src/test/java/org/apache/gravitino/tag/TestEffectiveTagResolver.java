@@ -24,10 +24,13 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -55,6 +58,7 @@ import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -77,6 +81,7 @@ public class TestEffectiveTagResolver {
   private static final MetadataObject CATALOG =
       MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
 
+  private EntityStore entityStore;
   private SupportsRelationOperations relationOperations;
   private EffectiveTagResolver resolver;
   private MockedStatic<MetadataObjectUtil> metadataObjectUtil;
@@ -85,7 +90,7 @@ public class TestEffectiveTagResolver {
 
   @BeforeEach
   void setUp() throws Exception {
-    EntityStore entityStore = mock(EntityStore.class);
+    entityStore = mock(EntityStore.class);
     when(entityStore.get(any(), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
         .thenThrow(new NoSuchEntityException("missing stored table"));
     relationOperations = mock(SupportsRelationOperations.class);
@@ -112,6 +117,111 @@ public class TestEffectiveTagResolver {
     metadataObjectUtil.close();
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "catalogManager", previousCatalogManager, true);
+  }
+
+  @Test
+  void testDisplayReadInheritsFromRegisteredAncestorsWithoutLiveValidation() throws Exception {
+    TagEntity inherited = tag(1L, "domain", TagAssignment.ofValues("finance"));
+    when(entityStore.exists(
+            MetadataObjectUtil.toEntityIdent(METALAKE, SCHEMA), Entity.EntityType.SCHEMA))
+        .thenReturn(true);
+    NameIdentifier schemaIdent = MetadataObjectUtil.toEntityIdent(METALAKE, SCHEMA);
+    RelationalEntity<?> relation =
+        new RelationalEntity<>(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            schemaIdent,
+            Entity.EntityType.SCHEMA,
+            inherited);
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            List.of(schemaIdent),
+            Entity.EntityType.SCHEMA))
+        .thenReturn(List.of(relation));
+    metadataObjectUtil
+        .when(() -> MetadataObjectUtil.checkMetadataObjects(eq(METALAKE), anyList()))
+        .thenThrow(new NoSuchMetadataObjectException("external table is unavailable"));
+
+    Map<MetadataObject, EffectiveTagResolver.ResolvedTag[]> result =
+        resolver.resolveWithSourcesForDisplay(METALAKE, List.of(TABLE, SCHEMA));
+
+    Assertions.assertEquals(2, result.size());
+    Assertions.assertEquals(1, result.get(TABLE).length);
+    Assertions.assertEquals(SCHEMA, result.get(TABLE)[0].source());
+    Assertions.assertArrayEquals(
+        new String[] {"finance"}, result.get(TABLE)[0].tag().assignment().orElseThrow().values());
+    Assertions.assertTrue(result.get(TABLE)[0].tag().inherited().orElseThrow());
+    Assertions.assertFalse(result.get(SCHEMA)[0].tag().inherited().orElseThrow());
+    metadataObjectUtil.verify(
+        () -> MetadataObjectUtil.checkMetadataObjects(any(), anyList()), never());
+    verify(relationOperations, times(1)).batchListEntitiesByRelation(any(), anyList(), any());
+  }
+
+  @Test
+  void testDisplayReadOfUnregisteredHierarchyReturnsEmptyWithoutLiveValidation() {
+    metadataObjectUtil
+        .when(() -> MetadataObjectUtil.checkMetadataObjects(eq(METALAKE), anyList()))
+        .thenThrow(new NoSuchMetadataObjectException("external table is unavailable"));
+
+    Map<MetadataObject, EffectiveTagResolver.ResolvedTag[]> result =
+        resolver.resolveWithSourcesForDisplay(METALAKE, List.of(TABLE));
+
+    Assertions.assertEquals(0, result.get(TABLE).length);
+    verifyNoInteractions(relationOperations);
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> resolver.resolveWithSources(METALAKE, List.of(TABLE)));
+  }
+
+  @Test
+  void testDisplayReadDoesNotHideStoreFailure() throws Exception {
+    IOException failure = new IOException("store unavailable");
+    when(entityStore.exists(
+            MetadataObjectUtil.toEntityIdent(METALAKE, TABLE), Entity.EntityType.TABLE))
+        .thenThrow(failure);
+
+    RuntimeException actual =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> resolver.resolveWithSourcesForDisplay(METALAKE, List.of(TABLE)));
+    Assertions.assertSame(failure, actual.getCause());
+    verifyNoInteractions(relationOperations);
+  }
+
+  @Test
+  void testDisplayReadRejectsMalformedColumnIdentifier() {
+    MetadataObject malformed = mock(MetadataObject.class);
+    when(malformed.type()).thenReturn(MetadataObject.Type.COLUMN);
+    when(malformed.fullName()).thenReturn("catalog.schema.column");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> resolver.resolveWithSourcesForDisplay(METALAKE, List.of(malformed)));
+    verifyNoInteractions(entityStore);
+  }
+
+  @Test
+  void testDisplayReadRejectsAnotherMetalake() {
+    MetadataObject other = MetadataObjects.parse("another_metalake", MetadataObject.Type.METALAKE);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> resolver.resolveWithSourcesForDisplay(METALAKE, List.of(other)));
+    verifyNoInteractions(entityStore);
+  }
+
+  @Test
+  void testDisplayReadRejectsMalformedTableIdentifier() {
+    MetadataObject malformed = mock(MetadataObject.class);
+    when(malformed.type()).thenReturn(MetadataObject.Type.TABLE);
+    when(malformed.fullName()).thenReturn("table");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> resolver.resolveWithSourcesForDisplay(METALAKE, List.of(malformed)));
+    verifyNoInteractions(entityStore);
+  }
+
+  @Test
+  void testDisplayReadOfEmptyListDoesNotAccessStore() {
+    Assertions.assertTrue(resolver.resolveWithSourcesForDisplay(METALAKE, List.of()).isEmpty());
+    verifyNoInteractions(entityStore);
   }
 
   @Test
@@ -216,6 +326,30 @@ public class TestEffectiveTagResolver {
         Assertions.assertThrows(
             NoSuchMetadataObjectException.class, () -> resolver.resolve(METALAKE, TABLE));
     Assertions.assertSame(exception, actual.getCause());
+  }
+
+  @Test
+  void testDisplayReadLoadsStoredTableOncePerBatchOfColumns() throws Exception {
+    MetadataObject first =
+        MetadataObjects.of(
+            Arrays.asList("catalog", "schema", "table", "first"), MetadataObject.Type.COLUMN);
+    MetadataObject second =
+        MetadataObjects.of(
+            Arrays.asList("catalog", "schema", "table", "second"), MetadataObject.Type.COLUMN);
+    ColumnEntity firstColumn = mock(ColumnEntity.class);
+    when(firstColumn.name()).thenReturn("first");
+    ColumnEntity secondColumn = mock(ColumnEntity.class);
+    when(secondColumn.name()).thenReturn("second");
+    TableEntity stored = mock(TableEntity.class);
+    when(stored.columns()).thenReturn(List.of(firstColumn, secondColumn));
+    when(entityStore.get(any(), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(stored);
+    when(relationOperations.batchListEntitiesByRelation(any(), any(), any()))
+        .thenReturn(Collections.emptyList());
+
+    resolver.resolveWithSourcesForDisplay(METALAKE, List.of(first, second));
+
+    verify(entityStore, times(1)).get(any(), eq(Entity.EntityType.TABLE), eq(TableEntity.class));
   }
 
   @Test

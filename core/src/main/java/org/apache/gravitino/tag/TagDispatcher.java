@@ -19,6 +19,7 @@
 package org.apache.gravitino.tag;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
@@ -251,4 +252,18 @@ public interface TagDispatcher {
    * @return The tag associated with the metadata object.
    */
   Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name);
+
+  /**
+   * Lists effective tags for display using only stored metadata.
+   *
+   * <p>Unregistered objects have no direct assignments but can inherit from registered ancestors.
+   * External metadata is neither validated nor imported. This method must not be used for policy
+   * enforcement.
+   *
+   * @param metalake the metalake name
+   * @param metadataObjects the objects to resolve
+   * @return effective tags keyed by requested object
+   */
+  Map<MetadataObject, Tag[]> listEffectiveTagsForDisplay(
+      String metalake, List<MetadataObject> metadataObjects);
 }
