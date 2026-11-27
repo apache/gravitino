@@ -258,14 +258,13 @@ public class TestGravitinoGlueCatalog {
     SupportsCredentials supportsCredentials = mock(SupportsCredentials.class);
     when(mockCatalog.supportsCredentials()).thenReturn(supportsCredentials);
     when(supportsCredentials.getCredentials()).thenReturn(new Credential[] {s3Cred});
-    Map<String, String> props =
-        new HashMap<>(
-            ImmutableMap.of("fs.s3a.access.key", "user-ak", "fs.s3a.secret.key", "user-sk"));
+    Map<String, String> configured =
+        ImmutableMap.of("fs.s3a.access.key", "user-ak", "fs.s3a.secret.key", "user-sk");
+    Map<String, String> props = new HashMap<>(configured);
 
     GravitinoGlueCatalog.applyS3Credential(mockCatalog, props, null);
 
-    Assertions.assertEquals("user-ak", props.get("fs.s3a.access.key"));
-    Assertions.assertEquals("user-sk", props.get("fs.s3a.secret.key"));
+    Assertions.assertEquals(configured, props, "no vended key is written, under any name");
   }
 
   /**

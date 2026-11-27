@@ -84,8 +84,9 @@ public final class LocalSparkSessions {
 
     /**
      * Stops the session and unregisters it. {@link SparkSession#close()} only stops the
-     * SparkContext: on Spark 3.5 the stopped session stays registered afterwards, and {@code
-     * SparkSession.active()} would then hand it to whoever asks next.
+     * SparkContext: on Spark 3.5 the stopped session stays registered as the thread's active
+     * session afterwards, and {@code SparkSession.active()} would then hand it to whoever asks
+     * next.
      */
     @Override
     public void close() {

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.hive;
 
+import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
@@ -102,11 +103,14 @@ public class GravitinoHiveCatalog extends BaseCatalog {
         AzureAccountKeyCredential azure = (AzureAccountKeyCredential) credential;
         // hadoop-azure looks the account key up under the host name of the table location, which
         // is <account>.dfs.core.windows.net on the public Azure Data Lake endpoint, and falls back
-        // to one key for all accounts. A configured key of either form wins.
+        // to one key for all accounts. A configured key of either form wins. The key reaches the
+        // catalog in lower case, so the session is checked under that name.
         VendedCredentialOptions.putKeyUnlessConfigured(
             props,
             sessionHadoopConf,
-            String.format("fs.azure.account.key.%s.dfs.core.windows.net", azure.accountName()),
+            String.format(
+                "fs.azure.account.key.%s.dfs.core.windows.net",
+                azure.accountName().toLowerCase(Locale.ROOT)),
             azure.accountKey(),
             "fs.azure.account.key");
       } else {
@@ -120,10 +124,10 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   /**
    * Places OSS credentials into the Hadoop configuration of the kyuubi catalog, under the two names
    * the OSS filesystem reads. They cannot go through the catalog options: those reach the catalog
-   * in lower case, and these names keep upper-case letters. The vended pair is written only where
-   * no OSS key is configured at all. Otherwise the keys given as catalog options are written, each
-   * only where the session does not configure it, since one vended half next to a configured half
-   * would not authenticate.
+   * in lower case, and these names keep upper-case letters. OSS keys given as catalog options are
+   * written as given, over the session's, the way the catalog applies every other option; the
+   * vended pair is then not written, since one vended half next to a configured half would not
+   * authenticate. Otherwise the vended pair is written unless the session configures an OSS key.
    *
    * @param credentials the credentials the Gravitino catalog vends
    * @param hadoopConf the Hadoop configuration of the kyuubi catalog
@@ -138,33 +142,32 @@ public class GravitinoHiveCatalog extends BaseCatalog {
       @Nullable Configuration sessionHadoopConf) {
     String accessKey = VendedCredentialOptions.optionValue(props, OSS_ACCESS_KEY);
     String secretKey = VendedCredentialOptions.optionValue(props, OSS_SECRET_KEY);
-    boolean configuredInSession =
-        VendedCredentialOptions.isConfiguredInSession(
-            sessionHadoopConf, OSS_ACCESS_KEY, OSS_SECRET_KEY);
-    if (!configuredInSession && accessKey == null && secretKey == null) {
-      for (Credential credential : credentials) {
-        if (credential instanceof OSSSecretKeyCredential) {
-          OSSSecretKeyCredential oss = (OSSSecretKeyCredential) credential;
-          writeOSSKeys(hadoopConf, oss.accessKeyId(), oss.secretAccessKey());
-          LOG.info(
-              "Vended OSS credentials are written under keys '{}' and '{}'",
-              OSS_ACCESS_KEY,
-              OSS_SECRET_KEY);
-        }
+    if (accessKey != null || secretKey != null) {
+      if (accessKey != null) {
+        hadoopConf.set(OSS_ACCESS_KEY, accessKey);
       }
+      if (secretKey != null) {
+        hadoopConf.set(OSS_SECRET_KEY, secretKey);
+      }
+      LOG.info("OSS credentials given as catalog options are used");
       return;
     }
-    // The option keys are lower-cased on their way to the catalog; those the session leaves free
-    // are written here under the names the OSS filesystem reads.
-    if (accessKey != null
-        && !VendedCredentialOptions.isConfiguredInSession(sessionHadoopConf, OSS_ACCESS_KEY)) {
-      hadoopConf.set(OSS_ACCESS_KEY, accessKey);
+    if (VendedCredentialOptions.isConfiguredInSession(
+        sessionHadoopConf, OSS_ACCESS_KEY, OSS_SECRET_KEY)) {
+      LOG.info("The vended OSS credentials are not used: an OSS key is configured on the session");
+      return;
     }
-    if (secretKey != null
-        && !VendedCredentialOptions.isConfiguredInSession(sessionHadoopConf, OSS_SECRET_KEY)) {
-      hadoopConf.set(OSS_SECRET_KEY, secretKey);
+    for (Credential credential : credentials) {
+      if (credential instanceof OSSSecretKeyCredential) {
+        OSSSecretKeyCredential oss = (OSSSecretKeyCredential) credential;
+        hadoopConf.set(OSS_ACCESS_KEY, oss.accessKeyId());
+        hadoopConf.set(OSS_SECRET_KEY, oss.secretAccessKey());
+        LOG.info(
+            "Vended OSS credentials are written under keys '{}' and '{}'",
+            OSS_ACCESS_KEY,
+            OSS_SECRET_KEY);
+      }
     }
-    LOG.info("OSS credentials configured on the session or given as catalog options are used");
   }
 
   @Override
@@ -218,15 +221,5 @@ public class GravitinoHiveCatalog extends BaseCatalog {
         (HiveTable) sparkTable,
         (HiveTableCatalog) sparkCatalog,
         getSparkTypeConverter());
-  }
-
-  private static void writeOSSKeys(
-      Configuration hadoopConf, @Nullable String accessKey, @Nullable String secretKey) {
-    if (accessKey != null) {
-      hadoopConf.set(OSS_ACCESS_KEY, accessKey);
-    }
-    if (secretKey != null) {
-      hadoopConf.set(OSS_SECRET_KEY, secretKey);
-    }
   }
 }

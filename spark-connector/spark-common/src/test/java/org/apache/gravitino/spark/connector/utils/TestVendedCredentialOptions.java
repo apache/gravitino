@@ -251,6 +251,9 @@ public class TestVendedCredentialOptions {
           VendedCredentialOptions.sessionHadoopConf(), "a stopped active session must not be read");
 
       SparkSession.clearActiveSession();
+      // Stopping the context already cleared the default session; register the stopped one again
+      // so that the fallback to the default session is what gets checked.
+      SparkSession.setDefaultSession(spark);
       assertNull(
           VendedCredentialOptions.sessionHadoopConf(),
           "a stopped default session must not be read");

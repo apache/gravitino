@@ -151,8 +151,37 @@ public class TestGravitinoHiveCatalogCredentials {
 
     // Catalog options reach the catalog in lower case, so this entry reaches S3A as
     // fs.s3a.access.key all the same. The vended pair is not written beside it.
-    assertEquals("user-ak", props.get("FS.S3A.ACCESS.KEY"), "the user's entry stays as it is");
-    assertNull(props.get(S3_ACCESS_KEY), "no vended key is added beside it");
+    assertEquals(
+        ImmutableMap.of(
+            "FS.S3A.ACCESS.KEY", "user-ak",
+            "FS.S3A.SECRET.KEY", "user-sk",
+            AZURE_KEY, "azure-key"),
+        props,
+        "the user's entries stay as they are and no vended S3 key is added beside them");
+  }
+
+  @Test
+  void testAzureKeyIsBuiltInLowerCaseForAnUpperCaseAccountName() {
+    Credential[] vended = {new AzureAccountKeyCredential("StorageAcct", "azure-key")};
+    Map<String, String> props = new HashMap<>();
+
+    GravitinoHiveCatalog.applyOptionCredentials(vended, props, null);
+
+    assertEquals(ImmutableMap.of(AZURE_KEY, "azure-key"), props);
+  }
+
+  @Test
+  void testSessionAzureKeyIsFoundForAnUpperCaseAccountName() {
+    // The option key reaches the catalog in lower case, so the session key that the vended one
+    // would be applied over is the lower-case one.
+    Credential[] vended = {new AzureAccountKeyCredential("StorageAcct", "azure-key")};
+    Configuration session = new Configuration(false);
+    session.set(AZURE_KEY, "user-azure-key");
+    Map<String, String> props = new HashMap<>();
+
+    GravitinoHiveCatalog.applyOptionCredentials(vended, props, session);
+
+    assertTrue(props.isEmpty(), "the session's account key must keep winning");
   }
 
   @Test
@@ -276,7 +305,9 @@ public class TestGravitinoHiveCatalogCredentials {
   }
 
   @Test
-  void testOssHalfGivenAsOptionsDoesNotReplaceTheSessionHalf() {
+  void testOssKeyGivenAsOptionsWinsOverTheSessionKey() {
+    // The catalog applies every other option over the session's configuration; OSS options,
+    // written here instead, rank the same way.
     for (String key : new String[] {OSS_ACCESS_KEY, OSS_SECRET_KEY}) {
       Configuration session = new Configuration(false);
       session.set(key, "session-value");
@@ -285,7 +316,7 @@ public class TestGravitinoHiveCatalogCredentials {
       GravitinoHiveCatalog.applyOSSCredential(
           ALL_CREDENTIALS, kyuubi, new HashMap<>(ImmutableMap.of(key, "user")), session);
 
-      assertNull(kyuubi.get(key), "the session's key stays, the option half is not written");
+      assertEquals("user", kyuubi.get(key), "the option is written over the session's key");
       String other = key.equals(OSS_ACCESS_KEY) ? OSS_SECRET_KEY : OSS_ACCESS_KEY;
       assertNull(kyuubi.get(other), "the vended half is not added");
     }
@@ -312,6 +343,7 @@ public class TestGravitinoHiveCatalogCredentials {
   @Test
   void testVendedKeysReachTheKyuubiConfiguration(@TempDir Path warehouse) {
     try (LocalSparkSessions.Session local = newLocalSession(warehouse, ImmutableMap.of())) {
+      dropS3KeysFromTheEnvironment(local);
       Configuration vended =
           kyuubiConfiguration(catalogVending(ALL_CREDENTIALS), ImmutableMap.of());
 
@@ -344,6 +376,7 @@ public class TestGravitinoHiveCatalogCredentials {
     Catalog client = mock(Catalog.class);
     when(client.supportsCredentials()).thenThrow(new UnsupportedOperationException("no vending"));
     try (LocalSparkSessions.Session local = newLocalSession(warehouse, ImmutableMap.of())) {
+      dropS3KeysFromTheEnvironment(local);
       assertNoVendedKey(kyuubiConfiguration(client, ImmutableMap.of()));
     }
   }
@@ -351,6 +384,7 @@ public class TestGravitinoHiveCatalogCredentials {
   @Test
   void testNothingIsWrittenWhenTheCatalogVendsNothing(@TempDir Path warehouse) {
     try (LocalSparkSessions.Session local = newLocalSession(warehouse, ImmutableMap.of())) {
+      dropS3KeysFromTheEnvironment(local);
       assertNoVendedKey(kyuubiConfiguration(catalogVending(), ImmutableMap.of()));
     }
   }
@@ -409,6 +443,16 @@ public class TestGravitinoHiveCatalogCredentials {
     assertNull(conf.get(S3_ACCESS_KEY), "no S3 key without a vended credential");
     assertNull(conf.get(OSS_ACCESS_KEY), "no OSS key without a vended credential");
     assertNull(conf.get(AZURE_KEY), "no Azure key without a vended credential");
+  }
+
+  /**
+   * Spark copies {@code AWS_ACCESS_KEY_ID} and {@code AWS_SECRET_ACCESS_KEY} from the environment
+   * into the SparkContext's Hadoop configuration as S3A keys, which would count as configured.
+   */
+  private static void dropS3KeysFromTheEnvironment(LocalSparkSessions.Session local) {
+    Configuration contextConf = local.spark().sparkContext().hadoopConfiguration();
+    contextConf.unset(S3_ACCESS_KEY);
+    contextConf.unset(S3_SECRET_KEY);
   }
 
   private static Catalog catalogVending(Credential... credentials) {

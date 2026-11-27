@@ -42,7 +42,7 @@ public class TestLocalSparkSessions {
     local.close();
 
     assertTrue(local.spark().sparkContext().isStopped(), "closing stops the session");
-    // On Spark 3.5 stop() alone would leave the stopped session registered.
+    // On Spark 3.5 stop() alone would leave the stopped session registered as the active one.
     assertTrue(
         SparkSession.getActiveSession().isEmpty(), "the closed session must not stay active");
     assertTrue(
