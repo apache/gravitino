@@ -327,8 +327,35 @@ public class TestDorisPhysicalSchemaValidator35 {
   }
 
   @Test
+  void testJsonRequiresMatchingLogicalAndPhysicalTypes() {
+    assertDoesNotThrow(
+        () ->
+            validateSingleColumn(
+                Types.ExternalType.of("json"), DataTypes.StringType, "JSON", "json", true));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            validateSingleColumn(
+                Types.StringType.get(), DataTypes.StringType, "JSON", "JSON", true));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            validateSingleColumn(
+                Types.ExternalType.of("json"),
+                DataTypes.StringType,
+                "VARCHAR(20)",
+                "VARCHAR(20)",
+                true));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            validateSingleColumn(
+                Types.ExternalType.of("json"), DataTypes.IntegerType, "JSON", "JSON", true));
+  }
+
+  @Test
   void testUnsupportedDorisTypeFailsClosed() {
-    for (String typeName : Arrays.asList("JSON", "CHAR(4)", "FLOAT")) {
+    for (String typeName : Arrays.asList("CHAR(4)", "FLOAT")) {
       IllegalArgumentException failure =
           assertThrows(
               IllegalArgumentException.class,

@@ -183,7 +183,15 @@ final class DorisPhysicalSchemaValidator35 {
       if (!sameTypeSignature) {
         throw mismatch(identifier, "FE and JDBC type signatures differ for " + logical.name());
       }
-      if (!ORDINARY_TYPES.contains(baseType(fe.typeName()))) {
+      Type logicalType = logical.dataType();
+      boolean logicalJson =
+          logicalType instanceof Types.ExternalType
+              && "json".equalsIgnoreCase(((Types.ExternalType) logicalType).catalogString());
+      boolean physicalJson = "json".equals(fe.signature());
+      if (logicalJson != physicalJson) {
+        throw mismatch(identifier, "logical and physical JSON types differ for " + logical.name());
+      }
+      if (!physicalJson && !ORDINARY_TYPES.contains(baseType(fe.typeName()))) {
         throw mismatch(identifier, "unsupported Doris type for " + logical.name());
       }
       DataType expected = typeConverter.toSparkType(logical.dataType());
