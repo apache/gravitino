@@ -1054,3 +1054,19 @@ CREATE TABLE IF NOT EXISTS kb_article_relation_meta (
     INDEX idx_kba_relation_metalake (metalake_id, deleted_at),
     INDEX idx_kba_relation_deleted (deleted_at, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Current Article bindings';
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_column_version_info' AND index_name = 'idx_column_liveness'),
+    'SELECT 1',
+    'CREATE INDEX idx_column_liveness ON table_column_version_info (column_id, deleted_at, table_id, table_version)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'kb_article_relation_meta' AND index_name = 'idx_kba_binding_scan'),
+    'SELECT 1',
+    'CREATE INDEX idx_kba_binding_scan ON kb_article_relation_meta (target_type, deleted_at, id)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

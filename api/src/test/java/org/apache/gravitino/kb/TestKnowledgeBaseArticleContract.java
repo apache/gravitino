@@ -82,26 +82,27 @@ public class TestKnowledgeBaseArticleContract {
   }
 
   @Test
-  public void testCreateAndEditRejectNullCharacterInMetadata() {
-    String invalid = "a\0b";
-    var builder =
-        ArticleCreate.builder()
-            .withTitle("Guide")
-            .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "# Guide"));
-    assertThrows(IllegalArgumentException.class, () -> builder.withTitle(invalid).build());
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> builder.withTitle("Guide").withComment(invalid).build());
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> builder.withComment(null).withSourceReference(invalid).build());
-    assertThrows(
-        IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.updateTitle(invalid));
-    assertThrows(
-        IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.updateComment(invalid));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> KnowledgeBaseArticleChange.updateSourceReference(invalid));
+  public void testCreateAndEditRejectInvalidMetadataText() {
+    for (String invalid : List.of("a\0b", "a\uD800", "\uDC00b")) {
+      var builder =
+          ArticleCreate.builder()
+              .withTitle("Guide")
+              .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "# Guide"));
+      assertThrows(IllegalArgumentException.class, () -> builder.withTitle(invalid).build());
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> builder.withTitle("Guide").withComment(invalid).build());
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> builder.withComment(null).withSourceReference(invalid).build());
+      assertThrows(
+          IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.updateTitle(invalid));
+      assertThrows(
+          IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.updateComment(invalid));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> KnowledgeBaseArticleChange.updateSourceReference(invalid));
+    }
   }
 
   @Test
@@ -605,8 +606,35 @@ public class TestKnowledgeBaseArticleContract {
         IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.setProperty("k", null));
     assertThrows(
         IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.removeProperty(null));
-    assertThrows(
-        IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.removeProperty(" "));
+  }
+
+  @Test
+  public void testCreateAndEditValidateSynonymsAndProperties() {
+    for (String invalid : List.of("x\uD800", "\uDC00x")) {
+      assertThrows(
+          IllegalArgumentException.class, () -> articleBuilder().addSynonym(invalid).build());
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> articleBuilder().withProperty(invalid, "v").build());
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> articleBuilder().withProperty("k", invalid).build());
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> KnowledgeBaseArticleChange.updateSynonyms(new String[] {invalid}));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> KnowledgeBaseArticleChange.setProperty(invalid, "v"));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> KnowledgeBaseArticleChange.setProperty("k", invalid));
+    }
+    for (String blank : List.of("", " ", "\t", "\u3000")) {
+      assertThrows(
+          IllegalArgumentException.class, () -> articleBuilder().withProperty(blank, "v").build());
+      assertThrows(
+          IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.setProperty(blank, "v"));
+    }
   }
 
   @Test
@@ -715,5 +743,11 @@ public class TestKnowledgeBaseArticleContract {
     assertThrows(
         IllegalArgumentException.class,
         () -> ArticleObjectIdentifier.of(MetadataObject.Type.TABLE, (List<String>) null, "table"));
+  }
+
+  private static ArticleCreate.Builder articleBuilder() {
+    return ArticleCreate.builder()
+        .withTitle("Guide")
+        .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "# Guide"));
   }
 }

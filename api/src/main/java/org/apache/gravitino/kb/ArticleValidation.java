@@ -21,6 +21,7 @@ package org.apache.gravitino.kb;
 
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import com.google.common.collect.ImmutableList;
 import java.text.Normalizer;
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 
 final class ArticleValidation {
   private static final Pattern NAME = Pattern.compile("[\\p{L}\\p{Nd}\\p{M}_-]+");
@@ -47,9 +49,11 @@ final class ArticleValidation {
 
   private ArticleValidation() {}
 
-  static void checkNoNullCharacter(@Nullable String value, String field) {
-    Preconditions.checkArgument(
-        value == null || value.indexOf('\0') < 0, "%s must not contain U+0000", field);
+  static void checkMetadataText(@Nullable String value, String field) {
+    if (value != null) {
+      Preconditions.checkArgument(value.indexOf('\0') < 0, "%s must not contain U+0000", field);
+      Utf8.encodedLength(value);
+    }
   }
 
   static String title(String value) {
@@ -81,6 +85,20 @@ final class ArticleValidation {
           value != null && !value.trim().isEmpty(), "Domain name must not be null or blank");
     }
     return ImmutableList.copyOf(values);
+  }
+
+  static void checkProperty(String key, String value) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(key), "Property name must not be null or blank");
+    Preconditions.checkArgument(value != null, "Property value must not be null");
+    Utf8.encodedLength(key);
+    Utf8.encodedLength(value);
+  }
+
+  static List<String> synonymsForWrite(List<String> values) {
+    List<String> normalized = synonyms(values);
+    normalized.forEach(Utf8::encodedLength);
+    return normalized;
   }
 
   static List<String> synonyms(List<String> values) {

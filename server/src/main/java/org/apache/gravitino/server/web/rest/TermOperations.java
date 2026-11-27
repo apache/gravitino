@@ -54,9 +54,9 @@ import org.apache.gravitino.dto.responses.TermBindingListResponse;
 import org.apache.gravitino.dto.responses.TermListResponse;
 import org.apache.gravitino.dto.responses.TermResponse;
 import org.apache.gravitino.dto.responses.TermTreeResponse;
-import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.LookupTooBroadException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.glossary.GlossaryManager;
@@ -124,11 +124,21 @@ public class TermOperations {
           return Boolean.parseBoolean(effective.details)
               ? Utils.ok(
                   new TermListResponse(
-                      views.listTerms(metalake, effective.domain, effective.nameContains, filter)))
+                      views.listTerms(
+                          metalake,
+                          effective.domain,
+                          effective.nameContains,
+                          filter,
+                          effective.match,
+                          Boolean.parseBoolean(effective.bindings))))
               : Utils.ok(
                   new NameListResponse(
                       views.listTermNames(
-                          metalake, effective.domain, effective.nameContains, filter)));
+                          metalake,
+                          effective.domain,
+                          effective.nameContains,
+                          filter,
+                          effective.match)));
         });
   }
 
@@ -299,10 +309,7 @@ public class TermOperations {
                       parseBindingTypes(types),
                       parseStatus(status))
                   .stream()
-                  .map(
-                      b ->
-                          new TermBindingDTO(
-                              b.kind(), DTOConverters.toDTO(b.object()), b.metric().orElse(null)))
+                  .map(TermBindingDTO::from)
                   .toArray(TermBindingDTO[]::new);
           return Response.ok(new TermBindingListResponse(bindings)).build();
         });
@@ -359,15 +366,12 @@ public class TermOperations {
     @Nullable
     private String nameContains;
 
-    // Reserved lookup parameters. Reject them until term matching and binding expansion are
-    // available.
     @QueryParam("match")
-    @Nullable
-    private String match;
+    private List<String> match = List.of();
 
     @QueryParam("bindings")
-    @Nullable
-    private String bindings;
+    @DefaultValue("false")
+    private String bindings = "false";
 
     /** Creates a query with default values (names only, no filters). */
     public ListTermsQuery() {}
@@ -466,7 +470,11 @@ public class TermOperations {
           nameContains == null || StringUtils.isNotBlank(nameContains),
           "nameContains must not be blank");
       Preconditions.checkArgument(
-          match == null && bindings == null, "Term lookup and binding expansion are not supported");
+          "true".equalsIgnoreCase(bindings) || "false".equalsIgnoreCase(bindings),
+          "bindings must be true or false");
+      Preconditions.checkArgument(
+          !Boolean.parseBoolean(bindings) || (!match.isEmpty() && Boolean.parseBoolean(details)),
+          "bindings=true requires match and details=true");
     }
   }
 
@@ -507,6 +515,8 @@ public class TermOperations {
             MetalakeManager.checkMetalakeInUse(metalake);
             return action.get();
           });
+    } catch (LookupTooBroadException e) {
+      return Utils.illegalArguments(e.getClass().getSimpleName(), e.getMessage(), null);
     } catch (IllegalArgumentException e) {
       LOG.warn(
           "Invalid glossary term {} request for [{}] under metalake [{}]: {}",

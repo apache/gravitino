@@ -62,14 +62,13 @@ final class ArticleEdits {
                 SEPARATORS.matcher(title.toLowerCase(Locale.ROOT)).replaceAll("-"),
                 Normalizer.Form.NFC)
             .replaceAll("^-|-$", "");
-    String suffix = attempt == 0 ? "" : "-" + (attempt + 1);
-    int length =
-        Math.min(
-            slug.codePointCount(0, slug.length()),
-            KnowledgeBaseArticle.NAME_MAX_LENGTH - suffix.length());
-    String base = slug.substring(0, slug.offsetByCodePoints(0, length));
+    int baseLength =
+        Math.min(slug.codePointCount(0, slug.length()), KnowledgeBaseArticle.NAME_MAX_LENGTH);
+    String base = slug.substring(0, slug.offsetByCodePoints(0, baseLength));
     if (base.codePoints().anyMatch(Character::isLetterOrDigit)) {
-      return base + suffix;
+      String suffix = attempt == 0 ? "" : "-" + (attempt + 1);
+      int length = Math.min(baseLength, KnowledgeBaseArticle.NAME_MAX_LENGTH - suffix.length());
+      return base.substring(0, base.offsetByCodePoints(0, length)) + suffix;
     }
     StringBuilder fallback = new StringBuilder("article-");
     for (int i = 0; i < 8; i++) {

@@ -171,7 +171,7 @@ final class GlossaryBindingAccess {
     };
   }
 
-  private static MetadataObject normalizeTarget(MetadataObject target) {
+  static MetadataObject normalizeTarget(MetadataObject target) {
     if (target.type() == MetadataObject.Type.COLUMN) {
       return MetadataObjects.parse(target.parent(), MetadataObject.Type.TABLE);
     }
