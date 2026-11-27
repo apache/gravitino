@@ -38,6 +38,7 @@ import org.apache.gravitino.lance.common.ops.gravitino.CommonUtil;
 import org.apache.gravitino.lance.common.ops.gravitino.ObjectIdentifier;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.lance.service.authorization.annotations.LanceRootNamespace;
+import org.apache.gravitino.lance.service.rest.LanceNamespaceOperations;
 import org.apache.gravitino.lance.service.rest.LanceTableOperations;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -99,6 +100,14 @@ public class LanceMetadataAuthorizationMethodInterceptor
     String delimiter =
         queryArgument(parameters, args, "delimiter")
             .orElse(NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT);
+    // The REST protocol encodes the root as the delimiter itself. Only namespace listing can
+    // address that root through an ID; other operations must still reject empty identifiers.
+    if (method.getDeclaringClass() == LanceNamespaceOperations.class
+        && "listNamespaces".equals(method.getName())
+        && !delimiter.isEmpty()
+        && delimiter.equals(targetId)) {
+      return new AuthorizationTarget(baseIdentifiers(), Entity.EntityType.METALAKE);
+    }
     ObjectIdentifier identifier = ObjectIdentifier.of(targetId, Pattern.quote(delimiter));
     if (identifier.levels() == 0 || identifier.levels() > maxIdentifierLevels(method)) {
       throw unsupportedIdentifier(targetId);

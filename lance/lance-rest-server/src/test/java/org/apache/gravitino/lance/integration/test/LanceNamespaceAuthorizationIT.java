@@ -151,6 +151,34 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
     assertStatus(200, post(ADMIN, HIDDEN_CATALOG, "describe"));
   }
 
+  /** Tests root delimiter listing with visibility filtering and user validation. */
+  @Test
+  public void testRootDelimiterListingPreservesAuthorization() throws Exception {
+    for (String delimiter : List.of("$", "::")) {
+      URI uri =
+          URI.create(
+              String.format(
+                  "http://localhost:%d/lance/v1/namespace/%s/list?delimiter=%s",
+                  getLanceRESTServerPort(), delimiter, delimiter));
+      HttpResponse<String> response =
+          httpClient.send(
+              request(USER, "/v1/namespace/list").uri(uri).GET().build(),
+              HttpResponse.BodyHandlers.ofString());
+      assertStatus(200, response);
+      ListNamespacesResponse namespaces =
+          ObjectMapperProvider.objectMapper()
+              .readValue(response.body(), ListNamespacesResponse.class);
+      Assertions.assertTrue(namespaces.getNamespaces().contains(VISIBLE_CATALOG));
+      Assertions.assertFalse(namespaces.getNamespaces().contains(HIDDEN_CATALOG));
+
+      HttpResponse<String> unknownUser =
+          httpClient.send(
+              request("unregistered_root_caller", "/v1/namespace/list").uri(uri).GET().build(),
+              HttpResponse.BodyHandlers.ofString());
+      assertStatus(403, unknownUser);
+    }
+  }
+
   @Test
   public void testCreateNamespaceRequiresCreatePrivilege() throws Exception {
     // The read-only user holds no create privilege at either level.

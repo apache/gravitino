@@ -40,6 +40,7 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.lance.service.authorization.annotations.LanceRootNamespace;
 import org.apache.gravitino.lance.service.rest.LanceNamespaceOperations;
@@ -160,6 +161,62 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
     MethodInvocation invocation = invocation(rootMethod, "$", null, null);
     assertEquals(PROCEEDED, interceptor.invoke(invocation));
     verify(authorizer, never()).authorize(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void testRootDelimiterListSkipsPrivilegeExpression() throws Throwable {
+    Method listMethod =
+        LanceNamespaceOperations.class.getMethod(
+            "listNamespaces", String.class, String.class, String.class, Integer.class);
+    for (String delimiter : new String[] {"$", ".", "::"}) {
+      assertEquals(
+          PROCEEDED, interceptor.invoke(invocation(listMethod, delimiter, delimiter, null, null)));
+    }
+    assertEquals(PROCEEDED, interceptor.invoke(invocation(listMethod, "$", null, null, null)));
+    verify(authorizer, never()).authorize(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void testRootDelimiterListStillValidatesUser() throws Throwable {
+    authorizationUtils
+        .when(() -> AuthorizationUtils.checkCurrentUser(any(), any(), any()))
+        .thenThrow(new ForbiddenException("User is not registered"));
+    Method listMethod =
+        LanceNamespaceOperations.class.getMethod(
+            "listNamespaces", String.class, String.class, String.class, Integer.class);
+    MethodInvocation invocation = invocation(listMethod, "$", "$", null, null);
+    assertErrorResponse(interceptor.invoke(invocation), Response.Status.FORBIDDEN);
+    verify(invocation, never()).proceed();
+  }
+
+  @Test
+  void testCatalogListingStillRequiresPrivileges() throws Throwable {
+    Method listMethod =
+        LanceNamespaceOperations.class.getMethod(
+            "listNamespaces", String.class, String.class, String.class, Integer.class);
+    MethodInvocation invocation = invocation(listMethod, CATALOG, "$", null, null);
+    assertErrorResponse(interceptor.invoke(invocation), Response.Status.FORBIDDEN);
+    verify(invocation, never()).proceed();
+
+    allow(Privilege.Name.USE_CATALOG);
+    assertEquals(PROCEEDED, interceptor.invoke(invocation));
+  }
+
+  @Test
+  void testRootDelimiterIsNotAcceptedForOtherNamespaceOperations() throws Throwable {
+    for (String operation : new String[] {"describeNamespace", "namespaceExists"}) {
+      MethodInvocation invocation = invocation(namespaceMethod(operation), "$", "$");
+      assertErrorResponse(interceptor.invoke(invocation), Response.Status.BAD_REQUEST);
+      verify(invocation, never()).proceed();
+    }
+    Method listMethod =
+        LanceNamespaceOperations.class.getMethod(
+            "listNamespaces", String.class, String.class, String.class, Integer.class);
+    for (String namespaceId : new String[] {"", "$$"}) {
+      MethodInvocation invocation = invocation(listMethod, namespaceId, "$", null, null);
+      assertErrorResponse(interceptor.invoke(invocation), Response.Status.BAD_REQUEST);
+      verify(invocation, never()).proceed();
+    }
   }
 
   @Test
