@@ -103,52 +103,6 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
-/**
- * Mirrors root [copySubprojectDependencies]: jars already shipped under distribution/package/libs
- * via those projects' runtimeClasspath. Optimizer packaging skips them in optimizer/libs; the CLI
- * loads optimizer/libs via addJarInDir and shared libs/... via optimizer/env.sh.
- */
-fun Project.publishesRuntimeJarsToRootLibs(): Boolean {
-  val parentName = parent?.name
-  return !name.startsWith("authorization") &&
-    !name.startsWith("catalog") &&
-    !name.startsWith("cli") &&
-    !name.startsWith("client") &&
-    !name.startsWith("filesystem") &&
-    !name.startsWith("flink") &&
-    !name.startsWith("iceberg") &&
-    !name.startsWith("lance") &&
-    !name.startsWith("optimizer") &&
-    !name.startsWith("spark") &&
-    !name.startsWith("hive-metastore") &&
-    !name.startsWith("trino-connector") &&
-    name != "hadoop-common" &&
-    name != "integration-test" &&
-    parentName != "bundles" &&
-    parentName != "maintenance" &&
-    parentName != "plugins" &&
-    name != "mcp-server"
-}
-
-fun rootPackageLibJarNames(root: Project): Set<String> =
-  root.subprojects
-    .filter { it.publishesRuntimeJarsToRootLibs() }
-    .flatMapTo(sortedSetOf()) { sp ->
-      val runtime = sp.configurations.findByName("runtimeClasspath") ?: return@flatMapTo emptySet()
-      if (!runtime.isCanBeResolved) {
-        return@flatMapTo emptySet()
-      }
-      runtime.incoming.artifacts.artifacts.map { it.file.name }
-    }
-
-fun isSkippedRuntimeJar(name: String): Boolean =
-  name.endsWith("-tests.jar") ||
-    name.endsWith("-sources.jar") ||
-    name.endsWith("-javadoc.jar") ||
-    name.endsWith("-jcstress.jar") ||
-    name.endsWith("-jmh.jar") ||
-    name.startsWith("error_prone_annotations-")
-
 tasks {
   val copyDepends by registering(Copy::class) {
     from(configurations.runtimeClasspath)
@@ -158,48 +112,49 @@ tasks {
     finalizedBy(copyDepends)
   }
 
-  // Module-owned jars only. Shared jars stay in root libs/ and are listed in env.sh.
-  register("copyLibs", Copy::class) {
-    dependsOn(copyDepends, "build")
+  // Jar names that root packaging places under distribution/package/libs (from root extra).
+  @Suppress("UNCHECKED_CAST")
+  fun packagedRootLibJarNames(): Set<String> =
+    (rootProject.extra["packageLibsJarNames"] as Provider<Set<String>>).get()
+
+  // Runtime jars not in root libs/ → optimizer/libs. Sync drops stale copies when Gradle
+  // dependencies change. CLI loads this dir via addJarInDir.
+  register("copyLibs", Sync::class) {
+    dependsOn(copyDepends, jar)
     from({
-      val rootLibJarNames = rootPackageLibJarNames(rootProject)
-      fileTree(layout.buildDirectory.dir("libs")) {
-        include("*.jar")
-        exclude { element ->
-          val name = element.file.name
-          isSkippedRuntimeJar(name) ||
-            (!name.startsWith("gravitino-optimizer-") && rootLibJarNames.contains(name))
+      val rootLibJarNames = packagedRootLibJarNames()
+      val moduleJarFile = jar.get().archiveFile.get().asFile
+      val selected = linkedMapOf<String, File>()
+      for (file in configurations.runtimeClasspath.get().files) {
+        if (file.name !in rootLibJarNames) {
+          selected[file.name] = file
         }
       }
+      selected[moduleJarFile.name] = moduleJarFile
+      selected.values
     })
     into("$rootDir/distribution/package/optimizer/libs")
   }
 
-  // Shared jars needed from root libs/ (exact list). Module jars stay out: the CLI loads
-  // optimizer/libs via addJarInDir. Avoids scanning every jar under libs/.
+  // Shared jars = optimizer runtimeClasspath ∩ root package libs. Module-only jars stay out
+  // (CLI addJarInDir on optimizer/libs). No jar-name allowlists here.
   val writeEnvSh by registering {
     dependsOn(copyDepends, jar, "copyLibs")
     val envSh = rootProject.file("distribution/package/optimizer/env.sh")
     val moduleJar = jar.flatMap { it.archiveFile }
     outputs.file(envSh)
     doLast {
-      val rootLibJarNames = rootPackageLibJarNames(rootProject)
-      val moduleJarName = moduleJar.get().asFile.name
+      val rootLibJarNames = packagedRootLibJarNames()
       val needed =
         configurations.runtimeClasspath.get().files.mapTo(sortedSetOf()) { it.name }.also {
-          it.add(moduleJarName)
+          it.add(moduleJar.get().asFile.name)
         }
       val entries = mutableListOf<String>()
       entries += "\${GRAVITINO_HOME}/conf"
       for (name in needed) {
-        if (isSkippedRuntimeJar(name)) {
-          continue
+        if (name in rootLibJarNames) {
+          entries += "\${GRAVITINO_HOME}/libs/$name"
         }
-        // Only shared root libs belong in env.sh; optimizer/libs is addJarInDir'd by the CLI.
-        if (name.startsWith("gravitino-optimizer-") || !rootLibJarNames.contains(name)) {
-          continue
-        }
-        entries += "\${GRAVITINO_HOME}/libs/$name"
       }
       val classpath = entries.joinToString(":")
       envSh.parentFile.mkdirs()

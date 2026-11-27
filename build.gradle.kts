@@ -1269,6 +1269,54 @@ jacoco {
   reportsDirectory.set(layout.buildDirectory.dir("JacocoReport"))
 }
 
+// Single source of truth for which runtime jars land in distribution/package/libs.
+// Consumers (e.g. optimizer packaging) must derive from packageLibsJarNames — do not re-list jars.
+fun Project.contributesRuntimeJarsToPackageLibs(): Boolean {
+  val parentName = parent?.name
+  return !name.startsWith("authorization") &&
+    !name.startsWith("catalog") &&
+    !name.startsWith("cli") &&
+    !name.startsWith("client") &&
+    !name.startsWith("filesystem") &&
+    !name.startsWith("flink") &&
+    !name.startsWith("iceberg") &&
+    !name.startsWith("lance") &&
+    !name.startsWith("optimizer") &&
+    !name.startsWith("spark") &&
+    !name.startsWith("hive-metastore") &&
+    !name.startsWith("trino-connector") &&
+    name != "hadoop-common" &&
+    name != "integration-test" &&
+    parentName != "bundles" &&
+    parentName != "maintenance" &&
+    parentName != "plugins" &&
+    name != "mcp-server"
+}
+
+fun Project.packageLibsRuntimeJars(): FileCollection {
+  var collection: FileCollection = files()
+  subprojects.forEach { sp ->
+    if (!sp.contributesRuntimeJarsToPackageLibs()) {
+      return@forEach
+    }
+    val runtime = sp.configurations.findByName("runtimeClasspath") ?: return@forEach
+    if (!runtime.isCanBeResolved) {
+      return@forEach
+    }
+    collection =
+      collection.plus(
+        runtime.asFileTree.matching {
+          // Historical package exclude (annotation-only jar); keep beside this helper only.
+          exclude("error_prone_annotations-*.jar")
+        }
+      )
+  }
+  return collection
+}
+
+extra["packageLibsJarNames"] =
+  provider { packageLibsRuntimeJars().files.mapTo(sortedSetOf()) { it.name } }
+
 tasks {
   val projectDir = layout.projectDirectory
   val outputDir = projectDir.dir("distribution")
@@ -1601,32 +1649,8 @@ tasks {
   }
 
   register("copySubprojectDependencies", Copy::class) {
-    subprojects.forEach() {
-      if (!it.name.startsWith("authorization") &&
-        !it.name.startsWith("catalog") &&
-        !it.name.startsWith("cli") &&
-        !it.name.startsWith("client") &&
-        !it.name.startsWith("filesystem") &&
-        !it.name.startsWith("flink") &&
-        !it.name.startsWith("iceberg") &&
-        !it.name.startsWith("lance") &&
-        !it.name.startsWith("optimizer") &&
-        !it.name.startsWith("spark") &&
-        !it.name.startsWith("hive-metastore") &&
-        !it.name.startsWith("trino-connector") &&
-        it.name != "hadoop-common" &&
-        it.name != "integration-test" &&
-        it.parent?.name != "bundles" &&
-        it.parent?.name != "maintenance" &&
-        it.parent?.name != "plugins" &&
-        it.name != "mcp-server"
-      ) {
-        from(it.configurations.runtimeClasspath) {
-          exclude("error_prone_annotations-*.jar")
-        }
-        into("distribution/package/libs")
-      }
-    }
+    from(packageLibsRuntimeJars())
+    into("distribution/package/libs")
     setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
   }
 
