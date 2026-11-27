@@ -134,14 +134,17 @@ and shutdown steps in [Upgrade Gravitino](./how-to-upgrade.md) before applying t
     secret that holds the whole property value. Use the locator recorded during the inventory.
     Neither `setSecretBinding` nor `setSecretReference` is available in the 1.3 client or REST API.
 - The Kafka catalog sets an empty `org.apache.kafka.sasl.oauthbearer.allowed.urls` in the server JVM
-  as a default, unless the property is already set with `-D` in `JAVA_OPTS`, `JAVA_TOOL_OPTIONS` or
-  `JDK_JAVA_OPTIONS`. This affects only Kafka catalogs whose `sasl.login.callback.handler.class` is
-  Kafka's `org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler` or its
-  legacy subclass `org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerLoginCallbackHandler`.
+  as a default, unless the property is already set with `-D`. This affects only Kafka catalogs
+  whose `sasl.login.callback.handler.class` is Kafka's
+  `org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler` or its legacy
+  subclass `org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerLoginCallbackHandler`.
   Both fetch a token from `sasl.oauthbearer.token.endpoint.url`. These catalogs fail to connect
-  after the upgrade until the token endpoint URL is added to the list, for example
-  `-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp.example.com/oauth2/token`. Catalogs
-  whose login handler creates the token itself, such as the AWS MSK IAM handler, need no change.
+  after the upgrade until the token endpoint URL is added to the list. Set it in `JAVA_OPTS`, for
+  example in `conf/gravitino-env.sh`:
+  `JAVA_OPTS+=" -Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp.example.com/oauth2/token"`.
+  `JAVA_TOOL_OPTIONS` and `JDK_JAVA_OPTIONS` also work, but local jobs that the server starts read
+  them too. Catalogs whose login handler creates the token itself, such as the AWS MSK IAM handler,
+  need no change.
 - The Kafka 3.9 client rejects `com.sun.security.auth.module.LdapLoginModule` in JAAS
   configurations by default. `JndiLoginModule` was already rejected by the 3.4 client. Check both
   the `sasl.jaas.config` of each Kafka catalog and the `KafkaClient` entry in the file named by the

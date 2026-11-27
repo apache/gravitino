@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.kafka;
 
 import static org.apache.gravitino.Catalog.Type.MESSAGING;
+import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.catalog.kafka.KafkaCatalogOperations.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY;
 import static org.apache.gravitino.catalog.kafka.KafkaCatalogOperations.OAUTHBEARER_ALLOWED_URLS_PROPERTY;
@@ -30,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Namespace;
@@ -39,6 +41,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -105,22 +108,23 @@ public class TestKafkaClientJvmDefaults {
 
   @Test
   public void testEmptyConfiguredValueIsKept() {
-    System.setProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY, "");
+    // The default of this property is "none", so overwriting the empty value would be visible.
+    System.setProperty(AUTOMATIC_CONFIG_PROVIDERS_PROPERTY, "");
 
     KafkaCatalogOperations.applyClientJvmDefaults();
 
+    Assertions.assertEquals("", System.getProperty(AUTOMATIC_CONFIG_PROVIDERS_PROPERTY));
     Assertions.assertEquals("", System.getProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY));
-    Assertions.assertEquals("none", System.getProperty(AUTOMATIC_CONFIG_PROVIDERS_PROPERTY));
   }
 
   @Test
   public void testInitializeRejectsFileTokenEndpointByDefault() throws IOException {
-    Path tokenFile = writeTokenFile();
+    String tokenUrl = writeToken().toUri().toString();
 
     for (String handler : HANDLERS) {
       Throwable thrown =
           Assertions.assertThrows(
-              RuntimeException.class, () -> initialize(oauthBearerConfig(handler, tokenFile)));
+              RuntimeException.class, () -> initialize(oauthBearerConfig(handler, tokenUrl)));
 
       Assertions.assertTrue(
           messages(thrown).contains("is not allowed"),
@@ -129,39 +133,57 @@ public class TestKafkaClientJvmDefaults {
   }
 
   @Test
-  public void testInitializeAllowsConfiguredTokenEndpoint() throws IOException {
-    Path tokenFile = writeTokenFile();
-    System.setProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY, tokenFile.toUri().toString());
+  public void testInitializeReadsConfiguredTokenEndpoint() throws IOException {
+    String tokenUrl = writeToken().toUri().toString();
+    // Kafka 3.9.2 builds the file path from the raw URL path, so it cannot read a file whose path
+    // needs percent-encoding, such as a path with a space. Skip instead of passing without a read.
+    Assumptions.assumeFalse(
+        tokenUrl.contains("%"), "Kafka cannot read a file token endpoint with an encoded path");
+    System.setProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY, tokenUrl);
 
     for (String handler : HANDLERS) {
-      // The allowed endpoint is fetched, and the login then fails because the file is not a token.
-      Throwable thrown =
-          Assertions.assertThrows(
-              RuntimeException.class, () -> initialize(oauthBearerConfig(handler, tokenFile)));
-
-      Assertions.assertFalse(
-          messages(thrown).contains("is not allowed"),
-          handler + " must accept the configured token endpoint, got: " + messages(thrown));
+      // The client reads and validates the token while it is created, so success means the
+      // allowed endpoint was read.
+      Assertions.assertDoesNotThrow(
+          () -> initialize(oauthBearerConfig(handler, tokenUrl)),
+          handler + " must read the configured token endpoint");
     }
   }
 
-  private Path writeTokenFile() throws IOException {
-    Path tokenFile = dir.resolve("token.json");
-    Files.write(tokenFile, "not a token".getBytes(StandardCharsets.UTF_8));
+  /**
+   * Writes an unsigned JWT that Kafka's login validator accepts: it needs {@code sub} and {@code
+   * exp}.
+   */
+  private Path writeToken() throws IOException {
+    Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
+    long expiresAt = Instant.now().plusSeconds(3600).getEpochSecond();
+    String header = "{\"alg\":\"none\"}";
+    String payload =
+        "{\"sub\":\"gravitino-test\",\"iat\":" + (expiresAt - 3600) + ",\"exp\":" + expiresAt + "}";
+    String token =
+        encoder.encodeToString(header.getBytes(StandardCharsets.UTF_8))
+            + "."
+            + encoder.encodeToString(payload.getBytes(StandardCharsets.UTF_8))
+            + "."
+            + encoder.encodeToString("signature".getBytes(StandardCharsets.UTF_8));
+    Path tokenFile = dir.resolve("token.jwt");
+    Files.write(tokenFile, token.getBytes(StandardCharsets.UTF_8));
     return tokenFile;
   }
 
-  private static Map<String, String> oauthBearerConfig(String handler, Path tokenFile) {
+  private static Map<String, String> oauthBearerConfig(String handler, String tokenUrl) {
     return ImmutableMap.<String, String>builder()
         .put(BOOTSTRAP_SERVERS, "127.0.0.1:1")
-        .put(ID_KEY, "gravitino.v1.uid33220758755757000")
+        // The test connection id makes initialize skip the default schema, so no entity store is
+        // needed.
+        .put(ID_KEY, DUMMY_ID.toString())
         .put("gravitino.bypass.security.protocol", "SASL_PLAINTEXT")
         .put("gravitino.bypass.sasl.mechanism", "OAUTHBEARER")
         .put("gravitino.bypass.sasl.login.callback.handler.class", handler)
         .put(
             "gravitino.bypass.sasl.jaas.config",
             "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;")
-        .put("gravitino.bypass.sasl.oauthbearer.token.endpoint.url", tokenFile.toUri().toString())
+        .put("gravitino.bypass.sasl.oauthbearer.token.endpoint.url", tokenUrl)
         .build();
   }
 
