@@ -28,8 +28,8 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.rel.Table;
 
 /**
- * The context passed to a {@link TableLocationProvider} on both of its callbacks: when a table is
- * being created and its location has to be provisioned, and when a table has been dropped and its
+ * The context passed to a {@link LocationProvider} on both of its callbacks: when a table is being
+ * created and its location has to be provisioned, and when a table has been dropped and its
  * location has to be unprovisioned.
  *
  * <p>The same type is used for both so that a new input becomes an additional accessor rather than
@@ -74,12 +74,12 @@ public class TableLocationContext {
    * depends on the callback being served:
    *
    * <ul>
-   *   <li>{@link TableLocationProvider#provisionTableLocation(TableLocationContext)} gets the
-   *       properties of the creation request, so the location entry holds whatever the caller
-   *       supplied, which may be nothing at all.
-   *   <li>{@link TableLocationProvider#unprovisionTableLocation(TableLocationContext)} gets the
-   *       stored properties of the table being dropped, read right before it was removed, so the
-   *       location entry holds the location that was provisioned for it.
+   *   <li>{@link LocationProvider#provisionTableLocation(TableLocationContext)} gets the properties
+   *       of the creation request, so the location entry holds whatever the caller supplied, which
+   *       may be nothing at all.
+   *   <li>{@link LocationProvider#unprovisionTableLocation(TableLocationContext)} gets the stored
+   *       properties of the table being dropped, read right before it was removed, so the location
+   *       entry holds the location that was provisioned for it.
    * </ul>
    *
    * <p>Values are carried through as they were given, null ones included: the catalog accepts a

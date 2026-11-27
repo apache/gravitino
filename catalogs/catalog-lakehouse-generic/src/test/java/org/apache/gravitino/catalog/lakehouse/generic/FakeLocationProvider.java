@@ -24,10 +24,10 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * A {@link TableLocationProvider} registered only in the test classpath, used to verify that a
- * custom provider is discovered and consulted by the generic catalog.
+ * A {@link LocationProvider} registered only in the test classpath, used to verify that a custom
+ * provider is discovered and consulted by the generic catalog.
  */
-public class FakeTableLocationProvider implements TableLocationProvider {
+public class FakeLocationProvider implements LocationProvider {
 
   /** The name under which this provider is registered. */
   public static final String NAME = "testing";
@@ -54,7 +54,7 @@ public class FakeTableLocationProvider implements TableLocationProvider {
   private static volatile String locationOverride;
 
   /** Public and no-argument, as the SPI requires; it acquires nothing. */
-  public FakeTableLocationProvider() {
+  public FakeLocationProvider() {
     CONSTRUCTED.incrementAndGet();
   }
 
@@ -132,10 +132,11 @@ public class FakeTableLocationProvider implements TableLocationProvider {
   }
 
   @Override
-  public void unprovisionTableLocation(TableLocationContext context) {
+  public boolean unprovisionTableLocation(TableLocationContext context) {
     UNPROVISIONED.add(context);
     if (failOnUnprovision) {
       throw new IllegalStateException("The path allocation service is unavailable");
     }
+    return true;
   }
 }

@@ -27,14 +27,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestDefaultTableLocationProvider {
+public class TestDefaultLocationProvider {
 
   private static final NameIdentifier TABLE_IDENT =
       NameIdentifier.of("metalake", "catalog", "schema1", "table1");
 
   @Test
   void testTableLocationWins() {
-    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    DefaultLocationProvider provider = new DefaultLocationProvider();
     Map<String, String> catalogProperties = ImmutableMap.of("location", "/tmp/catalog");
     Schema schema = mockSchema(ImmutableMap.of(Schema.PROPERTY_LOCATION, "/tmp/schema"));
 
@@ -51,7 +51,7 @@ public class TestDefaultTableLocationProvider {
 
   @Test
   void testFallBackToSchemaLocation() {
-    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    DefaultLocationProvider provider = new DefaultLocationProvider();
     Map<String, String> catalogProperties = ImmutableMap.of("location", "/tmp/catalog");
     Schema schema = mockSchema(ImmutableMap.of(Schema.PROPERTY_LOCATION, "/tmp/schema"));
 
@@ -63,7 +63,7 @@ public class TestDefaultTableLocationProvider {
 
   @Test
   void testFallBackToCatalogLocation() {
-    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    DefaultLocationProvider provider = new DefaultLocationProvider();
     Map<String, String> catalogProperties = ImmutableMap.of("location", "/tmp/catalog");
     Schema schema = mockSchema(ImmutableMap.of());
 
@@ -76,7 +76,7 @@ public class TestDefaultTableLocationProvider {
 
   @Test
   void testTrailingSlashIsNotDuplicated() {
-    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    DefaultLocationProvider provider = new DefaultLocationProvider();
     Map<String, String> catalogProperties = ImmutableMap.of("location", "/tmp/catalog/");
     Schema schema = mockSchema(ImmutableMap.of(Schema.PROPERTY_LOCATION, "/tmp/schema/"));
 
@@ -94,7 +94,7 @@ public class TestDefaultTableLocationProvider {
 
   @Test
   void testNullSchemaPropertiesFallsBackToCatalogLocation() {
-    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    DefaultLocationProvider provider = new DefaultLocationProvider();
     Map<String, String> catalogProperties = ImmutableMap.of("location", "/tmp/catalog");
     Schema schema = mockSchema(null);
 
@@ -105,7 +105,7 @@ public class TestDefaultTableLocationProvider {
 
   @Test
   void testNoLocationAnywhereThrows() {
-    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    DefaultLocationProvider provider = new DefaultLocationProvider();
     Map<String, String> catalogProperties = ImmutableMap.of();
     Schema schema = mockSchema(ImmutableMap.of());
 
@@ -126,7 +126,7 @@ public class TestDefaultTableLocationProvider {
     // carrying different catalog properties. Pinned because the provider used to hold the value
     // in a field, and a leftover field would make every catalog on a shared instance resolve to
     // whichever one initialized it first.
-    DefaultTableLocationProvider provider = new DefaultTableLocationProvider();
+    DefaultLocationProvider provider = new DefaultLocationProvider();
     Schema schema = mockSchema(ImmutableMap.of());
 
     Assertions.assertEquals(
@@ -141,21 +141,26 @@ public class TestDefaultTableLocationProvider {
 
   @Test
   void testProviderName() {
-    Assertions.assertEquals("default", new DefaultTableLocationProvider().name());
+    Assertions.assertEquals("default", new DefaultLocationProvider().name());
   }
 
   @Test
   void testUnprovisionIsANoOp() {
     // The built-in provider derives locations from properties and has nothing to reclaim, so
-    // unprovisioning one has to be harmless rather than unsupported.
-    Assertions.assertDoesNotThrow(
-        () ->
-            new DefaultTableLocationProvider()
-                .unprovisionTableLocation(
-                    context(
-                        mockSchema(ImmutableMap.of()),
-                        ImmutableMap.of(Table.PROPERTY_LOCATION, "/tmp/schema/table1/"),
-                        ImmutableMap.of())));
+    // unprovisioning one has to be harmless rather than unsupported, and reports that nothing was
+    // released.
+    DefaultLocationProvider provider = new DefaultLocationProvider();
+    Assertions.assertFalse(
+        provider.unprovisionTableLocation(
+            context(
+                mockSchema(ImmutableMap.of()),
+                ImmutableMap.of(Table.PROPERTY_LOCATION, "/tmp/schema/table1/"),
+                ImmutableMap.of())));
+    Assertions.assertFalse(
+        provider.unprovisionSchemaLocation(
+            SchemaLocationContext.builder()
+                .withSchemaIdentifier(NameIdentifier.of("metalake", "catalog", "schema"))
+                .build()));
   }
 
   private static Schema mockSchema(Map<String, String> properties) {
