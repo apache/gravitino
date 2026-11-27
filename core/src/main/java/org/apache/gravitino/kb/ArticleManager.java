@@ -37,7 +37,6 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.ExpectedRevision;
-import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.MissingArticleScopeException;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.NameConflictException;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.ScopedArticle;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.TransactionHook;
@@ -80,21 +79,25 @@ public final class ArticleManager {
     boolean generated = request.name() == null;
     String name = generated ? ArticleEdits.generatedName(request.title(), 0) : request.name();
     KnowledgeBaseArticleEntity article = edits.create(metalake, ids.nextId(), name, request);
+    Long expectedMetalakeId = null;
     for (int attempt = 0; ; attempt++) {
       try {
-        return Result.from(articles.insertScoped(article, false, policy));
-      } catch (NameConflictException conflict) {
+        return Result.from(
+            articles.createScoped(article, expectedMetalakeId, policy, TargetNameConflict::new));
+      } catch (TargetNameConflict conflict) {
         if (!generated || attempt == MAX_NAME_RETRIES || SqlSessions.hasActiveSession()) {
           throw new KnowledgeBaseArticleAlreadyExistsException(
-              conflict, "Article name %s already exists in %s", article.name(), metalake);
+              conflict.getCause(),
+              "Article name %s already exists in %s",
+              article.name(),
+              metalake);
         }
+        expectedMetalakeId = conflict.metalakeId;
         article =
             article.toBuilder()
                 .withName(nextAvailableName(metalake, request.title()))
                 .withId(ids.nextId())
                 .build();
-      } catch (MissingArticleScopeException missing) {
-        throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
       } catch (IOException failure) {
         throw new UncheckedIOException(failure);
       }
@@ -142,20 +145,28 @@ public final class ArticleManager {
     NameIdentifier ident = ident(metalake, name);
     ExpectedRevision expected = expectedRevision == null ? null : decode(expectedRevision);
     Preconditions.checkNotNull(changes, "changes");
-    try {
-      return Result.from(
-          articles.updateScoped(ident, expected, before -> edits.apply(before, changes), policy));
-    } catch (MissingArticleScopeException missing) {
-      throw new NoSuchKnowledgeBaseArticleException(missing, "Article %s does not exist", ident);
-    }
+    return Result.from(
+        articles.updateScoped(
+            ident,
+            expected,
+            before -> edits.apply(before, changes),
+            policy,
+            missing ->
+                new NoSuchKnowledgeBaseArticleException(
+                    missing, "Article %s does not exist", ident)));
   }
 
   /** Deletes the Article and its relations, returning false when the Article is absent. */
   public boolean deleteArticle(String metalake, String name) {
-    try {
-      return articles.delete(ident(metalake, name), policy);
-    } catch (MissingArticleScopeException missing) {
-      return false;
+    return articles.deleteAndGet(ident(metalake, name), policy).isPresent();
+  }
+
+  private static final class TargetNameConflict extends RuntimeException {
+    private final long metalakeId;
+
+    private TargetNameConflict(long metalakeId, NameConflictException cause) {
+      super(cause);
+      this.metalakeId = metalakeId;
     }
   }
 

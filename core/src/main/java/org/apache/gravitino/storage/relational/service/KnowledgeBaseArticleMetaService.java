@@ -38,7 +38,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
@@ -49,6 +51,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.kb.ArticleBody;
@@ -268,13 +271,65 @@ public final class KnowledgeBaseArticleMetaService {
   public ScopedArticle insertScoped(
       KnowledgeBaseArticleEntity entity, boolean overwrite, TransactionHook hook)
       throws IOException {
+    return insertScoped(
+        entity,
+        overwrite,
+        hook,
+        () -> lockMetalake(entity.namespace()),
+        (id, conflict) -> conflict);
+  }
+
+  /**
+   * Creates an Article under the original metalake. Only a conflict from this Article's row insert
+   * is passed to the caller for name allocation.
+   *
+   * @param entity the Article to create
+   * @param expectedMetalakeId the locked parent from a previous attempt, or null on the first
+   * @param hook the extension participating in the transaction
+   * @param onNameConflict maps a target name conflict and its locked metalake ID
+   * @return the created Article and its metalake ID
+   * @throws IOException if the storage write fails
+   */
+  public ScopedArticle createScoped(
+      KnowledgeBaseArticleEntity entity,
+      @Nullable Long expectedMetalakeId,
+      TransactionHook hook,
+      BiFunction<Long, NameConflictException, RuntimeException> onNameConflict)
+      throws IOException {
+    return insertScoped(
+        entity,
+        false,
+        hook,
+        () -> {
+          String name = metalakeName(entity.namespace());
+          long id;
+          try {
+            id = lockMetalake(entity.namespace());
+          } catch (NoSuchEntityException missing) {
+            throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", name);
+          }
+          if (expectedMetalakeId != null && expectedMetalakeId != id) {
+            throw new NoSuchMetalakeException("Metalake %s was replaced", name);
+          }
+          return id;
+        },
+        onNameConflict);
+  }
+
+  private ScopedArticle insertScoped(
+      KnowledgeBaseArticleEntity entity,
+      boolean overwrite,
+      TransactionHook hook,
+      LongSupplier lockParent,
+      BiFunction<Long, NameConflictException, RuntimeException> onNameConflict)
+      throws IOException {
     record InsertConflict(long metalakeId, EntityAlreadyExistsException failure) {}
     AtomicReference<InsertConflict> insertConflict = new AtomicReference<>();
     boolean retryInsert = overwrite && !SqlSessions.hasActiveSession();
     try {
       return write(
           mapper -> {
-            long metalakeId = lockMetalake(entity.namespace());
+            long metalakeId = lockParent.getAsLong();
             KnowledgeBaseArticleEntity before = overwrite ? observe(entity.nameIdentifier()) : null;
             InsertConflict conflict = insertConflict.get();
             if (conflict != null
@@ -302,6 +357,9 @@ public final class KnowledgeBaseArticleMetaService {
               insertArticleRow(mapper, row);
             } catch (EntityAlreadyExistsException e) {
               if (!retryInsert) {
+                if (e instanceof NameConflictException nameConflict) {
+                  throw onNameConflict.apply(metalakeId, nameConflict);
+                }
                 throw e;
               }
               // Leave the failed insert transaction before observing the row that won.
@@ -349,14 +407,38 @@ public final class KnowledgeBaseArticleMetaService {
       @Nullable ExpectedRevision expected,
       Function<KnowledgeBaseArticleEntity, KnowledgeBaseArticleEntity> updater,
       TransactionHook hook) {
+    return updateScoped(ident, expected, updater, hook, missing -> missing);
+  }
+
+  /**
+   * Updates an Article, mapping absence only while locating the target of this write.
+   *
+   * @param ident the Article name identifier
+   * @param expected the revision to match, or null for an unconditional edit
+   * @param updater the transformation to apply to the current Article
+   * @param hook the extension participating in the transaction
+   * @param onMissingTarget maps a missing Article or metalake to the caller's exception
+   * @return the effective Article and its metalake ID
+   */
+  public ScopedArticle updateScoped(
+      NameIdentifier ident,
+      @Nullable ExpectedRevision expected,
+      Function<KnowledgeBaseArticleEntity, KnowledgeBaseArticleEntity> updater,
+      TransactionHook hook,
+      Function<NoSuchEntityException, RuntimeException> onMissingTarget) {
     record ArticleIdentity(long metalakeId, long articleId) {}
     AtomicReference<ArticleIdentity> firstObserved = new AtomicReference<>();
     return write(
         mapper -> {
-          long metalakeId = lockMetalake(ident.namespace());
+          long metalakeId;
+          try {
+            metalakeId = lockMetalake(ident.namespace());
+          } catch (NoSuchEntityException missing) {
+            throw onMissingTarget.apply(missing);
+          }
           KnowledgeBaseArticleEntity before = observe(ident);
           if (before == null) {
-            throw missing(ident);
+            throw onMissingTarget.apply(missing(ident));
           }
           ArticleIdentity current = new ArticleIdentity(metalakeId, before.id());
           ArticleIdentity first = firstObserved.compareAndExchange(null, current);

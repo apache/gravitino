@@ -172,6 +172,27 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testMalformedMetadataCannotChangeStoredTitleOrRevision() throws IOException {
+    createAndInsertMakeLake("lake");
+    String malformed = "Guide\uD800";
+    var original = article(31, "guide").toBuilder().withTitle("Guide😀").build();
+    var fresh = article(32, "other").toBuilder().withTitle(malformed).build();
+    STORE.insert(original, false);
+    assertThrows(IllegalArgumentException.class, () -> STORE.insert(fresh, false));
+    assertFalse(backend.exists(fresh.nameIdentifier(), TYPE));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            STORE.update(
+                original.nameIdentifier(),
+                (KnowledgeBaseArticleEntity current) ->
+                    current.toBuilder().withTitle(malformed).build()));
+    var stored = STORE.get(original.nameIdentifier());
+    assertEquals("Guide😀", stored.title());
+    assertEquals(original.revision(), stored.revision());
+  }
+
+  @TestTemplate
   void testStoredNullCharacterMetadataCanBeRepaired() throws Exception {
     assumeFalse("postgresql".equals(backendType), "PostgreSQL text columns cannot store U+0000");
     createAndInsertMakeLake("lake");

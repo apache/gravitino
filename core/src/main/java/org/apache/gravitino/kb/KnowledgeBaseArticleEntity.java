@@ -151,13 +151,13 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
    */
   public void validateTextForWrite(@Nullable KnowledgeBaseArticleEntity before) {
     if (before == null || !title.equals(before.title)) {
-      ArticleValidation.checkNoNullCharacter(title, "Title");
+      ArticleValidation.checkMetadataText(title, "Title");
     }
     if (before == null || !Objects.equals(comment, before.comment)) {
-      ArticleValidation.checkNoNullCharacter(comment, "Comment");
+      ArticleValidation.checkMetadataText(comment, "Comment");
     }
     if (before == null || !Objects.equals(sourceReference, before.sourceReference)) {
-      ArticleValidation.checkNoNullCharacter(sourceReference, "Source reference");
+      ArticleValidation.checkMetadataText(sourceReference, "Source reference");
     }
   }
 

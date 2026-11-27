@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,7 +34,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -41,6 +44,8 @@ import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.MissingArticleScopeException;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.NameConflictException;
 import org.junit.jupiter.api.TestTemplate;
 
 class TestArticleManager extends TestJDBCBackend {
@@ -53,6 +58,11 @@ class TestArticleManager extends TestJDBCBackend {
     assertThrows(NoSuchMetalakeException.class, () -> manager.listArticles(LAKE));
     assertThrows(
         NoSuchMetalakeException.class, () -> manager.createArticle(LAKE, request().build()));
+    assertThrows(
+        NoSuchKnowledgeBaseArticleException.class,
+        () ->
+            manager.alterArticle(
+                LAKE, "café", null, KnowledgeBaseArticleChange.updateTitle("Changed")));
     assertFalse(manager.deleteArticle(LAKE, "café"));
     createAndInsertMakeLake(LAKE);
     ArticleManager.Result created =
@@ -144,6 +154,78 @@ class TestArticleManager extends TestJDBCBackend {
         EntityAlreadyExistsException.class,
         () -> duplicateId.createArticle(LAKE, request().withTitle("another").build()));
     assertEquals(8, manager.listArticles(LAKE).size());
+  }
+
+  @TestTemplate
+  void generatedNameRetryRejectsAReplacementMetalake() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    manager.createArticle(LAKE, request().build());
+    AtomicLong attempts = new AtomicLong();
+    ArticleManager racing =
+        new ArticleManager(
+            () -> {
+              if (attempts.incrementAndGet() == 2) {
+                try {
+                  assertTrue(backend.delete(NameIdentifier.of(LAKE), EntityType.METALAKE, true));
+                  createAndInsertMakeLake(LAKE);
+                } catch (IOException e) {
+                  throw new UncheckedIOException(e);
+                }
+              }
+              return ids.incrementAndGet();
+            },
+            1024);
+    assertThrows(
+        NoSuchMetalakeException.class, () -> racing.createArticle(LAKE, request().build()));
+    assertEquals(2, attempts.get());
+    assertTrue(manager.listArticles(LAKE).isEmpty());
+  }
+
+  @TestTemplate
+  void hookLookupFailurePropagatesAndRollsBackEachWrite() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    var original = manager.createArticle(LAKE, request().build());
+    var sibling = NameIdentifier.of(LAKE, "absent-sibling");
+    var guarded =
+        new ArticleManager(
+            ids::incrementAndGet,
+            1024,
+            (before, after) -> KnowledgeBaseArticleMetaService.getInstance().getContent(sibling));
+    assertThrows(
+        MissingArticleScopeException.class,
+        () -> guarded.createArticle(LAKE, request().withName("other").build()));
+    assertThrows(
+        MissingArticleScopeException.class,
+        () ->
+            guarded.alterArticle(
+                LAKE, "guide", null, KnowledgeBaseArticleChange.updateTitle("Changed")));
+    assertThrows(MissingArticleScopeException.class, () -> guarded.deleteArticle(LAKE, "guide"));
+    assertEquals(List.of(original.article()), manager.listArticles(LAKE));
+    assertEquals(original, manager.loadArticle(LAKE, "guide"));
+  }
+
+  @TestTemplate
+  void hookInsertConflictDoesNotRetryTheOuterCreate() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    var sibling = manager.createArticle(LAKE, request().withName("sibling").build());
+    var duplicate =
+        new ArticleEdits(1024).create(LAKE, ids.incrementAndGet(), "sibling", request().build());
+    AtomicLong calls = new AtomicLong();
+    var guarded =
+        new ArticleManager(
+            ids::incrementAndGet,
+            1024,
+            (before, after) -> {
+              calls.incrementAndGet();
+              try {
+                KnowledgeBaseArticleMetaService.getInstance().insert(duplicate, false);
+              } catch (IOException e) {
+                throw new UncheckedIOException(e);
+              }
+            });
+    assertThrows(NameConflictException.class, () -> guarded.createArticle(LAKE, request().build()));
+    assertEquals(1, calls.get());
+    assertEquals(List.of(sibling.article()), manager.listArticles(LAKE));
   }
 
   @TestTemplate

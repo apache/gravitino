@@ -21,6 +21,7 @@ package org.apache.gravitino.kb;
 
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import com.google.common.collect.ImmutableList;
 import java.text.Normalizer;
 import java.util.List;
@@ -47,9 +48,11 @@ final class ArticleValidation {
 
   private ArticleValidation() {}
 
-  static void checkNoNullCharacter(@Nullable String value, String field) {
-    Preconditions.checkArgument(
-        value == null || value.indexOf('\0') < 0, "%s must not contain U+0000", field);
+  static void checkMetadataText(@Nullable String value, String field) {
+    if (value != null) {
+      Preconditions.checkArgument(value.indexOf('\0') < 0, "%s must not contain U+0000", field);
+      Utf8.encodedLength(value);
+    }
   }
 
   static String title(String value) {

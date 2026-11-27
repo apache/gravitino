@@ -59,9 +59,9 @@ public class ArticleCreate {
   }
 
   private ArticleCreate(Builder builder) {
-    ArticleValidation.checkNoNullCharacter(builder.title, "Title");
-    ArticleValidation.checkNoNullCharacter(builder.comment, "Comment");
-    ArticleValidation.checkNoNullCharacter(builder.sourceReference, "Source reference");
+    ArticleValidation.checkMetadataText(builder.title, "Title");
+    ArticleValidation.checkMetadataText(builder.comment, "Comment");
+    ArticleValidation.checkMetadataText(builder.sourceReference, "Source reference");
     this.name = ArticleValidation.name(builder.name);
     this.title = ArticleValidation.title(builder.title);
     this.body = builder.body;
