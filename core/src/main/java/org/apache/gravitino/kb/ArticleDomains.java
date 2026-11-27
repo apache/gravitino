@@ -97,8 +97,9 @@ final class ArticleDomains {
       }
       if (changed) {
         requireManage(domain, name);
-      } else if (name != null) {
-        requireReadable(domain);
+      } else if (name != null && !readable(domain)) {
+        // A manager can retain an assignment even when USE_DOMAIN is explicitly denied.
+        requireManage(domain, name);
       }
       if (member) {
         result.add(id);

@@ -42,6 +42,14 @@ class TestArticleEdits {
   }
 
   @Test
+  void numericSuffixKeepsAValidBaseWhenItsOnlyLetterIsTruncated() {
+    String marks = "\u0301".repeat(126);
+    assertEquals(marks + "a", ArticleEdits.generatedName(marks + "A", 0));
+    assertEquals(marks + "-2", ArticleEdits.generatedName(marks + "A", 1));
+    assertTrue(ArticleEdits.generatedName(marks.repeat(2) + "A", 0).matches("article-[0-9a-z]{8}"));
+  }
+
+  @Test
   void configBounds() {
     Config config = new Config(false) {};
     assertEquals(1_048_576, config.get(Configs.KB_ARTICLE_MAX_BODY_BYTES));

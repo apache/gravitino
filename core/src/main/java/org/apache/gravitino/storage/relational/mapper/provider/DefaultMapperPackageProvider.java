@@ -116,6 +116,7 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         GlossaryTermRelMapper.class,
         GlossaryTermDomainRelMapper.class,
         GlossaryTermBindingMapper.class,
+        ArticleSummaryMapper.class,
         KnowledgeBaseArticleMapper.class,
         TopicMetaMapper.class,
         UserMetaMapper.class,

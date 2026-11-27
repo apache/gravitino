@@ -59,9 +59,9 @@ public class ArticleCreate {
   }
 
   private ArticleCreate(Builder builder) {
-    ArticleValidation.checkNoNullCharacter(builder.title, "Title");
-    ArticleValidation.checkNoNullCharacter(builder.comment, "Comment");
-    ArticleValidation.checkNoNullCharacter(builder.sourceReference, "Source reference");
+    ArticleValidation.checkMetadataText(builder.title, "Title");
+    ArticleValidation.checkMetadataText(builder.comment, "Comment");
+    ArticleValidation.checkMetadataText(builder.sourceReference, "Source reference");
     this.name = ArticleValidation.name(builder.name);
     this.title = ArticleValidation.title(builder.title);
     this.body = builder.body;
@@ -71,13 +71,14 @@ public class ArticleCreate {
     this.comment =
         ArticleValidation.length(
             builder.comment, KnowledgeBaseArticle.COMMENT_MAX_LENGTH, "Comment");
-    this.synonyms = ArticleValidation.synonyms(builder.synonyms.build());
+    this.synonyms = ArticleValidation.synonymsForWrite(builder.synonyms.build());
     this.sourceReference =
         ArticleValidation.length(
             builder.sourceReference,
             KnowledgeBaseArticle.SOURCE_REFERENCE_MAX_LENGTH,
             "Source reference");
     this.properties = builder.properties.build();
+    this.properties.forEach(ArticleValidation::checkProperty);
     this.objects = builder.objects.build();
   }
 

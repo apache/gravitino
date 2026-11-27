@@ -35,11 +35,13 @@ import com.codahale.metrics.jersey2.InstrumentedResourceMethodApplicationListene
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.IntStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
+import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -59,6 +61,7 @@ import org.apache.gravitino.dto.responses.TermListResponse;
 import org.apache.gravitino.dto.responses.TermResponse;
 import org.apache.gravitino.dto.responses.TermTreeResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.LookupTooBroadException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -198,7 +201,7 @@ public class TestTermOperations extends BaseOperationsTest {
 
   @Test
   void testListDefaultsToNamesAcrossVisibleStatuses() {
-    when(dispatcher.listTermNames("test", null, null, null))
+    when(dispatcher.listTermNames("test", null, null, null, List.of()))
         .thenReturn(new String[] {"Draft term"});
     try (Response response = target(BASE).request(ACCEPT_V1).get()) {
       assertEquals(200, response.getStatus());
@@ -209,9 +212,10 @@ public class TestTermOperations extends BaseOperationsTest {
 
   @Test
   void testListTermsQueryDefaultsAndDirectCall() throws Exception {
-    when(dispatcher.listTermNames("test", null, null, null))
+    when(dispatcher.listTermNames("test", null, null, null, List.of()))
         .thenReturn(new String[] {"Draft term"});
-    when(dispatcher.listTerms("test", "Sales", "rev", GlossaryTerm.Status.APPROVED))
+    when(dispatcher.listTerms(
+            "test", "Sales", "rev", GlossaryTerm.Status.APPROVED, List.of(), false))
         .thenReturn(new TermDTO[0]);
     TermOperations ops = new TermOperations(dispatcher);
     FieldUtils.writeField(ops, "httpRequest", mock(HttpServletRequest.class), true);
@@ -248,9 +252,10 @@ public class TestTermOperations extends BaseOperationsTest {
   void testCreateAndFilter() throws Exception {
     TermDTO term = JsonUtils.objectMapper().readValue("{\"name\":\"Term\"}", TermDTO.class);
     when(dispatcher.createTerm("test", TermSpec.builder("Term").build())).thenReturn(term);
-    when(dispatcher.listTerms("test", "Sales", "erm", GlossaryTerm.Status.APPROVED))
+    when(dispatcher.listTerms(
+            "test", "Sales", "erm", GlossaryTerm.Status.APPROVED, List.of(), false))
         .thenReturn(new TermDTO[] {term});
-    when(dispatcher.listTermNames("test", "Sales", "erm", GlossaryTerm.Status.APPROVED))
+    when(dispatcher.listTermNames("test", "Sales", "erm", GlossaryTerm.Status.APPROVED, List.of()))
         .thenReturn(new String[] {"Term"});
     try (Response r = target(BASE).request().post(Entity.json("{\"name\":\"Term\"}"))) {
       assertEquals(200, r.getStatus());
@@ -335,15 +340,79 @@ public class TestTermOperations extends BaseOperationsTest {
   }
 
   @Test
-  void testUnsupportedListFiltersAndMissingBodiesAreRejectedBeforeDispatch() {
+  void testLookupWordValidation() {
+    for (List<String> words : List.of(List.of("  "), Collections.nCopies(21, "one"))) {
+      when(dispatcher.listTermNames("test", null, null, null, words)).thenCallRealMethod();
+      try (Response r = target(BASE).queryParam("match", words.toArray()).request().get()) {
+        assertEquals(400, r.getStatus());
+        assertEquals("IllegalArgumentException", r.readEntity(ErrorResponse.class).getType());
+      }
+    }
+  }
+
+  @Test
+  void testLookupWireFormatAndWorkLimit() throws Exception {
+    List<String> words = List.of(" Active  user ", "Customer");
+    String matched =
+        "{\"name\":\"Customer\",\"matchedBy\":[{\"word\":\" Active  user \",\"field\":\"SYNONYM\"},{\"word\":\"Customer\",\"field\":\"NAME\"}]";
+    TermDTO definition = JsonUtils.objectMapper().readValue(matched + "}", TermDTO.class);
+    TermDTO expanded =
+        JsonUtils.objectMapper()
+            .readValue(matched + ",\"bindings\":[],\"bindingsTruncated\":false}", TermDTO.class);
+    when(dispatcher.listTermNames("test", null, null, null, words))
+        .thenReturn(new String[] {"Customer"});
+    when(dispatcher.listTerms("test", null, null, null, words, false))
+        .thenReturn(new TermDTO[] {definition});
+    String message = "Glossary lookup is too broad. Omit embedded bindings or narrow the query.";
+    when(dispatcher.listTerms("test", null, null, null, words, true))
+        .thenReturn(new TermDTO[] {expanded})
+        .thenThrow(new LookupTooBroadException(message));
+    WebTarget lookup = target(BASE).queryParam("match", words.toArray());
+    try (Response r = lookup.request().get()) {
+      assertEquals(200, r.getStatus());
+      assertArrayEquals(new String[] {"Customer"}, r.readEntity(NameListResponse.class).getNames());
+    }
+    WebTarget details = lookup.queryParam("details", true);
+    for (boolean bindings : List.of(false, true)) {
+      try (Response r = details.queryParam("bindings", bindings).request().get()) {
+        assertEquals(200, r.getStatus());
+        JsonNode root =
+            JsonUtils.objectMapper().readTree(r.readEntity(String.class)).path("terms").get(0);
+        assertEquals(words.get(0), root.path("matchedBy").get(0).path("word").asText());
+        assertEquals("SYNONYM", root.path("matchedBy").get(0).path("field").asText());
+        assertEquals("NAME", root.path("matchedBy").get(1).path("field").asText());
+        assertEquals(bindings, root.has("bindings"));
+        assertEquals(bindings, root.has("bindingsTruncated"));
+        if (bindings) {
+          assertTrue(root.path("bindings").isArray() && root.path("bindings").isEmpty());
+          assertTrue(root.path("bindingsTruncated").isBoolean());
+          assertFalse(root.path("bindingsTruncated").booleanValue());
+        }
+      }
+    }
+    try (Response r = details.queryParam("bindings", true).request().get()) {
+      assertEquals(400, r.getStatus());
+      ErrorResponse error = r.readEntity(ErrorResponse.class);
+      assertEquals("LookupTooBroadException", error.getType());
+      assertEquals(message, error.getMessage());
+    }
+  }
+
+  @Test
+  void testInvalidListFiltersAndMissingBodiesAreRejectedBeforeDispatch() {
     try (Response r = target(BASE).queryParam("details", "yes").request().get()) {
       assertEquals(400, r.getStatus());
       assertTrue(r.readEntity(ErrorResponse.class).getMessage().contains("true or false"));
     }
-    try (Response r = target(BASE).queryParam("match", "revenue").request().get()) {
+    try (Response r = target(BASE).queryParam("bindings", "yes").request().get()) {
       assertEquals(400, r.getStatus());
     }
-    try (Response r = target(BASE).queryParam("bindings", "true").request().get()) {
+    try (Response r =
+        target(BASE).queryParam("bindings", "true").queryParam("details", true).request().get()) {
+      assertEquals(400, r.getStatus());
+    }
+    try (Response r =
+        target(BASE).queryParam("bindings", "true").queryParam("match", "T").request().get()) {
       assertEquals(400, r.getStatus());
     }
     try (Response r = target(BASE).request().post(Entity.json(""))) {
