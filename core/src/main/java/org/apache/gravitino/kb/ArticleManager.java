@@ -34,13 +34,16 @@ import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsExceptio
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.ExpectedRevision;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.NameConflictException;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.ScopedArticle;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.TransactionHook;
+import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
 /** Manages current Knowledge Base Articles in a metalake. */
 public final class ArticleManager {
@@ -74,18 +77,43 @@ public final class ArticleManager {
     }
   }
 
-  /** Creates an Article, retrying generated names only after a live name conflict. */
+  /**
+   * Creates an Article, allocating an available name when none is supplied.
+   *
+   * @throws OptimisticLockException if a concurrent writer claims the generated name in a
+   *     caller-owned transaction. The caller can then retry the transaction.
+   */
   public Result createArticle(String metalake, ArticleCreate request) {
-    boolean generated = request.name() == null;
-    String name = generated ? ArticleEdits.generatedName(request.title(), 0) : request.name();
-    KnowledgeBaseArticleEntity article = edits.create(metalake, ids.nextId(), name, request);
+    String name = request.name();
+    boolean generated = name == null;
+    boolean allocateInCallerTransaction = generated && SqlSessions.hasActiveSession();
     Long expectedMetalakeId = null;
+    if (allocateInCallerTransaction) {
+      // Fence the metalake observed during name selection against replacement before the insert.
+      SessionUtils.clearSessionCache();
+      try {
+        expectedMetalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+      } catch (NoSuchEntityException missing) {
+        throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
+      }
+      name = nextAvailableName(metalake, request.title(), 0);
+    } else if (generated) {
+      name = ArticleEdits.generatedName(request.title(), 0);
+    }
+    KnowledgeBaseArticleEntity article = edits.create(metalake, ids.nextId(), name, request);
     for (int attempt = 0; ; attempt++) {
       try {
         return Result.from(
             articles.createScoped(article, expectedMetalakeId, policy, TargetNameConflict::new));
       } catch (TargetNameConflict conflict) {
-        if (!generated || attempt == MAX_NAME_RETRIES || SqlSessions.hasActiveSession()) {
+        if (allocateInCallerTransaction) {
+          throw new OptimisticLockException(
+              conflict.getCause(),
+              "Article name %s was claimed in %s; retry the transaction",
+              article.name(),
+              metalake);
+        }
+        if (!generated || attempt == MAX_NAME_RETRIES) {
           throw new KnowledgeBaseArticleAlreadyExistsException(
               conflict.getCause(),
               "Article name %s already exists in %s",
@@ -95,7 +123,8 @@ public final class ArticleManager {
         expectedMetalakeId = conflict.metalakeId;
         article =
             article.toBuilder()
-                .withName(nextAvailableName(metalake, request.title()))
+                .withName(
+                    SqlSessions.readSnapshot(() -> nextAvailableName(metalake, request.title(), 1)))
                 .withId(ids.nextId())
                 .build();
       } catch (IOException failure) {
@@ -174,23 +203,19 @@ public final class ArticleManager {
     return NameIdentifier.of(metalake, KnowledgeBaseArticle.normalizeName(name));
   }
 
-  private String nextAvailableName(String metalake, String title) {
-    // Existing suffixes cost only reads. Reserve the write retry budget for lost insert races.
-    return SqlSessions.readSnapshot(
-        () -> {
-          for (long offset = 1; ; offset += NAME_LOOKUP_BATCH) {
-            List<String> candidates = new ArrayList<>(NAME_LOOKUP_BATCH);
-            for (int i = 0; i < NAME_LOOKUP_BATCH; i++) {
-              candidates.add(ArticleEdits.generatedName(title, offset + i));
-            }
-            Set<String> occupied = articles.occupiedNames(metalake, candidates);
-            for (String candidate : candidates) {
-              if (!occupied.contains(candidate)) {
-                return candidate;
-              }
-            }
-          }
-        });
+  private String nextAvailableName(String metalake, String title, long start) {
+    for (long offset = start; ; offset += NAME_LOOKUP_BATCH) {
+      List<String> candidates = new ArrayList<>(NAME_LOOKUP_BATCH);
+      for (int i = 0; i < NAME_LOOKUP_BATCH; i++) {
+        candidates.add(ArticleEdits.generatedName(title, offset + i));
+      }
+      Set<String> occupied = articles.occupiedNames(metalake, candidates);
+      for (String candidate : candidates) {
+        if (!occupied.contains(candidate)) {
+          return candidate;
+        }
+      }
+    }
   }
 
   private static String encode(long metalakeId, long articleId, long revision) {
@@ -211,8 +236,7 @@ public final class ArticleManager {
     long lake = bytes.getLong();
     long article = bytes.getLong();
     long revision = bytes.getLong();
-    Preconditions.checkArgument(
-        lake >= 0 && article >= 0 && revision > 0, "Invalid Article revision token");
+    Preconditions.checkArgument(revision > 0, "Invalid Article revision token");
     return new ExpectedRevision(lake, article, revision);
   }
 }

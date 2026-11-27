@@ -42,10 +42,13 @@ import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsExceptio
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.MissingArticleScopeException;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.NameConflictException;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.TestTemplate;
 
 class TestArticleManager extends TestJDBCBackend {
@@ -136,6 +139,93 @@ class TestArticleManager extends TestJDBCBackend {
     assertThrows(
         ArticleRevisionConflictException.class,
         () -> manager.alterArticle(LAKE, "café", created.revisionToken()));
+  }
+
+  @TestTemplate
+  void legacyBlankPropertyCanBeRemovedByItsExactKey() throws Exception {
+    createAndInsertMakeLake(LAKE);
+    var created = manager.createArticle(LAKE, request().build());
+    try (var session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        var update =
+            session
+                .getConnection()
+                .prepareStatement("UPDATE kb_article_meta SET properties=? WHERE article_id=?")) {
+      update.setString(1, "{\" \":\"legacy\",\"keep\":\"v\"}");
+      update.setLong(2, created.article().id());
+      assertEquals(1, update.executeUpdate());
+    }
+    var loaded = manager.loadArticle(LAKE, "guide");
+    assertEquals(Map.of(" ", "legacy", "keep", "v"), loaded.article().properties());
+    var edited =
+        manager.alterArticle(
+            LAKE,
+            "guide",
+            loaded.revisionToken(),
+            KnowledgeBaseArticleChange.setProperty("keep", "updated"));
+    assertEquals("legacy", edited.article().properties().get(" "));
+    manager.alterArticle(
+        LAKE, "guide", edited.revisionToken(), KnowledgeBaseArticleChange.removeProperty(" "));
+    var stored = manager.loadArticle(LAKE, "guide").article();
+    assertEquals(Map.of("keep", "updated"), stored.properties());
+    assertEquals(3, stored.revision());
+  }
+
+  @TestTemplate
+  void conditionalEditAcceptsStoredNegativeIds() throws IOException {
+    // MySQL stores metalake IDs in an unsigned column.
+    long metalakeId = "mysql".equals(backendType) ? 1L : -1L;
+    backend.insert(createBaseMakeLake(metalakeId, LAKE, AUDIT_INFO), false);
+    ArticleManager manager = new ArticleManager(() -> -2L, 1024);
+    var created = manager.createArticle(LAKE, request().build());
+    var edited =
+        manager.alterArticle(
+            LAKE,
+            "guide",
+            created.revisionToken(),
+            KnowledgeBaseArticleChange.updateTitle("Edited"));
+    assertEquals("Edited", edited.article().title());
+    assertEquals(2, edited.article().revision());
+  }
+
+  @TestTemplate
+  void generatedNamesUseAvailableSuffixesInCallerTransaction() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    manager.createArticle(LAKE, request().build());
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          assertEquals("guide-2", manager.createArticle(LAKE, request().build()).article().name());
+          assertEquals("guide-3", manager.createArticle(LAKE, request().build()).article().name());
+          assertThrows(
+              KnowledgeBaseArticleAlreadyExistsException.class,
+              () -> manager.createArticle(LAKE, request().withName("guide").build()));
+        });
+    assertEquals("guide-2", manager.loadArticle(LAKE, "guide-2").article().name());
+    assertEquals("guide-3", manager.loadArticle(LAKE, "guide-3").article().name());
+  }
+
+  @TestTemplate
+  void generatedNameLostToAnotherWriterRequiresCallerTransactionRetry() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    manager.createArticle(LAKE, request().build());
+    ArticleManager racing =
+        new ArticleManager(
+            () -> {
+              CompletableFuture.runAsync(
+                      () -> manager.createArticle(LAKE, request().withName("guide-2").build()))
+                  .orTimeout(15, TimeUnit.SECONDS)
+                  .join();
+              return ids.incrementAndGet();
+            },
+            1024);
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            SessionUtils.doMultipleWithCommit(() -> racing.createArticle(LAKE, request().build())));
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            assertEquals(
+                "guide-3", manager.createArticle(LAKE, request().build()).article().name()));
   }
 
   @TestTemplate

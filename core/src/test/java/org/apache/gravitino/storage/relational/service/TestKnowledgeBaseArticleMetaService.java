@@ -193,6 +193,34 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testInvalidSynonymsAndPropertiesCannotChangeStoredValuesOrRevision() throws IOException {
+    createAndInsertMakeLake("lake");
+    var original =
+        article(31, "guide").toBuilder()
+            .withSynonyms(List.of("Guide😀"))
+            .withProperties(Map.of("x😀", "v😀", "x?", "other"))
+            .build();
+    STORE.insert(original, false);
+    var fresh = article(32, "other");
+    String invalid = "x\uD800";
+    for (var edit :
+        List.<UnaryOperator<KnowledgeBaseArticleEntity>>of(
+            a -> a.toBuilder().withSynonyms(List.of(invalid)).build(),
+            a -> a.toBuilder().withProperties(Map.of(invalid, "v", "x?", "other")).build(),
+            a -> a.toBuilder().withProperties(Map.of("k", invalid)).build(),
+            a -> a.toBuilder().withProperties(Map.of(" ", "v")).build())) {
+      assertThrows(IllegalArgumentException.class, () -> STORE.insert(edit.apply(fresh), false));
+      assertThrows(
+          IllegalArgumentException.class, () -> STORE.update(original.nameIdentifier(), edit));
+    }
+    assertFalse(backend.exists(fresh.nameIdentifier(), TYPE));
+    var stored = STORE.get(original.nameIdentifier());
+    assertEquals(original.synonyms(), stored.synonyms());
+    assertEquals(original.properties(), stored.properties());
+    assertEquals(original.revision(), stored.revision());
+  }
+
+  @TestTemplate
   void testStoredNullCharacterMetadataCanBeRepaired() throws Exception {
     assumeFalse("postgresql".equals(backendType), "PostgreSQL text columns cannot store U+0000");
     createAndInsertMakeLake("lake");

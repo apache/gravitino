@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -121,7 +120,7 @@ public interface KnowledgeBaseArticleChange {
   }
 
   /**
-   * Creates a change to remove a property.
+   * Creates a change to remove a property by its exact stored key, including a legacy blank key.
    *
    * @param property the property name
    * @return the change
@@ -477,7 +476,7 @@ public interface KnowledgeBaseArticleChange {
     private UpdateSynonyms(String[] newSynonyms) {
       Preconditions.checkNotNull(newSynonyms, "newSynonyms");
       this.newSynonyms =
-          ArticleValidation.synonyms(Arrays.asList(newSynonyms)).toArray(new String[0]);
+          ArticleValidation.synonymsForWrite(Arrays.asList(newSynonyms)).toArray(new String[0]);
     }
 
     /**
@@ -560,9 +559,7 @@ public interface KnowledgeBaseArticleChange {
     private final String value;
 
     private SetProperty(String property, String value) {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(property), "Property name must not be null or blank");
-      Preconditions.checkArgument(value != null, "Property value must not be null");
+      ArticleValidation.checkProperty(property, value);
       this.property = property;
       this.value = value;
     }
@@ -609,8 +606,7 @@ public interface KnowledgeBaseArticleChange {
     private final String property;
 
     private RemoveProperty(String property) {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(property), "Property name must not be null or blank");
+      Preconditions.checkArgument(property != null, "Property name must not be null");
       this.property = property;
     }
 

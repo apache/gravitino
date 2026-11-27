@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 
 final class ArticleValidation {
   private static final Pattern NAME = Pattern.compile("[\\p{L}\\p{Nd}\\p{M}_-]+");
@@ -84,6 +85,20 @@ final class ArticleValidation {
           value != null && !value.trim().isEmpty(), "Domain name must not be null or blank");
     }
     return ImmutableList.copyOf(values);
+  }
+
+  static void checkProperty(String key, String value) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(key), "Property name must not be null or blank");
+    Preconditions.checkArgument(value != null, "Property value must not be null");
+    Utf8.encodedLength(key);
+    Utf8.encodedLength(value);
+  }
+
+  static List<String> synonymsForWrite(List<String> values) {
+    List<String> normalized = synonyms(values);
+    normalized.forEach(Utf8::encodedLength);
+    return normalized;
   }
 
   static List<String> synonyms(List<String> values) {
