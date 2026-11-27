@@ -535,6 +535,7 @@ public class SemanticModelMetaService {
             SessionUtils.doWithoutCommit(
                 SemanticModelSourceMapper.class,
                 mapper -> mapper.softDeleteByModelId(semanticModelId)),
+        () -> OntologyMetaService.getInstance().cascadeModel(semanticModelId),
         () ->
             EntityChangeLogWriter.append(
                 semanticModelIdent, Entity.EntityType.SEMANTIC_MODEL, OperateType.DROP));

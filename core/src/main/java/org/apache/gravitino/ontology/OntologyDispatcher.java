@@ -21,6 +21,8 @@ package org.apache.gravitino.ontology;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiPredicate;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
@@ -32,6 +34,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.CapabilityHelpers;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchOntologyException;
 import org.apache.gravitino.listener.api.event.OperationType;
@@ -44,14 +48,14 @@ import org.apache.gravitino.storage.relational.service.OntologyMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
-/** Applies metadata lifecycle hooks and audits ontology operations. */
+/** Normalizes model scopes, applies metadata lifecycle hooks, and audits ontology operations. */
 public final class OntologyDispatcher {
 
   private final GravitinoEnv env;
   private final OntologyMetaService storage;
 
   /**
-   * Creates the server's ontology dispatcher.
+   * Creates the server's ontology and mapping dispatcher.
    *
    * @param env The server environment.
    */
@@ -147,20 +151,26 @@ public final class OntologyDispatcher {
   }
 
   /**
-   * Applies an ordered batch of ontology changes.
+   * Applies ontology changes, preserving compatibility with its live mappings.
    *
    * @param metalake The containing metalake.
    * @param name The current ontology name.
+   * @param visible Checks access given the mapping identifier and whether its model has a published
+   *     revision.
    * @param changes The changes applied atomically.
    * @return The updated ontology.
    */
-  public Ontology alterOntology(String metalake, String name, OntologyChange... changes) {
+  public Ontology alterOntology(
+      String metalake,
+      String name,
+      BiPredicate<NameIdentifier, Boolean> visible,
+      OntologyChange... changes) {
     NameIdentifier ident = NameIdentifierUtil.ofOntology(metalake, name);
     return operate(
         OperationType.ALTER_ONTOLOGY,
         ident,
         () -> {
-          Ontology result = storage.alterOntology(metalake, name, changes);
+          Ontology result = storage.alterOntology(metalake, name, visible, changes);
           if (!name.equals(result.name())) {
             AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.ONTOLOGY);
           }
@@ -169,24 +179,193 @@ public final class OntologyDispatcher {
   }
 
   /**
-   * Drops a live ontology.
+   * Drops an unused ontology.
    *
    * @param metalake The containing metalake.
    * @param name The ontology name.
+   * @param visible Checks access given the mapping identifier and whether its model has a published
+   *     revision.
    * @return Whether the ontology was dropped.
    */
-  public boolean dropOntology(String metalake, String name) {
+  public boolean dropOntology(
+      String metalake, String name, BiPredicate<NameIdentifier, Boolean> visible) {
     NameIdentifier ident = NameIdentifierUtil.ofOntology(metalake, name);
     return operate(
         OperationType.DROP_ONTOLOGY,
         ident,
         () -> {
-          boolean dropped = storage.dropOntology(metalake, name);
+          boolean dropped = storage.dropOntology(metalake, name, visible);
           if (dropped) {
             AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.ONTOLOGY);
           }
           return dropped;
         });
+  }
+
+  /**
+   * Finds mappings of an ontology.
+   *
+   * @param metalake The containing metalake.
+   * @param name The ontology name.
+   * @return Mapping identifiers before authorization filtering.
+   */
+  public List<NameIdentifier> listOntologyMappings(String metalake, String name) {
+    return operate(
+        OperationType.LIST_MAPPINGS_BY_ONTOLOGY,
+        NameIdentifierUtil.ofOntology(metalake, name),
+        () -> storage.listOntologyMappings(metalake, name));
+  }
+
+  /**
+   * Lists mappings under a model.
+   *
+   * @param model The parent model.
+   * @return The mapping identifiers.
+   */
+  public List<NameIdentifier> listModelMappings(NameIdentifier model) {
+    return operate(
+        OperationType.LIST_ONTOLOGY_MAPPING,
+        model,
+        () -> {
+          NameIdentifier parent = normalizeModel(model);
+          return storage.listModelMappings(parent).stream()
+              .map(name -> mappingIdent(parent, name))
+              .toList();
+        });
+  }
+
+  /**
+   * Loads a mapping.
+   *
+   * @param model The parent model.
+   * @param name The mapping name.
+   * @return The current mapping.
+   */
+  public OntologyMapping loadMapping(NameIdentifier model, String name) {
+    return operate(
+        OperationType.LOAD_ONTOLOGY_MAPPING,
+        mappingIdent(model, name),
+        () -> storage.loadMapping(normalizeModel(model), name));
+  }
+
+  /**
+   * Creates a mapping under a model.
+   *
+   * @param model The parent model.
+   * @param name The mapping name.
+   * @param comment The optional description.
+   * @param ontology The referenced ontology name.
+   * @param definition The mapping definition.
+   * @param properties The Gravitino properties.
+   * @param checkOntology Checks load authority on the referenced ontology.
+   * @return The created mapping.
+   */
+  public OntologyMapping createMapping(
+      NameIdentifier model,
+      String name,
+      @Nullable String comment,
+      String ontology,
+      OntologyMappingDefinition definition,
+      Map<String, String> properties,
+      Consumer<String> checkOntology) {
+    return operate(
+        OperationType.CREATE_ONTOLOGY_MAPPING,
+        mappingIdent(model, name),
+        () ->
+            storage.createMapping(
+                env.idGenerator(),
+                normalizeModel(model),
+                name,
+                comment,
+                ontology,
+                definition,
+                properties,
+                checkOntology));
+  }
+
+  /**
+   * Imports an Ossie mapping under a model.
+   *
+   * @param model The parent model.
+   * @param document The input document.
+   * @param checkOntology Checks load authority on the referenced ontology.
+   * @return The imported mapping.
+   */
+  public OntologyMapping importMapping(
+      NameIdentifier model, OssieDocument document, Consumer<String> checkOntology) {
+    AtomicReference<NameIdentifier> target = new AtomicReference<>(model);
+    return operate(
+        OperationType.IMPORT_ONTOLOGY_MAPPING,
+        target,
+        () -> {
+          NameIdentifier parent = normalizeModel(model);
+          OssieOntologyDocuments.ParsedMapping value =
+              OssieOntologyDocuments.importMapping(document, parent.name());
+          target.set(mappingIdent(model, value.name()));
+          return storage.createMapping(
+              env.idGenerator(),
+              parent,
+              value.name(),
+              value.comment(),
+              value.ontology(),
+              value.definition(),
+              value.properties(),
+              checkOntology);
+        },
+        created -> mappingIdent(model, created.name()));
+  }
+
+  /**
+   * Exports the current mapping with its current parent and ontology names.
+   *
+   * @param model The parent model.
+   * @param name The mapping name.
+   * @param format The output format.
+   * @return The Ossie document.
+   */
+  public OssieDocument exportMapping(NameIdentifier model, String name, OssieFormat format) {
+    return operate(
+        OperationType.EXPORT_ONTOLOGY_MAPPING,
+        mappingIdent(model, name),
+        () -> {
+          NameIdentifier parent = normalizeModel(model);
+          return OssieOntologyDocuments.exportMapping(
+              storage.loadMapping(parent, name), parent.name(), format);
+        });
+  }
+
+  /**
+   * Applies a batch of mapping changes.
+   *
+   * @param model The parent model.
+   * @param name The current mapping name.
+   * @param checkOntology Checks load authority if the definition is replaced.
+   * @param changes The changes applied atomically.
+   * @return The updated mapping.
+   */
+  public OntologyMapping alterMapping(
+      NameIdentifier model,
+      String name,
+      Consumer<String> checkOntology,
+      OntologyMappingChange... changes) {
+    return operate(
+        OperationType.ALTER_ONTOLOGY_MAPPING,
+        mappingIdent(model, name),
+        () -> storage.alterMapping(normalizeModel(model), name, checkOntology, changes));
+  }
+
+  /**
+   * Drops a mapping.
+   *
+   * @param model The parent model.
+   * @param name The mapping name.
+   * @return Whether it was dropped.
+   */
+  public boolean dropMapping(NameIdentifier model, String name) {
+    return operate(
+        OperationType.DROP_ONTOLOGY_MAPPING,
+        mappingIdent(model, name),
+        () -> storage.dropMapping(normalizeModel(model), name));
   }
 
   private OntologyEntity create(
@@ -220,6 +399,28 @@ public final class OntologyDispatcher {
     } catch (NoSuchEntityException e) {
       throw new NoSuchOntologyException(e, "Ontology '%s' does not exist", name);
     }
+  }
+
+  private NameIdentifier normalizeModel(NameIdentifier model) {
+    return env.catalogManager()
+        .doWithCatalog(
+            NameIdentifierUtil.getCatalogIdentifier(model),
+            catalog -> {
+              catalog.checkMetalakeAndCatalogInUse();
+              return NameIdentifier.of(
+                  CapabilityHelpers.applyCaseSensitive(
+                      model.namespace(), Capability.Scope.SEMANTIC_MODEL, catalog.capability()),
+                  model.name());
+            });
+  }
+
+  private static NameIdentifier mappingIdent(NameIdentifier model, String mapping) {
+    return NameIdentifier.of(
+        model.namespace().level(0),
+        model.namespace().level(1),
+        model.namespace().level(2),
+        model.name(),
+        mapping);
   }
 
   private <T> T operate(OperationType operation, NameIdentifier ident, Supplier<T> action) {

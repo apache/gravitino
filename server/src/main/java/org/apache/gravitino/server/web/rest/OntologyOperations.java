@@ -212,7 +212,11 @@ public class OntologyOperations {
           return Utils.ok(
               new OntologyResponse(
                   OntologyDTO.from(
-                      dispatcher.alterOntology(metalake, ontology, body.ontologyChanges()))));
+                      dispatcher.alterOntology(
+                          metalake,
+                          ontology,
+                          OntologyRestSupport::canLoadMapping,
+                          body.ontologyChanges()))));
         });
   }
 
@@ -236,7 +240,10 @@ public class OntologyOperations {
     return OntologyRestSupport.run(
         request,
         () -> {
-          return Utils.ok(new DropResponse(dispatcher.dropOntology(metalake, ontology)));
+          return Utils.ok(
+              new DropResponse(
+                  dispatcher.dropOntology(
+                      metalake, ontology, OntologyRestSupport::canLoadMapping)));
         });
   }
 
