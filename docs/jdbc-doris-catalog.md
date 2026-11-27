@@ -369,6 +369,7 @@ Gravitino supports these table alteration operations:
 - `RenameTable`
 - `UpdateComment`
 - `AddColumn`
+- `RenameColumn` (Doris 1.2.0+ with `light_schema_change=true`)
 - `DeleteColumn`
 - `UpdateColumnType`
 - `UpdateColumnPosition`
@@ -378,6 +379,8 @@ Gravitino supports these table alteration operations:
 Please be aware that:
 
  - Not all table alteration operations can be processed in batches.
+ - Column renames must be submitted individually. An `alterTable` call containing `RenameColumn`
+   cannot include any other change, including another rename. Nested column renames are not supported.
  - Schema changes, such as adding/modifying/dropping columns can be processed in batches.
  - Supports modifying multiple column comments at the same time.
  - Doesn't support modifying the column type and column comment at the same time.
