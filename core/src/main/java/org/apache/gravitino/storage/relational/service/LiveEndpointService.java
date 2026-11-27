@@ -20,6 +20,10 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
+import java.util.TreeMap;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -49,42 +53,53 @@ public final class LiveEndpointService {
    */
   public static void lockLiveEndpoint(
       NameIdentifier identifier, Entity.EntityType type, NamespacedEntityId observed) {
+    lockLiveEndpoints(List.of(new Endpoint(identifier, type, observed)));
+  }
+
+  /** A name and its stable identity observed while planning a relation write. */
+  public record Endpoint(
+      NameIdentifier identifier, Entity.EntityType type, NamespacedEntityId ids) {}
+
+  record Row(int depth, Entity.EntityType type, long id) {}
+
+  /** Locks the union of the endpoint chains in hierarchy and ID order and checks every identity. */
+  public static void lockLiveEndpoints(Collection<Endpoint> endpoints) {
     Preconditions.checkState(
         SessionUtils.isInTransaction(), "A transaction is required to lock a live endpoint");
-    long[] namespaceIds = observed.namespaceIds();
-    if (type == Entity.EntityType.METALAKE) {
-      lock(identifier, type, observed.entityId());
-    } else {
-      checkNamespaceDepth(type, namespaceIds, 1);
-      lock(identifier, Entity.EntityType.METALAKE, namespaceIds[0]);
-      if (type == Entity.EntityType.CATALOG) {
-        lock(identifier, type, observed.entityId());
-      } else if (namespaceIds.length > 1) {
-        lock(identifier, Entity.EntityType.CATALOG, namespaceIds[1]);
-        if (type == Entity.EntityType.SCHEMA) {
-          lock(identifier, type, observed.entityId());
-        } else {
-          checkNamespaceDepth(type, namespaceIds, 3);
-          lock(identifier, Entity.EntityType.SCHEMA, namespaceIds[2]);
-          if (type == Entity.EntityType.COLUMN) {
-            checkNamespaceDepth(type, namespaceIds, 4);
-            lock(identifier, Entity.EntityType.TABLE, namespaceIds[3]);
-          } else {
-            lock(identifier, type, observed.entityId());
-          }
+    var rows =
+        new TreeMap<Row, NameIdentifier>(
+            Comparator.comparingInt(Row::depth)
+                .thenComparing(Row::type)
+                .thenComparingLong(Row::id));
+    for (Endpoint endpoint : endpoints) {
+      var type = endpoint.type();
+      long[] parents = endpoint.ids().namespaceIds();
+      if (type != Entity.EntityType.METALAKE) {
+        checkNamespaceDepth(type, parents, 1);
+        rows.put(new Row(0, Entity.EntityType.METALAKE, parents[0]), endpoint.identifier());
+      }
+      if (parents.length > 1) {
+        rows.put(new Row(1, Entity.EntityType.CATALOG, parents[1]), endpoint.identifier());
+        if (type != Entity.EntityType.SCHEMA) {
+          checkNamespaceDepth(type, parents, 3);
+          rows.put(new Row(2, Entity.EntityType.SCHEMA, parents[2]), endpoint.identifier());
         }
+      }
+      if (type == Entity.EntityType.COLUMN) {
+        checkNamespaceDepth(type, parents, 4);
+        rows.put(new Row(3, Entity.EntityType.TABLE, parents[3]), endpoint.identifier());
       } else {
-        lock(identifier, type, observed.entityId());
+        rows.put(new Row(parents.length, type, endpoint.ids().entityId()), endpoint.identifier());
       }
     }
-
-    // An earlier name lookup in this transaction may be in MyBatis's first-level cache. The
-    // locking reads above must be followed by a database read of the current name-to-ID chain.
+    rows.forEach((row, name) -> lock(name, row.type(), row.id()));
     SessionUtils.clearSessionCache();
-    NamespacedEntityId current =
-        new RelationalEntityStoreIdResolver().getEntityIds(identifier, type);
-    if (!Arrays.equals(current.fullIds(), observed.fullIds())) {
-      throw missing(identifier, type);
+    var resolver = new RelationalEntityStoreIdResolver();
+    for (Endpoint endpoint : endpoints) {
+      var current = resolver.getEntityIds(endpoint.identifier(), endpoint.type());
+      if (!Arrays.equals(current.fullIds(), endpoint.ids().fullIds())) {
+        throw missing(endpoint.identifier(), endpoint.type());
+      }
     }
   }
 
