@@ -146,13 +146,28 @@ public class TestPaimonPropertiesConverter {
   }
 
   @Test
+  void testHiveBackendPropertiesForTextFormat() {
+    // Paimon supports text format tables since Paimon 2.0.
+    Assertions.assertEquals(
+        ImmutableMap.of(
+            PaimonPropertiesConstants.PAIMON_TABLE_TYPE,
+            PaimonPropertiesConstants.PAIMON_TABLE_TYPE_FORMAT_TABLE,
+            PaimonPropertiesConstants.PAIMON_FILE_FORMAT,
+            "text",
+            "k1",
+            "v1"),
+        paimonPropertiesConverter.toHiveBackendTableProperties(
+            ImmutableMap.of(TableCatalog.PROP_PROVIDER, "text", "k1", "v1")));
+  }
+
+  @Test
   void testHiveBackendPropertiesForUnsupportedFormat() {
-    // A provider that Paimon does not support as a format table format keeps a Paimon table, as in
-    // Paimon's own SparkCatalog. Paimon 1.2 has no text format table.
+    // A provider that Paimon does not support as a format table format keeps a Paimon table.
+    // Paimon has no avro format table.
     Assertions.assertEquals(
         ImmutableMap.of("k1", "v1"),
         paimonPropertiesConverter.toHiveBackendTableProperties(
-            ImmutableMap.of(TableCatalog.PROP_PROVIDER, "text", "k1", "v1")));
+            ImmutableMap.of(TableCatalog.PROP_PROVIDER, "avro", "k1", "v1")));
   }
 
   @Test

@@ -260,9 +260,9 @@ public class TestPaimonCatalogOps {
     // Test AddColumn last column.
     assertAddColumn(7, Types.DoubleType.get(), defaultPos(), 6);
     assertAddColumn(8, Types.DoubleType.get(), null, 7);
-    // Test NullPointerException with AddColumn for after non-existent column.
+    // Test AddColumn after a non-existent column.
     assertThrowsExactly(
-        NullPointerException.class,
+        ColumnNotExistException.class,
         () -> assertAddColumn(9, Types.LongType.get(), after("col_10"), null));
   }
 
@@ -307,19 +307,26 @@ public class TestPaimonCatalogOps {
 
   @Test
   void testUpdateColumnType() throws Exception {
+    // Paimon does not allow changing the type of a primary key column, so widen a non-key column.
+    assertAddColumn(5, Types.IntegerType.get(), defaultPos(), 4);
     assertAlterTable(
         table -> {
-          DataField dataField = table.rowType().getFields().get(0);
-          assertEquals("col_1", dataField.name());
-          assertEquals(DataTypes.BIGINT().notNull(), dataField.type());
+          DataField dataField = table.rowType().getFields().get(4);
+          assertEquals("col_5", dataField.name());
+          assertEquals(DataTypes.BIGINT(), dataField.type());
         },
-        updateColumnType(getFieldName("col_1"), Types.LongType.get()));
-    assertColumnNotExist(updateColumnType(getFieldName("col_5"), Types.ShortType.get()));
+        updateColumnType(getFieldName("col_5"), Types.LongType.get()));
+    assertColumnNotExist(updateColumnType(getFieldName("col_6"), Types.ShortType.get()));
+    assertThrowsExactly(
+        UnsupportedOperationException.class,
+        () ->
+            assertAlterTable(
+                table -> {}, updateColumnType(getFieldName("col_1"), Types.LongType.get())));
     assertThrowsExactly(
         IllegalStateException.class,
         () ->
             assertAlterTable(
-                table -> {}, updateColumnType(getFieldName("col_1"), Types.DateType.get())));
+                table -> {}, updateColumnType(getFieldName("col_5"), Types.DateType.get())));
     assertThrowsExactly(
         IllegalStateException.class,
         () ->

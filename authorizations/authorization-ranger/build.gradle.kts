@@ -133,7 +133,7 @@ dependencies {
   }
   testImplementation(libs.hadoop3.hdfs.client)
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
-  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion")
+  testImplementation("org.apache.paimon:paimon-spark-${sparkMajorVersion}_$scalaVersion:$paimonVersion")
 }
 
 tasks {

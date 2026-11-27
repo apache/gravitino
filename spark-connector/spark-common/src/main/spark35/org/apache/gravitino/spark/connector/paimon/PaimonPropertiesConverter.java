@@ -70,11 +70,12 @@ public class PaimonPropertiesConverter implements PropertiesConverter {
 
   /**
    * Converts the Spark table properties of a table created in a Paimon catalog with the Hive
-   * backend, the only Paimon backend that can create format tables. It follows Paimon's own
-   * SparkCatalog: a provider from the USING clause that Paimon supports as a format table format
+   * backend, the only Paimon backend that can create format tables. As in Paimon's own
+   * SparkCatalog, a provider from the USING clause that Paimon supports as a format table format
    * ({@code SparkSource.FORMAT_NAMES}, which depends on the Paimon version) makes a format table of
-   * that format; any other provider, "paimon" or no provider keeps a Paimon table; and LOCATION
-   * becomes the Paimon table path. Other backends keep the properties as they are.
+   * that format, and LOCATION becomes the Paimon table path. "paimon", no provider or any other
+   * provider keeps a Paimon table; Paimon's own SparkCatalog rejects other providers since Paimon
+   * 2.0. Other backends keep the properties as they are.
    *
    * @param properties the Spark table properties, already converted by {@link
    *     #toGravitinoTableProperties(Map)}.

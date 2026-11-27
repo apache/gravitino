@@ -43,6 +43,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
+import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -447,6 +448,30 @@ public class TestGravitinoPaimonTable {
   }
 
   @Test
+  void testPurgeTableWhenBackendFailsWithRuntimeException() throws Exception {
+    PaimonCatalogOps originalOps = paimonCatalogOperations.paimonCatalogOps;
+    RuntimeException failure = new RuntimeException("Can not get table from metastore.");
+    try (FailingPurgePaimonCatalogOps failingOps = new FailingPurgePaimonCatalogOps(failure)) {
+      paimonCatalogOperations.paimonCatalogOps = failingOps;
+
+      // The schema no longer exists, so the table does not exist either.
+      NameIdentifier tableInDroppedSchema = NameIdentifier.of("dropped_schema", genRandomName());
+      Assertions.assertFalse(paimonCatalogOperations.purgeTable(tableInDroppedSchema));
+
+      // The schema still exists, so the failure is not about a missing table.
+      NameIdentifier tableInExistingSchema =
+          NameIdentifier.of(paimonSchema.name(), genRandomName());
+      RuntimeException thrown =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () -> paimonCatalogOperations.purgeTable(tableInExistingSchema));
+      Assertions.assertSame(failure, thrown);
+    } finally {
+      paimonCatalogOperations.paimonCatalogOps = originalOps;
+    }
+  }
+
+  @Test
   void testListTableException() {
     Namespace tableNs = Namespace.of("metalake", paimonCatalog.name(), "not_exist_db");
     TableCatalog tableCatalog = paimonCatalogOperations;
@@ -725,5 +750,20 @@ public class TestGravitinoPaimonTable {
         Column.of(
             "col3", Types.StringType.get(), "col_3_comment", false, false, DEFAULT_VALUE_NOT_SET);
     return new Column[] {col1, col2, col3};
+  }
+
+  private static class FailingPurgePaimonCatalogOps extends PaimonCatalogOps {
+
+    private final RuntimeException failure;
+
+    FailingPurgePaimonCatalogOps(RuntimeException failure) {
+      super(new PaimonConfig(initBackendCatalogProperties()));
+      this.failure = failure;
+    }
+
+    @Override
+    public void purgeTable(String tableName) {
+      throw failure;
+    }
   }
 }

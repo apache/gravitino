@@ -119,7 +119,7 @@ dependencies {
   compileOnly(libs.lance.namespace.apache.client)
   compileOnly(libs.aws.glue)
   if (scalaVersion == "2.12") {
-    compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+    compileOnly("org.apache.paimon:paimon-spark-${sparkMajorVersion}_$scalaVersion:$paimonVersion") {
       exclude("org.apache.spark")
     }
   }
@@ -240,7 +240,7 @@ dependencies {
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
   if (scalaVersion == "2.12") {
-    testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+    testImplementation("org.apache.paimon:paimon-spark-${sparkMajorVersion}_$scalaVersion:$paimonVersion") {
       exclude("org.apache.spark")
     }
   }

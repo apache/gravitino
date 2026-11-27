@@ -211,7 +211,7 @@
    Ethlo Time ITU
    Apache Hive
    Apache Paimon
-   FastDoubleParser (older Jackson copy shaded in paimon-format 1.2.0)
+   FastDoubleParser (older Jackson copy shaded in paimon-format 2.1.0)
    Apache DataSketches Java
    Apache DataSketches Memory
    Apache Iceberg
