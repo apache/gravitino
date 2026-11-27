@@ -247,6 +247,9 @@ components:
             - MODIFY_SEMANTIC_MODEL
             - MANAGE_DOMAIN
             - USE_DOMAIN
+            - CREATE_ONTOLOGY
+            - USE_ONTOLOGY
+            - MODIFY_ONTOLOGY
           description: The name of the privilege
         condition:
           type: string
@@ -285,6 +288,7 @@ components:
             - "ROLE"
             - "MODEL"
             - "SEMANTIC_MODEL"
+            - "ONTOLOGY"
             - "FUNCTION"
             - "TAG"
             - "POLICY"
@@ -468,6 +472,7 @@ components:
           - "ROLE"
           - "MODEL"
           - "SEMANTIC_MODEL"
+          - "ONTOLOGY"
           - "DOMAIN"
           - "FUNCTION"
           - "TAG"

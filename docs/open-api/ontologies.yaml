@@ -1,0 +1,610 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+  /metalakes/{metalake}/ontologies:
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+    get:
+      tags:
+        - ontology
+      summary: List ontologies
+      operationId: listOntologies
+      responses:
+        '200':
+          description: The visible ontology names.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/NameListResponse
+        '400':
+          description: The request, document, or structured reference is invalid.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '403':
+          description: The caller lacks authority.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '404':
+          description: The object or its parent does not exist.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+    post:
+      tags:
+        - ontology
+      summary: Create an ontology
+      operationId: createOntology
+      requestBody:
+        required: true
+        content:
+          application/vnd.gravitino.v1+json:
+            schema:
+              $ref: '#/components/schemas/OntologyCreateRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OntologyCreateRequest'
+      responses:
+        '200':
+          description: The current ontology.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: '#/components/schemas/OntologyResponse'
+        '400':
+          description: The request, document, or structured reference is invalid.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '403':
+          description: The caller lacks authority.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '404':
+          description: The object or its parent does not exist.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '409':
+          description: The name already exists or live mappings prevent the ontology change.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+  /metalakes/{metalake}/ontologies/ossie:
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+    post:
+      tags:
+        - ontology
+      summary: Import an Ossie ontology
+      operationId: importOntology
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+          application/yaml:
+            schema:
+              type: string
+          application/x-yaml:
+            schema:
+              type: string
+          text/yaml:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: The current ontology.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: '#/components/schemas/OntologyResponse'
+        '400':
+          description: The request, document, or structured reference is invalid.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '403':
+          description: The caller lacks authority.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '404':
+          description: The object or its parent does not exist.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '409':
+          description: The name already exists or live mappings prevent the ontology change.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+  /metalakes/{metalake}/ontologies/{ontology}:
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - name: ontology
+        in: path
+        description: The ontology name.
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+    get:
+      tags:
+        - ontology
+      summary: Load the current ontology
+      operationId: loadOntology
+      responses:
+        '200':
+          description: The current ontology.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: '#/components/schemas/OntologyResponse'
+        '400':
+          description: The request, document, or structured reference is invalid.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '403':
+          description: The caller lacks authority.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '404':
+          description: The object or its parent does not exist.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+    put:
+      tags:
+        - ontology
+      summary: Apply an ordered batch of ontology changes
+      operationId: alterOntology
+      requestBody:
+        required: true
+        content:
+          application/vnd.gravitino.v1+json:
+            schema:
+              $ref: '#/components/schemas/OntologyUpdatesRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OntologyUpdatesRequest'
+      responses:
+        '200':
+          description: The current ontology.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: '#/components/schemas/OntologyResponse'
+        '400':
+          description: The request, document, or structured reference is invalid.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '403':
+          description: The caller lacks authority.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '404':
+          description: The object or its parent does not exist.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '409':
+          description: The name already exists or live mappings prevent the ontology change.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+    delete:
+      tags:
+        - ontology
+      summary: Drop the ontology
+      operationId: dropOntology
+      responses:
+        '200':
+          $ref: ./openapi.yaml#/components/responses/DropResponse
+        '400':
+          description: The request, document, or structured reference is invalid.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '403':
+          description: The caller lacks authority.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '404':
+          description: The object or its parent does not exist.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '409':
+          description: The name already exists or live mappings prevent the ontology change.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+  /metalakes/{metalake}/ontologies/{ontology}/ossie:
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - name: ontology
+        in: path
+        description: The ontology name.
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+    get:
+      tags:
+        - ontology
+      summary: Export the latest ontology as Ossie
+      operationId: exportOntology
+      parameters:
+        - name: format
+          in: query
+          description: The Ossie document format.
+          schema:
+            type: string
+            enum:
+              - yaml
+              - json
+            default: yaml
+      responses:
+        '200':
+          description: The standalone Ossie document.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+            application/yaml:
+              schema:
+                type: string
+        '400':
+          description: The request, document, or structured reference is invalid.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '403':
+          description: The caller lacks authority.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        '404':
+          description: The object or its parent does not exist.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+components:
+  schemas:
+    OntologyDefinition:
+      type: object
+      properties:
+        aiContext:
+          oneOf:
+            - type: string
+            - type: object
+              additionalProperties: true
+        prefixes:
+          type: object
+          additionalProperties:
+            type: string
+        requires:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        annotations:
+          type: object
+          additionalProperties: true
+        ontology:
+          type: array
+          items:
+            $ref: '#/components/schemas/OntologyConcept'
+          minItems: 1
+      required:
+        - ontology
+      additionalProperties: false
+    OntologyConcept:
+      type: object
+      properties:
+        concept:
+          type: string
+          minLength: 1
+        type:
+          type: string
+          enum:
+            - EntityType
+            - ValueType
+        description:
+          type: string
+        extends:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        identifyBy:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        derivedBy:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        requires:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/OntologyRelationship'
+        iri:
+          type: string
+          minLength: 1
+        annotations:
+          type: object
+          additionalProperties: true
+      required:
+        - concept
+        - type
+      additionalProperties: false
+    OntologyRelationship:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/OntologyRole'
+        multiplicity:
+          type: string
+          enum:
+            - ManyToOne
+            - OneToOne
+        description:
+          type: string
+        verbalizes:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          minItems: 1
+        derivedBy:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        requires:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        iri:
+          type: string
+          minLength: 1
+        annotations:
+          type: object
+          additionalProperties: true
+      required:
+        - name
+        - verbalizes
+      additionalProperties: false
+    OntologyRole:
+      type: object
+      properties:
+        concept:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        annotations:
+          type: object
+          additionalProperties: true
+      required:
+        - concept
+      additionalProperties: false
+    OntologyCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        comment:
+          type: string
+          nullable: true
+        definition:
+          $ref: '#/components/schemas/OntologyDefinition'
+        properties:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+        - name
+        - definition
+      additionalProperties: false
+    OntologyDTO:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        comment:
+          type: string
+          nullable: true
+        definition:
+          $ref: '#/components/schemas/OntologyDefinition'
+        properties:
+          type: object
+          additionalProperties:
+            type: string
+        audit:
+          $ref: ./openapi.yaml#/components/schemas/Audit
+      required:
+        - name
+        - definition
+        - properties
+        - audit
+    OntologyResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          enum:
+            - 0
+        ontology:
+          $ref: '#/components/schemas/OntologyDTO'
+      required:
+        - code
+        - ontology
+    OntologyUpdatesRequest:
+      type: object
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: '#/components/schemas/OntologyUpdate'
+          minItems: 1
+      required:
+        - updates
+      additionalProperties: false
+    OntologyUpdate:
+      oneOf:
+        - type: object
+          properties:
+            '@type':
+              type: string
+              enum:
+                - rename
+            newName:
+              type: string
+              minLength: 1
+              maxLength: 128
+          required:
+            - '@type'
+            - newName
+          additionalProperties: false
+        - type: object
+          properties:
+            '@type':
+              type: string
+              enum:
+                - updateComment
+            newComment:
+              type: string
+              nullable: true
+          required:
+            - '@type'
+          additionalProperties: false
+        - type: object
+          properties:
+            '@type':
+              type: string
+              enum:
+                - setProperty
+            property:
+              type: string
+              minLength: 1
+            value:
+              type: string
+          required:
+            - '@type'
+            - property
+            - value
+          additionalProperties: false
+        - type: object
+          properties:
+            '@type':
+              type: string
+              enum:
+                - removeProperty
+            property:
+              type: string
+              minLength: 1
+          required:
+            - '@type'
+            - property
+          additionalProperties: false
+        - type: object
+          properties:
+            '@type':
+              type: string
+              enum:
+                - replaceDefinition
+            definition:
+              $ref: '#/components/schemas/OntologyDefinition'
+          required:
+            - '@type'
+            - definition
+          additionalProperties: false
