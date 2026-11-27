@@ -39,6 +39,19 @@ bin="$(cd "${bin}">/dev/null; pwd)"
 
 . "${bin}/common.sh"
 
+# Exact runtime classpath generated at package time.
+OPTIMIZER_ENV_SH="${GRAVITINO_HOME}/optimizer/env.sh"
+if [[ ! -f "${OPTIMIZER_ENV_SH}" ]]; then
+  echo "ERROR: missing ${OPTIMIZER_ENV_SH}. Rebuild the distribution (optimizer:copyLibAndConfigs)."
+  exit 1
+fi
+# shellcheck source=/dev/null
+. "${OPTIMIZER_ENV_SH}"
+if [[ -z "${GRAVITINO_CLASSPATH}" ]]; then
+  echo "ERROR: GRAVITINO_CLASSPATH is empty after sourcing ${OPTIMIZER_ENV_SH}."
+  exit 1
+fi
+
 check_java_version
 
 HOSTNAME=$(hostname)
@@ -74,16 +87,6 @@ if [[ "$JVM_VERSION" -eq 17 ]]; then
   JAVA_OPTS+=" --add-opens java.base/sun.security.action=ALL-UNNAMED"
   JAVA_OPTS+=" --add-opens java.base/sun.util.calendar=ALL-UNNAMED"
   JAVA_OPTS+=" --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED"
-fi
-
-# Module-owned jars (Gradle copyLibs) first, then shared jars from root libs/.
-# Do not enumerate artifacts here: dependency changes are handled by Gradle packaging.
-if [ -d "${GRAVITINO_HOME}/optimizer/libs" ]; then
-  addJarInDir "${GRAVITINO_HOME}/optimizer/libs"
-  addDirToClasspath "${GRAVITINO_HOME}/optimizer/conf"
-fi
-if [ -d "${GRAVITINO_HOME}/libs" ]; then
-  addJarInDir "${GRAVITINO_HOME}/libs"
 fi
 
 ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_OPTIMIZER_NAME} "$@"
