@@ -112,73 +112,25 @@ tasks {
     finalizedBy(copyDepends)
   }
 
-  fun isOptimizerLocalJar(name: String): Boolean {
-    if (name.startsWith("gravitino-updaters-") || name.startsWith("commons-cli-")) {
-      return true
-    }
-    // gravitino-optimizer-*.jar and gravitino-optimizer-api-*.jar
-    return name.startsWith("gravitino-optimizer-")
-  }
-
-  fun skipSharedJar(name: String): Boolean {
-    return name.endsWith("-tests.jar") ||
-      name.endsWith("-sources.jar") ||
-      name.endsWith("-javadoc.jar") ||
-      name.endsWith("-empty.jar") ||
-      name.startsWith("error_prone_annotations-")
-  }
-
-  // CLI-owned jars only; Sync trims a previous fat copy.
+  // Jars not shipped in root libs/, plus the CLI modules. Shared deps are named
+  // explicitly in bin/gravitino-optimizer.sh and loaded from ${GRAVITINO_HOME}/libs.
   register("copyLibs", Sync::class) {
     dependsOn(copyDepends, "build")
     from("build/libs") {
       include(
         "gravitino-optimizer-*.jar",
         "gravitino-updaters-*.jar",
-        "commons-cli-*.jar"
+        "gravitino-client-java-*.jar",
+        "commons-cli-*.jar",
+        "qlexpress4-*.jar"
       )
       exclude("*-javadoc.jar", "*-sources.jar", "*-empty.jar", "*-tests.jar")
     }
     into("$rootDir/distribution/package/optimizer/libs")
   }
 
-  // Exact jar names to load from ${GRAVITINO_HOME}/libs. Jars not present in root
-  // libs (e.g. client-java, qlexpress) stay in optimizer/libs instead.
-  val writeSharedLibsList by registering {
-    dependsOn(copyDepends, "copyLibs")
-    val rootLibsDir = file("$rootDir/distribution/package/libs")
-    val optimizerLibsDir = file("$rootDir/distribution/package/optimizer/libs")
-    val sharedListFile = file("$rootDir/distribution/package/optimizer/conf/shared-libs")
-    outputs.file(sharedListFile)
-    val copySubprojectDependencies = rootProject.tasks.findByName("copySubprojectDependencies")
-    if (copySubprojectDependencies != null) {
-      mustRunAfter(copySubprojectDependencies)
-    }
-    doLast {
-      val runtimeJars =
-        configurations.runtimeClasspath.get()
-          .files
-          .filter { it.name.endsWith(".jar") }
-          .filterNot { isOptimizerLocalJar(it.name) }
-          .filterNot { skipSharedJar(it.name) }
-          .distinctBy { it.name }
-
-      val sharedNames = linkedSetOf<String>()
-      for (jar in runtimeJars) {
-        if (rootLibsDir.resolve(jar.name).isFile) {
-          sharedNames.add(jar.name)
-        } else {
-          jar.copyTo(optimizerLibsDir.resolve(jar.name), overwrite = true)
-        }
-      }
-
-      sharedListFile.parentFile.mkdirs()
-      sharedListFile.writeText(sharedNames.sorted().joinToString("\n", postfix = "\n"))
-    }
-  }
-
-  register("copyLibAndConfigs") {
-    dependsOn("copyLibs", writeSharedLibsList)
+  register("copyLibAndConfigs", Copy::class) {
+    dependsOn("copyLibs")
   }
 }
 
