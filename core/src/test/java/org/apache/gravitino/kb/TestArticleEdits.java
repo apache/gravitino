@@ -129,6 +129,7 @@ class TestArticleEdits {
         1,
         "guide",
         ArticleCreate.builder().withTitle("Guide").withBody(body).build(),
-        Set.of());
+        Set.of(),
+        () -> edits.storedBody(body));
   }
 }

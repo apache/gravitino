@@ -59,6 +59,11 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().selectGroupMetaByMetalakeIdAndName(metalakeId, name);
   }
 
+  /** Returns SQL that selects an active group by ID. */
+  public static String selectGroupMetaById(@Param("groupId") Long groupId) {
+    return getProvider().selectGroupMetaById(groupId);
+  }
+
   /** Returns SQL that selects and locks an active group by ID. */
   public static String selectGroupMetaByIdForUpdate(@Param("groupId") Long groupId) {
     return getProvider().selectGroupMetaByIdForUpdate(groupId);
