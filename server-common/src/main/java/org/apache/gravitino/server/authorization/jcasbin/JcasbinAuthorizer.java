@@ -2276,7 +2276,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
       // Expand only allowed glossary grants, before Casbin combines policies from all roles.
       // A deny on MANAGE must not discard the same grant's independent CREATE and VIEW allows.
-      if (type == MetadataObject.Type.METALAKE
+      if ((type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.DOMAIN)
           && privilege.condition() == Privilege.Condition.ALLOW) {
         if (privilege.name() == Privilege.Name.MANAGE_DEFINITIONS) {
           allowRows.add(

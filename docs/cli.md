@@ -815,7 +815,8 @@ gcli.sh role revoke --metalake metalake_demo --role editor --privilege create_de
 also permits creating terms and editing or viewing drafts the caller owns, including through
 a group. `manage_definitions` additionally permits editing and deleting any term in the
 metalake. An explicit deny on viewing prevents access through either higher privilege.
-The metalake owner has access to all terms.
+The metalake owner has access to all terms. To grant these privileges on a domain, use the
+[permissions REST API](./security/access-control.md#glossary-privileges).
 
 Custom implementations of `gravitino.authorization.impl` must expand allowed MANAGE and
 CREATE privileges before applying explicit denies. Implement `canAccessGlossaryTerm` for

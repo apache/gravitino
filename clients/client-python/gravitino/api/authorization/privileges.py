@@ -1979,7 +1979,7 @@ class ViewDefinition(GenericPrivilege):
         return ViewDefinition._DENY_INSTANCE
 
     def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
-        return obj_type == MetadataObject.Type.METALAKE
+        return obj_type in Privileges.DOMAIN_SUPPORTED_TYPES
 
 
 class CreateDefinition(GenericPrivilege):
@@ -2007,7 +2007,7 @@ class CreateDefinition(GenericPrivilege):
         return CreateDefinition._DENY_INSTANCE
 
     def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
-        return obj_type == MetadataObject.Type.METALAKE
+        return obj_type in Privileges.DOMAIN_SUPPORTED_TYPES
 
 
 class ManageDefinitions(GenericPrivilege):
@@ -2035,7 +2035,7 @@ class ManageDefinitions(GenericPrivilege):
         return ManageDefinitions._DENY_INSTANCE
 
     def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
-        return obj_type == MetadataObject.Type.METALAKE
+        return obj_type in Privileges.DOMAIN_SUPPORTED_TYPES
 
 
 class Privileges:

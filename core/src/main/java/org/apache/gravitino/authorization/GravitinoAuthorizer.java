@@ -52,9 +52,10 @@ public interface GravitinoAuthorizer extends Closeable {
   }
 
   /**
-   * Perform authorization and return the authorization result. For metalake glossary privileges,
-   * expand allowed MANAGE_DEFINITIONS into CREATE_DEFINITION and VIEW_DEFINITION, and allowed
-   * CREATE_DEFINITION into VIEW_DEFINITION, before applying explicit denies to each capability.
+   * Perform authorization and return the authorization result. For metalake and domain glossary
+   * privileges, expand allowed MANAGE_DEFINITIONS into CREATE_DEFINITION and VIEW_DEFINITION, and
+   * allowed CREATE_DEFINITION into VIEW_DEFINITION, before applying explicit denies to each
+   * capability.
    *
    * @param principal the user principal
    * @param metalake the metalake

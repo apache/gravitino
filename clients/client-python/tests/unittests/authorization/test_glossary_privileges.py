@@ -24,7 +24,7 @@ from gravitino.dto.authorization.privilege_dto import PrivilegeDTO
 
 
 class TestGlossaryPrivileges(unittest.TestCase):
-    def test_metalake_grants_round_trip(self):
+    def test_definition_grant_scopes_and_round_trip(self):
         for name, bit in (
             ("VIEW_DEFINITION", 44),
             ("CREATE_DEFINITION", 45),
@@ -35,7 +35,8 @@ class TestGlossaryPrivileges(unittest.TestCase):
                 self.assertEqual(1 << bit, privilege.name().low_bits)
                 for scope in MetadataObject.Type:
                     self.assertEqual(
-                        scope == MetadataObject.Type.METALAKE,
+                        scope
+                        in (MetadataObject.Type.METALAKE, MetadataObject.Type.DOMAIN),
                         privilege.can_bind_to(scope),
                     )
                 dto = DTOConverters.to_privilege_dto(privilege)

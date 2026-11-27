@@ -97,6 +97,11 @@ public final class GlossaryTermVersions {
       return domains.keySet();
     }
 
+    /** Resolves the current names of surviving member domains by their original identities. */
+    public String[] currentDomainNames() {
+      return loadDomainsById(domainIds()).stream().map(DomainPO::domainName).toArray(String[]::new);
+    }
+
     /** Filters frozen names using access to the same domain identity at read time. */
     public String[] visibleDomainNames(Predicate<String> readable) {
       return loadDomainsById(domainIds()).stream()

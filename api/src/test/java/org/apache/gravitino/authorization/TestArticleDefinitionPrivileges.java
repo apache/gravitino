@@ -34,7 +34,8 @@ class TestArticleDefinitionPrivileges {
             || name == Privilege.Name.MANAGE_DEFINITIONS) {
           for (MetadataObject.Type type : MetadataObject.Type.values()) {
             Assertions.assertEquals(
-                type == MetadataObject.Type.METALAKE, privilege.canBindTo(type));
+                type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.DOMAIN,
+                privilege.canBindTo(type));
           }
         }
       }

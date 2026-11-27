@@ -6,7 +6,7 @@ When granting or revoking privileges the following privileges can be used.
 
 create_catalog, use_catalog, create_schema, use_schema, create_table, modify_table, select_table, create_fileset, write_fileset, read_fileset, create_topic, produce_topic, consume_topic, manage_users, create_role, manage_grants, view_definition, create_definition, manage_definitions
 
-Glossary privileges apply to the selected metalake. Omit --name when granting or revoking them by name. Revoking with --all requires an explicit entity name, so it never removes metalake privileges; revoke those by name.
+Omit --name for a metalake-wide glossary grant or revocation. Use the permissions REST API for a domain-scoped glossary grant. Revoking with --all requires an explicit entity name, so it never removes metalake privileges; revoke those by name.
 
 Example commands
 
