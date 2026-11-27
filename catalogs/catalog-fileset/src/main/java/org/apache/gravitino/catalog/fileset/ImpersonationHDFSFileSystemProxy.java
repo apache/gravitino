@@ -20,7 +20,9 @@ package org.apache.gravitino.catalog.fileset;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProxy;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -43,11 +45,29 @@ public class ImpersonationHDFSFileSystemProxy extends HDFSFileSystemProxy {
    */
   public ImpersonationHDFSFileSystemProxy(
       Path path, Map<String, String> config, ProxyUserHandler handler) {
+    this(path, config, null, handler);
+  }
+
+  /**
+   * Create a HDFSAuthenticationFileSystem with the given path and configuration. Supports both
+   * simple and Kerberos authentication and has user impersonation capability.
+   *
+   * @param path the HDFS path
+   * @param config the configuration map of Gravitino
+   * @param hadoopConf the Hadoop configuration to log in and connect with, built from {@code
+   *     config} by {@link HDFSFileSystemProxy#hadoopConfiguration(Map)}, or null to build it here
+   * @param handler the handle of retrieving proxy user
+   */
+  public ImpersonationHDFSFileSystemProxy(
+      Path path,
+      Map<String, String> config,
+      @Nullable Configuration hadoopConf,
+      ProxyUserHandler handler) {
     super();
 
     Preconditions.checkArgument(handler != null, "ProxyUserHandler cannot be null");
     this.proxyUserHandler = handler;
-    initFileSystem(path, config);
+    initFileSystem(path, config, hadoopConf);
   }
 
   protected UserGroupInformation getRequestUser() {
