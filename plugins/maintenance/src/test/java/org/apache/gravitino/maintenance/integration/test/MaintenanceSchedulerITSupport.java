@@ -99,7 +99,7 @@ final class MaintenanceSchedulerITSupport {
             Map.of(),
             timeTrigger,
             commitTrigger,
-            /*minIntervalMs=*/ 0L,
+            /*minIntervalMs=*/ null,
             Map.of("spark_executor_memory", "2g"),
             Map.of()));
     metalake.addPolicyForTag(tagName, policyName, AllValuesSelector.get());

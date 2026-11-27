@@ -203,8 +203,8 @@ too heavy. Create/alter rejects `commitTrigger = true` for orphan-cleanup; that 
 **`minIntervalMs`** is the On-write cooldown for **that policy's type** after `MAX(finished_at)`
 on `table_maintenance_job` for `(table, policy)`. It is allowed only with
 `commitTrigger=true`. Server conf and code defaults are lower-priority fallbacks for On-write
-policies that omit it. Scheduled (`timeTrigger`) expand/cron paths ignore this cooldown;
-overlap is blocked by the in-flight check only.
+policies that omit it. Scheduled (`timeTrigger`) expand/cron paths have **no**
+`minIntervalMs` logic; overlap is blocked by in-flight / already-queued checks only.
 
 **`timeTrigger` cron:** the string is stored as-is on the policy API. Syntax and time-zone
 rules are owned by the TMS / db-scheduler registration path (not re-validated with a second
@@ -392,8 +392,8 @@ many cron-jobs due now, then schedules itself for the next 02:00. Expand's due t
 
 Expand writes these one-shot rows **with a schedule-time job snapshot** in `task_data`
 (metalake, table targets, one chain step, merged `jobConf` including auth overlays).
-Expand / cron schedule does **not** apply `minIntervalMs` (On-write only); tables already
-in flight are still dropped. Most types use one table per job
+Expand / cron schedule has **no** `minIntervalMs` plumbing (On-write only); tables already
+in flight or already queued are still dropped. Most types use one table per job
 (`table:{table_id};policy:{policy_id}`). Batched **snapshot-expiry** may use
 `batch:{batch_id};policy:{policy_id}` (one snapshot covering several same-catalog tables;
 member table ids live in `task_data`).

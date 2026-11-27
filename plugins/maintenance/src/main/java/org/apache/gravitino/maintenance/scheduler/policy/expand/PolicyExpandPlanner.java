@@ -108,11 +108,9 @@ public final class PolicyExpandPlanner {
       return Optional.empty();
     }
 
-    // Scheduled (timeTrigger) runs ignore minIntervalMs; that cooldown is On write only.
-    // Overlap is still blocked by the in-flight check in the enumerator / action manager.
+    // Expand / cron has no minIntervalMs; overlap is blocked by in-flight / already-queued only.
     List<TableCandidate> toSchedule =
-        tableEnumerator.listTableIds(
-            policy, scheduleBatchSize, /*minIntervalMs=*/ 0L, actionManager, cronJobClient);
+        tableEnumerator.listTableIds(policy, scheduleBatchSize, actionManager, cronJobClient);
     int scheduled = cronJobClient.scheduleNow(policy, toSchedule, scheduleBatchSize);
     LOG.info(
         "Expanded policy {}: scheduled {} cron-job rows for {} tables (type={}); next expand due {}",

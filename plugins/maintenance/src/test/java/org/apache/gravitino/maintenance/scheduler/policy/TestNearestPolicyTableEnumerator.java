@@ -122,7 +122,7 @@ class TestNearestPolicyTableEnumerator {
         .thenReturn(java.util.Optional.of(10L));
 
     Assertions.assertEquals(
-        List.of(100L), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
+        List.of(100L), tableIds(enumerator.listTableIds(policy, 10, allowAll())));
   }
 
   @Test
@@ -174,7 +174,7 @@ class TestNearestPolicyTableEnumerator {
         .thenReturn(java.util.Optional.of(10L));
 
     Assertions.assertEquals(
-        List.of(101L), tableIds(enumerator.listTableIds(catalogPolicy, 10, allowAll(), 0L)));
+        List.of(101L), tableIds(enumerator.listTableIds(catalogPolicy, 10, allowAll())));
   }
 
   @Test
@@ -218,7 +218,7 @@ class TestNearestPolicyTableEnumerator {
         .thenReturn(java.util.Optional.of(10L));
 
     Assertions.assertEquals(
-        List.of(200L), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
+        List.of(200L), tableIds(enumerator.listTableIds(policy, 10, allowAll())));
   }
 
   @Test
@@ -267,10 +267,8 @@ class TestNearestPolicyTableEnumerator {
             eq(METALAKE), any(MetadataObject.class), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
         .thenReturn(java.util.Optional.of(10L));
 
-    NearestPolicyTableEnumerator.ShouldSkipTable gate =
-        (tableId, policyId, minIntervalMs, nowMs) -> tableId != 102L;
-    Assertions.assertEquals(
-        List.of(102L), tableIds(enumerator.listTableIds(policy, 1, gate, 60_000L)));
+    NearestPolicyTableEnumerator.ShouldSkipTable gate = (tableId, policyId) -> tableId != 102L;
+    Assertions.assertEquals(List.of(102L), tableIds(enumerator.listTableIds(policy, 1, gate)));
   }
 
   @Test
@@ -295,7 +293,7 @@ class TestNearestPolicyTableEnumerator {
 
     Assertions.assertEquals(
         List.of(500L, 501L),
-        tableIds(catalogEnumerator(schemas, tables).listTableIds(policy, 10, allowAll(), 0L)));
+        tableIds(catalogEnumerator(schemas, tables).listTableIds(policy, 10, allowAll())));
     verify(tables).loadTable(missing);
     verify(tables, never()).loadTable(known);
   }
@@ -354,7 +352,7 @@ class TestNearestPolicyTableEnumerator {
   }
 
   private static NearestPolicyTableEnumerator.ShouldSkipTable allowAll() {
-    return (tableId, policyId, minIntervalMs, nowMs) -> false;
+    return (tableId, policyId) -> false;
   }
 
   private static RelationalEntity<TagEntity> policyTagEdge(PolicyEntity policy, TagEntity tag) {
