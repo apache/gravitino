@@ -39,7 +39,6 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.utils.IcebergTableProperti
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -167,9 +166,8 @@ public class IcebergTable extends BaseTable {
   /**
    * Creates an {@link IcebergTable} from Iceberg metadata and keeps the supplied audit.
    *
-   * <p>Iceberg metadata has no Gravitino creator or create time. {@link
-   * org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogOperations#createTable} passes the
-   * audit it recorded before the backend call. Load paths pass {@link AuditInfo#EMPTY}.
+   * <p>Iceberg metadata has no Gravitino creator or create time. Callers that already recorded an
+   * audit can pass it. Load paths pass {@link AuditInfo#EMPTY}.
    *
    * @param table The inner Table representing the IcebergTable.
    * @param tableName The name of Table.
@@ -199,21 +197,6 @@ public class IcebergTable extends BaseTable {
         .withSortOrders(sortOrder)
         .withDistribution(getDistribution(properties))
         .build();
-  }
-
-  /**
-   * Keeps the columns from the create request.
-   *
-   * <p>{@link #fromIcebergTable} converts Iceberg metadata, which rewrites types such as timestamp
-   * precision. Create must return the caller's columns. Reserved properties such as {@code
-   * partition-specs} still come from the reloaded metadata.
-   *
-   * @param columns columns supplied by the caller
-   * @return this table
-   */
-  public IcebergTable withColumns(Column[] columns) {
-    this.columns = columns;
-    return this;
   }
 
   @Override

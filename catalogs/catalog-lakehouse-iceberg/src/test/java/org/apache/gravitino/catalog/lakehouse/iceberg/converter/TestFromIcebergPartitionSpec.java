@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg.converter;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -145,19 +146,20 @@ public class TestFromIcebergPartitionSpec extends TestBaseConvert {
   }
 
   @Test
-  public void testV1VoidPartitionFieldKeepsLaterFieldPositions() {
+  public void testV1VoidPartitionFieldIsOmitted() {
     Schema schema =
         new Schema(
             Types.NestedField.required(1, "id", Types.LongType.get()),
             Types.NestedField.required(2, "region", Types.StringType.get()));
     PartitionSpec partitionSpec =
         PartitionSpec.builderFor(schema).alwaysNull("region", "region").identity("id").build();
+    Map<Integer, String> namesWithoutDroppedColumn = new HashMap<>(schema.idToName());
+    namesWithoutDroppedColumn.remove(2);
 
-    Transform[] transforms = FromIcebergPartitionSpec.fromPartitionSpec(partitionSpec, schema);
+    Transform[] transforms =
+        FromIcebergPartitionSpec.fromPartitionSpec(
+            partitionSpec, schema, namesWithoutDroppedColumn);
 
-    Assertions.assertEquals(2, transforms.length);
-    Assertions.assertInstanceOf(Transforms.ApplyTransform.class, transforms[0]);
-    Assertions.assertEquals(FromIcebergPartitionSpec.VOID_TRANSFORM, transforms[0].name());
-    Assertions.assertEquals(Transforms.identity("id"), transforms[1]);
+    Assertions.assertArrayEquals(new Transform[] {Transforms.identity("id")}, transforms);
   }
 }

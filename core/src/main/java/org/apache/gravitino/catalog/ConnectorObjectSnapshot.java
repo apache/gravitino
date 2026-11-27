@@ -18,9 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
@@ -33,7 +31,6 @@ import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.View;
-import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.partitions.Partition;
 
 /** Creates parent-ClassLoader metadata snapshots from connector-backed operation results. */
@@ -65,26 +62,8 @@ final class ConnectorObjectSnapshot {
       return (R) DTOConverters.toDTOs((Partition[]) result);
     } else if (result instanceof FileInfo[]) {
       return (R) DTOConverters.toDTO((FileInfo[]) result);
-    } else if (result instanceof Map) {
-      return (R) detachMap((Map<?, ?>) result);
     }
     return result;
-  }
-
-  /**
-   * Copies a map that is leaving the catalog class loader. Transform arrays are rebuilt as API
-   * transforms so a connector implementation of {@link Transform} does not escape with the map.
-   */
-  private static Map<Object, Object> detachMap(Map<?, ?> source) {
-    Map<Object, Object> copied = new LinkedHashMap<>();
-    for (Map.Entry<?, ?> entry : source.entrySet()) {
-      Object value = entry.getValue();
-      if (value instanceof Transform[]) {
-        value = DTOConverters.fromDTOs(DTOConverters.toDTOs((Transform[]) value));
-      }
-      copied.put(entry.getKey(), value);
-    }
-    return Collections.unmodifiableMap(copied);
   }
 
   private static final class FilesetSnapshot implements Fileset {

@@ -49,7 +49,6 @@ import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
-import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.secret.SecretManager;
@@ -132,25 +131,6 @@ class TestOperationDispatcherSnapshots {
     Assertions.assertDoesNotThrow(() -> snapshot.properties().put("consumer", "value"));
   }
 
-  @Test
-  void testPartitionSpecMapIsCopiedOutOfTheConnector() {
-    Transform[] original = new Transform[] {Transforms.identity("id")};
-    Map<Integer, Transform[]> specs = new HashMap<>();
-    specs.put(1, original);
-
-    Map<Integer, Transform[]> snapshot = ConnectorObjectSnapshot.detach(specs);
-    original[0] = Transforms.identity("mutated");
-    specs.put(2, new Transform[] {Transforms.identity("late")});
-
-    Assertions.assertEquals(1, snapshot.size());
-    Assertions.assertFalse(snapshot.containsKey(2));
-    Assertions.assertNotSame(original, snapshot.get(1));
-    Assertions.assertArrayEquals(new Transform[] {Transforms.identity("id")}, snapshot.get(1));
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> snapshot.put(3, new Transform[] {Transforms.identity("more")}));
-  }
-
   /**
    * Every value a dispatcher returns leaves the catalog lease, so it must either carry no connector
    * state or be converted by {@link ConnectorObjectSnapshot#detach}. That method is a manual type
@@ -201,8 +181,7 @@ class TestOperationDispatcherSnapshots {
           Partition.class,
           ModelVersion[].class,
           Partition[].class,
-          FileInfo[].class,
-          Map.class);
+          FileInfo[].class);
 
   /**
    * Returns whether values of this type are built by Gravitino itself rather than by a connector,

@@ -55,6 +55,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.DistributionMode;
@@ -279,6 +280,7 @@ public class TestIcebergTable {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
+    properties.put("provider", "orc");
 
     IcebergColumn col1 =
         IcebergColumn.builder()
@@ -301,11 +303,20 @@ public class TestIcebergTable {
 
     Table table =
         icebergCatalogOperations.createTable(
-            tableIdentifier, columns, ICEBERG_COMMENT, properties, partitions);
+            tableIdentifier,
+            columns,
+            ICEBERG_COMMENT,
+            properties,
+            partitions,
+            Distributions.hash(8),
+            new SortOrder[0],
+            new Index[0]);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(ICEBERG_COMMENT, table.comment());
     Assertions.assertEquals("val1", table.properties().get("key1"));
     Assertions.assertEquals("val2", table.properties().get("key2"));
+    Assertions.assertEquals("orc", table.properties().get("provider"));
+    Assertions.assertEquals(8, table.distribution().number());
     Assertions.assertArrayEquals(partitions, table.partitioning());
     Assertions.assertEquals("0", table.properties().get("default-spec-id"));
     Assertions.assertNotNull(table.properties().get("partition-specs"));

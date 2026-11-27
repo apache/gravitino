@@ -22,8 +22,6 @@ import com.google.common.collect.Lists;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.rel.expressions.Expression;
-import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.iceberg.PartitionField;
@@ -39,9 +37,6 @@ import org.apache.iceberg.transforms.PartitionSpecVisitor;
  * core/src/main/java/org/apache/iceberg/spark/Spark3Util/SpecTransformToSparkTransform.java
  */
 public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform> {
-
-  /** Iceberg {@code void} transform name kept as a Gravitino apply transform. */
-  public static final String VOID_TRANSFORM = "void";
 
   private final Map<Integer, String> idToName;
 
@@ -91,9 +86,10 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
 
   @Override
   public Transform alwaysNull(int fieldId, String sourceName, int sourceId) {
-    // Keep the slot so later fields stay at their Iceberg positions after v1 partition evolution.
-    return Transforms.apply(
-        VOID_TRANSFORM, new Expression[] {NamedReference.field(fieldName(sourceId))});
+    // Omit void from Table.partitioning(). Spark and Trino reject void(...). The native
+    // partition-specs JSON keeps the field and its position, and a dropped source id is not
+    // resolved here.
+    return null;
   }
 
   @Override
@@ -140,7 +136,7 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
    * @param partitionSpec Iceberg partition spec.
    * @param schema Iceberg schema used by {@link PartitionSpecVisitor}.
    * @param idToName field-id to dotted Iceberg name, including retained schemas when needed.
-   * @return array of transforms for partition fields, including {@code void} placeholders.
+   * @return array of transforms for partition fields. {@code void} fields are omitted.
    */
   public static Transform[] fromPartitionSpec(
       PartitionSpec partitionSpec, Schema schema, Map<Integer, String> idToName) {
@@ -149,7 +145,10 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
     List<PartitionField> fields = partitionSpec.fields();
 
     for (PartitionField field : fields) {
-      transforms.add(PartitionSpecVisitor.visit(schema, field, visitor));
+      Transform transform = PartitionSpecVisitor.visit(schema, field, visitor);
+      if (transform != null) {
+        transforms.add(transform);
+      }
     }
     return transforms.toArray(new Transform[0]);
   }

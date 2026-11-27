@@ -22,7 +22,6 @@ import java.nio.file.Path;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
-import org.apache.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergPartitionSpec;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -153,7 +152,7 @@ class TestIcebergTablePropertiesUtil {
   }
 
   @Test
-  void testFromIcebergTableKeepsV1VoidPartitionPositions() {
+  void testFromIcebergTableOmitsV1VoidFromPartitioning() {
     Schema schema =
         new Schema(
             Types.NestedField.required(1, "id", Types.LongType.get()),
@@ -173,10 +172,8 @@ class TestIcebergTablePropertiesUtil {
         TableMetadata.buildFrom(metadata).setDefaultPartitionSpec(voided).build();
 
     IcebergTable loaded = IcebergTable.fromIcebergTable(evolved, "events");
-    Transform[] current = loaded.partitioning();
-    Assertions.assertEquals(2, current.length);
-    Assertions.assertEquals(FromIcebergPartitionSpec.VOID_TRANSFORM, current[0].name());
-    Assertions.assertEquals(Transforms.identity("id"), current[1]);
+    Assertions.assertArrayEquals(
+        new Transform[] {Transforms.identity("id")}, loaded.partitioning());
     Assertions.assertEquals(
         partitionSpecsJson(evolved), loaded.properties().get("partition-specs"));
   }

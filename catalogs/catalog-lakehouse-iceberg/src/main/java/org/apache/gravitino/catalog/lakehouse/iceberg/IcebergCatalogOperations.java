@@ -38,6 +38,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
+import org.apache.gravitino.catalog.lakehouse.iceberg.utils.IcebergTablePropertiesUtil;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -627,12 +628,21 @@ public class IcebergCatalogOperations
       loadTableResponse.validate();
 
       LOG.info("Created Iceberg table {}", tableIdent.name());
-      // Reload metadata so historical specs are present. Keep the creator recorded above and the
-      // caller's columns: reloading rewrites types such as timestamp precision.
-      IcebergTable reloaded =
-          IcebergTable.fromIcebergTable(
-              loadTableResponse.tableMetadata(), tableIdent.name(), createdTable.auditInfo());
-      return reloaded.withColumns(createdTable.columns());
+      // Keep the caller's columns, provider, and distribution. Copy only the spec properties from
+      // backend metadata; reloading the whole table rewrites those fields.
+      Map<String, String> reserved =
+          IcebergTablePropertiesUtil.buildReservedProperties(loadTableResponse.tableMetadata());
+      createdTable
+          .properties()
+          .put(
+              IcebergTablePropertiesMetadata.DEFAULT_SPEC_ID,
+              reserved.get(IcebergTablePropertiesMetadata.DEFAULT_SPEC_ID));
+      createdTable
+          .properties()
+          .put(
+              IcebergTablePropertiesMetadata.PARTITION_SPECS,
+              reserved.get(IcebergTablePropertiesMetadata.PARTITION_SPECS));
+      return createdTable;
     } catch (AlreadyExistsException e) {
       throw new TableAlreadyExistsException(e, "Table already exists: %s", tableIdent.name());
     } catch (ValidationException | BadRequestException e) {
