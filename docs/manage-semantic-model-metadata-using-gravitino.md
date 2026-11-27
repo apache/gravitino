@@ -50,6 +50,7 @@ finished; Java file operations also require the calling method to handle or decl
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -70,6 +71,7 @@ import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
 
 try (GravitinoClient client = GravitinoClient.builder("http://localhost:8090")
     .withMetalake("example").build()) {
@@ -220,21 +222,20 @@ Expression amountExpression = Expression.builder()
 Field amount = Field.builder().withName("order_amount")
     .withExpression(amountExpression).withDatatype(DataType.DECIMAL).build();
 // Key and join fields only need a name and an expression over the source columns.
-private static Expression keyExpression(String column) {
-  return Expression.builder()
-      .withDialects(new DialectExpression[] {
-          DialectExpression.builder().withDialect(Dialects.ANSI_SQL)
-              .withExpression(column).build()
-      }).build();
-}
+Function<String, Expression> keyExpression = column ->
+    Expression.builder()
+        .withDialects(new DialectExpression[] {
+            DialectExpression.builder().withDialect(Dialects.ANSI_SQL)
+                .withExpression(column).build()
+        }).build();
 Field orderId = Field.builder().withName("order_id")
-    .withExpression(keyExpression("order_id")).build();
+    .withExpression(keyExpression.apply("order_id")).build();
 Field orderCustomer = Field.builder().withName("customer_id")
-    .withExpression(keyExpression("customer_id")).build();
+    .withExpression(keyExpression.apply("customer_id")).build();
 Field customerId = Field.builder().withName("customer_id")
-    .withExpression(keyExpression("customer_id")).build();
+    .withExpression(keyExpression.apply("customer_id")).build();
 Field customerCode = Field.builder().withName("customer_code")
-    .withExpression(keyExpression("customer_code")).build();
+    .withExpression(keyExpression.apply("customer_code")).build();
 Dataset orders = Dataset.builder().withName("orders")
     .withSource(NameIdentifier.of("sales", "mart", "orders"))
     .withPrimaryKey(new String[] {"order_id"})
