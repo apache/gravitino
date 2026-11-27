@@ -593,6 +593,44 @@ class TestArticleAuthorization extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void createChecksDomainPermissionBeforeTermApproval() throws Exception {
+    insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    role(
+        "salesReader",
+        SecurableObjects.parse(
+            "Sales", MetadataObject.Type.DOMAIN, List.of(Privileges.allow("USE_DOMAIN"))));
+    user("author", "create", "salesReader");
+    var glossary = new GlossaryManager(ids::incrementAndGet, true);
+    as(
+        "lakeOwner",
+        () ->
+            glossary.createTerm(
+                LAKE, TermSpec.builder("Old").withStatus(GlossaryTerm.Status.DEPRECATED).build()));
+    var request =
+        ArticleCreate.builder()
+            .withTitle("Guide")
+            .withName("guide")
+            .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+            .addTerms("Old")
+            .addDomains("Sales")
+            .build();
+    as(
+        "author",
+        () -> assertThrows(ForbiddenException.class, () -> manager.createArticle(LAKE, request)));
+    as(
+        "lakeOwner",
+        () ->
+            assertThrows(
+                UnapprovedTermException.class, () -> manager.createArticle(LAKE, request)));
+    as(
+        "lakeOwner",
+        () ->
+            assertThrows(
+                NoSuchKnowledgeBaseArticleException.class,
+                () -> manager.loadArticle(LAKE, "guide")));
+  }
+
+  @TestTemplate
   void hiddenTermBindingsAreFilteredBeforePagingAndStatusConflicts() throws Exception {
     var glossary = new GlossaryManager(ids::incrementAndGet, true);
     as("writer2", () -> glossary.createTerm(LAKE, TermSpec.builder("First").build()));

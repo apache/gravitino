@@ -25,8 +25,10 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,8 +45,8 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GlossaryTermNames;
-import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
-import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.MemberType;
+import org.apache.gravitino.storage.relational.mapper.ArticleSummaryMapper;
+import org.apache.gravitino.storage.relational.mapper.ArticleSummaryMapper.BoundTerm;
 import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
@@ -96,7 +98,7 @@ final class ArticleTerms {
   }
 
   /** Rechecks the name, stable ID and current status while the target rows are fenced. */
-  List<CheckedEdit> check(long lake, Plan plan) {
+  Collection<CheckedEdit> check(long lake, Plan plan) {
     Map<Long, GlossaryTermPO> live = new HashMap<>();
     for (List<Long> batch : Lists.partition(List.copyOf(plan.ids().values()), BATCH_SIZE)) {
       for (var row :
@@ -106,7 +108,7 @@ final class ArticleTerms {
       }
     }
     GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorization);
-    List<CheckedEdit> checked = new ArrayList<>();
+    Map<Long, CheckedEdit> checked = new LinkedHashMap<>();
     for (Edit edit : plan.edits()) {
       for (String name : edit.names()) {
         String key = GlossaryTermNames.key(name);
@@ -114,15 +116,15 @@ final class ArticleTerms {
         if (row == null || !key.equals(row.getNameKey()) || !readable(access, row)) {
           throw missing(name);
         }
-        checked.add(new CheckedEdit(edit.add(), row));
+        checked.put(row.getTermId(), new CheckedEdit(edit.add(), row));
       }
     }
-    return checked;
+    return checked.values();
   }
 
   record CheckedEdit(boolean add, GlossaryTermPO target) {}
 
-  static Set<Binding> apply(List<CheckedEdit> checked, Set<Binding> before) {
+  static Set<Binding> apply(Collection<CheckedEdit> checked, Set<Binding> before) {
     if (checked.isEmpty()) {
       return before;
     }
@@ -199,7 +201,7 @@ final class ArticleTerms {
       List<String> domainNames,
       @Nullable Owner owner,
       AuditInfo auditInfo,
-      TermBindingPage preview)
+      List<ArticleTermBinding> preview)
       implements ArticleSummary {
     @Override
     public String[] domains() {
@@ -208,12 +210,14 @@ final class ArticleTerms {
 
     @Override
     public ArticleTermBinding[] terms() {
-      return preview.terms().toArray(ArticleTermBinding[]::new);
+      return preview
+          .subList(0, Math.min(preview.size(), ArticleListFilter.DEFAULT_LIMIT))
+          .toArray(ArticleTermBinding[]::new);
     }
 
     @Override
     public boolean termsHasMore() {
-      return preview.hasMore();
+      return preview.size() > ArticleListFilter.DEFAULT_LIMIT;
     }
   }
 
@@ -226,39 +230,72 @@ final class ArticleTerms {
             mapper -> mapper.articlesForTerm(lake, target, deprecated, limit + 1, offset));
     boolean more = rows.size() > limit;
     var page = rows.subList(0, Math.min(limit, rows.size()));
-    var names =
-        page.stream().map(row -> NameIdentifier.of(metalake, row.getArticleName())).toList();
+    if (page.isEmpty()) {
+      return ArticlePage.of(List.of(), false);
+    }
+    Map<Long, NameIdentifier> names = new HashMap<>();
+    for (var row : page) {
+      names.put(row.getArticleId(), NameIdentifier.of(metalake, row.getArticleName()));
+    }
     Map<String, Owner> owners = new HashMap<>();
     for (var relation :
-        OwnerMetaService.getInstance().batchGetOwner(names, EntityType.KNOWLEDGE_BASE_ARTICLE)) {
+        OwnerMetaService.getInstance()
+            .listOwnersByObjectIds(metalake, names, EntityType.KNOWLEDGE_BASE_ARTICLE)) {
       var entity = relation.targetEntity();
       owners.put(
           relation.source().name(),
           new DirectOwner(entity.name(), Owner.Type.valueOf(entity.type().name())));
     }
-    var domains = new ArticleDomains(metalake, authorization);
+    var memberships = new ArticleDomains(metalake, authorization).pageNames(lake, names.keySet());
+    var previews = previews(lake, names.keySet());
     List<ArticleSummary> result = new ArrayList<>();
     for (var row : page) {
       long id = row.getArticleId();
-      var memberships =
-          SessionUtils.getWithoutCommit(
-              DomainMemberMapper.class,
-              mapper -> mapper.domains(lake, MemberType.KNOWLEDGE_BASE_ARTICLE, id));
+
       try {
         result.add(
             new Summary(
                 row.getArticleName(),
                 row.getTitle(),
                 ArticleStatus.valueOf(row.getStatus()),
-                domains.visibleNames(memberships).values().stream().sorted().toList(),
+                memberships.getOrDefault(id, List.of()),
                 owners.get(row.getArticleName()),
                 JsonUtils.anyFieldMapper().readValue(row.getAuditInfo(), AuditInfo.class),
-                page(lake, id, ArticleListFilter.DEFAULT_LIMIT, 0)));
+                previews.getOrDefault(id, List.of())));
       } catch (IOException failure) {
         throw new UncheckedIOException(failure);
       }
     }
     return ArticlePage.of(result, more);
+  }
+
+  private Map<Long, List<ArticleTermBinding>> previews(long lake, Set<Long> articles) {
+    var access = Suppliers.memoize(() -> GlossaryAccess.forRequest(metalake, authorization));
+    Map<Long, List<ArticleTermBinding>> previews = new HashMap<>();
+    Set<Long> pending = new HashSet<>(articles);
+    BoundTerm cursor = null;
+    while (!pending.isEmpty()) {
+      BoundTerm after = cursor;
+      var rows =
+          SessionUtils.getWithoutCommit(
+              ArticleSummaryMapper.class,
+              mapper -> mapper.pageTerms(lake, pending, after, BATCH_SIZE));
+      for (BoundTerm row : rows) {
+        if (pending.contains(row.articleId()) && access.get().canRead(row.termId(), row.status())) {
+          var preview = previews.computeIfAbsent(row.articleId(), unused -> new ArrayList<>());
+          preview.add(new Term(row.name(), ArticleTermBinding.Status.valueOf(row.status().name())));
+          if (preview.size() > ArticleListFilter.DEFAULT_LIMIT) {
+            // Keep the extra readable Term for hasMore and skip all later bindings of this Article.
+            pending.remove(row.articleId());
+          }
+        }
+      }
+      if (rows.size() < BATCH_SIZE) {
+        break;
+      }
+      cursor = rows.get(rows.size() - 1);
+    }
+    return previews;
   }
 
   private Window window(long lake, long article, int limit, int offset) {

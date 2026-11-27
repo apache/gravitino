@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -43,7 +44,6 @@ import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
@@ -125,18 +125,18 @@ public final class ArticleManager {
                   if (authorizationEnabled) {
                     ArticleAccess.forRequest(metalake).requireCreate();
                   }
-                  Set<Binding> bindings = Set.of();
+                  Collection<ArticleTerms.CheckedEdit> checkedTerms = List.of();
                   if (!request.terms().isEmpty()) {
                     long lake = terms.lake();
                     ArticleTerms.Plan resolved = termPlan.get();
                     articles.lockTermTargets(lake, resolved.targets());
-                    bindings = ArticleTerms.apply(terms.check(lake, resolved), Set.of());
+                    checkedTerms = terms.check(lake, resolved);
                   }
                   Set<Long> initial = domains.check(plan.get(), Set.of(), true);
                   return edits
                       .create(metalake, articleId, ident.name(), request, initial)
                       .toBuilder()
-                      .withBindings(bindings)
+                      .withBindings(ArticleTerms.apply(checkedTerms, Set.of()))
                       .build();
                 },
                 false,
