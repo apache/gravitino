@@ -68,6 +68,9 @@ Use either to manage metadata. See
 * [Manage Semantic Model metadata using Gravitino](./manage-semantic-model-metadata-using-gravitino.md)
   to learn how to define, govern, and exchange semantic metadata. Start with
   [Semantic Models](./semantic-models.md) for concepts and supported use cases.
+* [Manage ontologies and mappings](./manage-ontologies-and-mappings-in-gravitino.md) to map a shared
+  business vocabulary to a semantic model. See [Ontologies and Mappings](./ontologies-and-mappings.md)
+  for scope and permissions.
 * [Manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md) to learn
   how to manage fileset metadata.
 * [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) to learn how to manage
