@@ -41,6 +41,7 @@ const { Search } = Input
 export default function TagsPage() {
   const [open, setOpen] = useState(false)
   const [editTag, setEditTag] = useState('')
+  const [policyBindingRevisions, setPolicyBindingRevisions] = useState(new Map())
   const [search, setSearch] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedTag, setSelectedTag] = useState(null)
@@ -73,6 +74,10 @@ export default function TagsPage() {
         key: tag.name
       }
     })
+
+  const refreshTagPolicies = tagName => {
+    setPolicyBindingRevisions(revisions => new Map(revisions).set(tagName, (revisions.get(tagName) || 0) + 1))
+  }
 
   const onSearchTable = e => {
     const { value } = e.target
@@ -185,6 +190,8 @@ export default function TagsPage() {
             key={`tag-${record.name}-policies`}
             metadataObjectType='tag'
             metadataObjectFullName={record.name}
+            allowedValues={record.allowedValues}
+            refreshVersion={policyBindingRevisions.get(record.name)}
           />
         )
       },
@@ -218,7 +225,7 @@ export default function TagsPage() {
         }
       }
     ],
-    [currentMetalake, store.tagsData]
+    [currentMetalake, store.tagsData, policyBindingRevisions]
   )
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
@@ -247,7 +254,13 @@ export default function TagsPage() {
           pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
         />
       </Spin>
-      <CreateTagDialog open={open} setOpen={setOpen} metalake={currentMetalake} editTag={editTag} />
+      <CreateTagDialog
+        open={open}
+        setOpen={setOpen}
+        metalake={currentMetalake}
+        editTag={editTag}
+        onPolicyBindingsChange={refreshTagPolicies}
+      />
       <Drawer
         title={`View Tag "${selectedTag?.name || ''}" Details`}
         placement='right'

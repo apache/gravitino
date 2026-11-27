@@ -20,27 +20,30 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LockOutlined, PlusOutlined } from '@ant-design/icons'
-import { Flex, Select, Space, Tag, Tooltip, theme } from 'antd'
+import { Button, Cascader, Flex, Input, Space, Tag, Tooltip, theme } from 'antd'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { addPolicyForTag, getPoliciesForTag, removePolicyFromTag } from '@/lib/store/policies'
 import { getCurrentEntityPolicies } from '@/lib/store/metalakes'
 import { useSearchParams } from 'next/navigation'
 
 const tagInputStyle = {
-  width: 100,
+  width: 130,
   height: 22,
   marginInlineEnd: 8,
   verticalAlign: 'top'
 }
 
+const tagValuePrefix = 'value:'
+
 export default function PolicyTag({ ...props }) {
-  const { readOnly, metadataObjectType, metadataObjectFullName } = props
+  const { readOnly, metadataObjectType, metadataObjectFullName, allowedValues, refreshVersion, onBindingsChange } =
+    props
   const isTag = metadataObjectType === 'tag'
+  const hasValues = allowedValues?.length !== 0
   const { token } = theme.useToken()
   const [inputVisible, setInputVisible] = useState(false)
-  const [optionList, setOptionList] = useState([])
+  const [customPolicy, setCustomPolicy] = useState(null)
   const containerRef = useRef(null)
-  const inputRef = useRef(null)
   const router = useRouter()
   const store = useAppSelector(state => state.policies)
   const dispatch = useAppDispatch()
@@ -63,74 +66,65 @@ export default function PolicyTag({ ...props }) {
   }
 
   useEffect(() => {
+    let active = true
+    let observer
+
     const initLoad = async () => {
       const policies = await getPolicies()
-      if (policies) setPoliciesForObject(policies)
+      if (active && policies) setPoliciesForObject(policies)
     }
     if (currentMetalake && metadataObjectType && metadataObjectFullName) {
       if (!isTag || typeof IntersectionObserver === 'undefined') {
         initLoad()
       } else {
-        const observer = new IntersectionObserver(([entry]) => {
+        observer = new IntersectionObserver(([entry]) => {
           if (entry.isIntersecting) {
             observer.disconnect()
             initLoad()
           }
         })
         if (containerRef.current) observer.observe(containerRef.current)
-
-        return () => observer.disconnect()
       }
     }
-  }, [currentMetalake, metadataObjectType, metadataObjectFullName, isTag])
 
-  useEffect(() => {
-    if (inputVisible) {
-      const options =
-        store.policiesData?.filter(
-          policyOption => !policiesForObject?.map(policy => policy.name)?.includes(policyOption.name)
-        ) || []
-      setOptionList(options)
-      inputRef.current?.focus()
+    return () => {
+      active = false
+      observer?.disconnect()
     }
-  }, [inputVisible, policiesForObject, store.policiesData])
+  }, [currentMetalake, metadataObjectType, metadataObjectFullName, isTag, refreshVersion])
 
-  const showInput = () => {
-    setInputVisible(true)
+  const refreshAfterMutation = async () => {
+    onBindingsChange?.(metadataObjectFullName)
+    if (containerRef.current) {
+      const policies = await getPolicies()
+      if (containerRef.current && policies) setPoliciesForObject(policies)
+    }
   }
 
-  const tagRender = props => {
-    const { value, closable, onClose } = props
-
-    const onPreventMouseDown = event => {
-      event.preventDefault()
-      event.stopPropagation()
-    }
-
-    return (
-      <Tag
-        className='text-defaultPrimary'
-        onMouseDown={onPreventMouseDown}
-        closable={closable}
-        onClose={onClose}
-        style={{ marginInlineEnd: 4 }}
-      >
-        {value}
-      </Tag>
-    )
-  }
-
-  const handleChange = async value => {
-    if (value && !policiesForObject?.map(policy => policy.name)?.includes(value)) {
-      const result = await dispatch(
-        addPolicyForTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy: value })
-      )
-      if (result.meta.requestStatus === 'fulfilled') {
-        const policies = await getPolicies()
-        if (policies) setPoliciesForObject(policies)
-      }
-    }
+  const associatePolicy = async (policy, selector) => {
     setInputVisible(false)
+    setCustomPolicy(null)
+
+    const result = await dispatch(
+      addPolicyForTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy, selector })
+    )
+    if (result.meta.requestStatus === 'fulfilled') {
+      await refreshAfterMutation()
+    }
+  }
+
+  const handleChange = ([policy, selection]) => {
+    if (selection === 'custom') {
+      setInputVisible(false)
+      setCustomPolicy(policy)
+
+      return
+    }
+
+    const selector = selection?.startsWith(tagValuePrefix)
+      ? { type: 'TAG_VALUE', value: selection.slice(tagValuePrefix.length) }
+      : { type: 'ALL_VALUES' }
+    associatePolicy(policy, selector)
   }
 
   const handleClose = async (removedPolicy, event) => {
@@ -140,13 +134,8 @@ export default function PolicyTag({ ...props }) {
       removePolicyFromTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy: removedPolicy })
     )
     if (result.meta.requestStatus === 'fulfilled') {
-      const policies = await getPolicies()
-      if (policies) setPoliciesForObject(policies)
+      await refreshAfterMutation()
     }
-  }
-
-  const handleBlur = () => {
-    setInputVisible(false)
   }
 
   const handleClick = name => () => {
@@ -159,11 +148,27 @@ export default function PolicyTag({ ...props }) {
     borderStyle: 'dashed'
   }
 
+  const selectorOptions = hasValues
+    ? [
+        { label: 'All values', value: 'all' },
+        ...(allowedValues == null
+          ? [{ label: 'Enter a value', value: 'custom' }]
+          : allowedValues.map(value => ({ label: value, value: `${tagValuePrefix}${value}` })))
+      ]
+    : undefined
+
+  // The API stores one selector per tag and policy. Remove a binding before adding another.
+  const availablePolicies = inputVisible
+    ? store.policiesData?.filter(policy => !policiesForObject.some(boundPolicy => boundPolicy.name === policy.name))
+    : []
+
   return (
     <Flex ref={containerRef} gap='4px 0' wrap>
       {policiesForObject?.map((policy, index) => {
-        const isLongPolicy = policy.name.length > 20
-        let color = policy.enabled ? token.colorPrimary : token.colorTextDisabled
+        const selectorLabel = policy.selector?.type === 'TAG_VALUE' ? policy.selector.value : 'All values'
+        const label = isTag && hasValues ? `${policy.name} · ${selectorLabel}` : policy.name
+        const isLongPolicy = label.length > 20
+        const color = policy.enabled ? token.colorPrimary : token.colorTextDisabled
 
         const policyElem = (
           <Tag
@@ -171,17 +176,17 @@ export default function PolicyTag({ ...props }) {
             color={color}
             closable={isTag && !readOnly && !policy.inherited}
             icon={policy.inherited ? <LockOutlined /> : null}
-            onClick={handleClick(policy.name)}
-            className='cursor-pointer'
+            onClick={isTag ? undefined : handleClick(policy.name)}
+            className={isTag ? undefined : 'cursor-pointer'}
             style={{ userSelect: 'none' }}
             onClose={event => handleClose(policy.name, event)}
           >
-            <span>{isLongPolicy ? `${policy.name.slice(0, 20)}...` : policy.name}</span>
+            <span className='inline-block max-w-[190px] truncate align-bottom'>{label}</span>
           </Tag>
         )
 
         return isLongPolicy ? (
-          <Tooltip title={policy.name} key={policy.name}>
+          <Tooltip title={label} key={policy.name}>
             {policyElem}
           </Tooltip>
         ) : (
@@ -190,29 +195,52 @@ export default function PolicyTag({ ...props }) {
       })}
       {policiesForObject?.length === 0 && <span>No Policies</span>}
       {inputVisible && isTag && !readOnly && (
-        <Select
+        <Cascader
           size='small'
-          tagRender={tagRender}
-          ref={inputRef}
+          aria-label='Associate Policy'
+          placeholder='Policy'
           style={tagInputStyle}
+          autoFocus
+          open
+          allowClear={false}
+          onOpenChange={setInputVisible}
           onChange={handleChange}
-          onBlur={handleBlur}
-        >
-          {optionList.map(policy => (
-            <Select.Option value={policy.name} key={policy.name}>
+          options={availablePolicies?.map(policy => ({
+            value: policy.name,
+            label: (
               <Space>
                 <span
                   className='tag-swatch'
                   style={{ backgroundColor: policy.enabled ? token.colorPrimary : token.colorTextDisabled }}
-                ></span>
+                />
                 <span>{policy.name}</span>
               </Space>
-            </Select.Option>
-          ))}
-        </Select>
+            ),
+            children: selectorOptions
+          }))}
+        />
       )}
-      {!inputVisible && isTag && !readOnly && (
-        <Tag style={tagPlusStyle} icon={<PlusOutlined />} onClick={showInput}>
+      {customPolicy && (
+        <Space size={4} wrap>
+          <Input.Search
+            size='small'
+            aria-label={`Tag value for ${customPolicy}`}
+            placeholder='Tag value'
+            enterButton='Associate'
+            autoFocus
+            onPressEnter={event => event.preventDefault()}
+            onSearch={value => {
+              const trimmed = value.trim()
+              if (trimmed) associatePolicy(customPolicy, { type: 'TAG_VALUE', value: trimmed })
+            }}
+          />
+          <Button size='small' onClick={() => setCustomPolicy(null)}>
+            Cancel
+          </Button>
+        </Space>
+      )}
+      {!inputVisible && !customPolicy && isTag && !readOnly && (
+        <Tag style={tagPlusStyle} icon={<PlusOutlined />} onClick={() => setInputVisible(true)}>
           Associate Policy
         </Tag>
       )}

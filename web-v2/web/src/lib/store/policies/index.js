@@ -118,15 +118,18 @@ export const getPoliciesForTag = createAsyncThunk('policies/getPoliciesForTag', 
   return res.associations?.map(association => ({ ...association.policy, selector: association.selector })) || []
 })
 
-export const addPolicyForTag = createAsyncThunk('policies/addPolicyForTag', async ({ metalake, tag, policy }) => {
-  const [err, res] = await to(addPolicyForTagApi({ metalake, tag, policy }))
+export const addPolicyForTag = createAsyncThunk(
+  'policies/addPolicyForTag',
+  async ({ metalake, tag, policy, selector }) => {
+    const [err, res] = await to(addPolicyForTagApi({ metalake, tag, policy, selector }))
 
-  if (err || !res) {
-    throw new Error(err)
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    return res
   }
-
-  return res
-})
+)
 
 export const removePolicyFromTag = createAsyncThunk(
   'policies/removePolicyFromTag',
