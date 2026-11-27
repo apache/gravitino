@@ -21,9 +21,9 @@ package org.apache.gravitino.ontology;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
@@ -155,12 +155,16 @@ public final class OntologyDispatcher {
    *
    * @param metalake The containing metalake.
    * @param name The current ontology name.
-   * @param visible Tests whether the caller can load a mapping's parent model.
+   * @param visible Checks access given the mapping identifier and whether its model has a published
+   *     revision.
    * @param changes The changes applied atomically.
    * @return The updated ontology.
    */
   public Ontology alterOntology(
-      String metalake, String name, Predicate<NameIdentifier> visible, OntologyChange... changes) {
+      String metalake,
+      String name,
+      BiPredicate<NameIdentifier, Boolean> visible,
+      OntologyChange... changes) {
     NameIdentifier ident = NameIdentifierUtil.ofOntology(metalake, name);
     return operate(
         OperationType.ALTER_ONTOLOGY,
@@ -179,10 +183,12 @@ public final class OntologyDispatcher {
    *
    * @param metalake The containing metalake.
    * @param name The ontology name.
-   * @param visible Tests whether the caller can load a mapping's parent model.
+   * @param visible Checks access given the mapping identifier and whether its model has a published
+   *     revision.
    * @return Whether the ontology was dropped.
    */
-  public boolean dropOntology(String metalake, String name, Predicate<NameIdentifier> visible) {
+  public boolean dropOntology(
+      String metalake, String name, BiPredicate<NameIdentifier, Boolean> visible) {
     NameIdentifier ident = NameIdentifierUtil.ofOntology(metalake, name);
     return operate(
         OperationType.DROP_ONTOLOGY,

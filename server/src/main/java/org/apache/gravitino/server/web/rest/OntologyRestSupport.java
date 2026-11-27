@@ -102,11 +102,13 @@ final class OntologyRestSupport {
         .build();
   }
 
-  static boolean canLoadMapping(NameIdentifier mapping) {
+  static boolean canLoadMapping(NameIdentifier mapping, boolean modelHasPublishedRevision) {
     NameIdentifier model = NameIdentifier.of(mapping.namespace().levels());
     return MetadataAuthzHelper.checkAccess(
         model,
         Entity.EntityType.SEMANTIC_MODEL,
-        AuthorizationExpressionConstants.LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION);
+        modelHasPublishedRevision
+            ? AuthorizationExpressionConstants.LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION
+            : AuthorizationExpressionConstants.MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION);
   }
 }

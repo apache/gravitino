@@ -112,7 +112,7 @@ class TestOntologyDispatcher {
     assertThrows(MetalakeNotInUseException.class, () -> dispatcher.listOntologies(METALAKE.name()));
     assertThrows(
         MetalakeNotInUseException.class,
-        () -> dispatcher.dropOntology(METALAKE.name(), "Sales", ignored -> true));
+        () -> dispatcher.dropOntology(METALAKE.name(), "Sales", (mapping, published) -> true));
     assertThrows(MetalakeNotInUseException.class, () -> dispatcher.listModelMappings(MODEL));
     verifyNoInteractions(storage);
   }

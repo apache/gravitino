@@ -37,6 +37,7 @@ public class OntologySnapshotPO {
   private String catalogName;
   private String schemaName;
   private String semanticModelName;
+  private int semanticModelActiveVersion;
   private int currentVersion;
   private int lastVersion;
   @Nullable private String comment;

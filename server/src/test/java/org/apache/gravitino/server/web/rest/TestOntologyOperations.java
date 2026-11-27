@@ -20,12 +20,14 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -40,6 +42,8 @@ import javax.ws.rs.client.Invocation;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.requests.OntologyCreateRequest;
 import org.apache.gravitino.dto.requests.OntologyUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -61,6 +65,8 @@ import org.apache.gravitino.ontology.OntologyDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
@@ -71,6 +77,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 
 /** Exercises the ontology REST resource with authorization disabled. */
 public class TestOntologyOperations extends BaseOperationsTest {
@@ -135,6 +142,35 @@ public class TestOntologyOperations extends BaseOperationsTest {
       result.validate();
       assertEquals("Sales", result.ontology().name());
       assertEquals(DEFINITION, result.ontology().definition().fields());
+    }
+  }
+
+  /** Checks the parent model privilege required to disclose a mapping conflict. */
+  @Test
+  public void testMappingConflictVisibilityRequiresModifyBeforeFirstPublication() {
+    NameIdentifier model = NameIdentifier.of(METALAKE, "catalog", "schema", "model");
+    NameIdentifier mapping = NameIdentifier.of(METALAKE, "catalog", "schema", "model", "mapping");
+    try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
+      auth.when(
+              () ->
+                  MetadataAuthzHelper.checkAccess(
+                      model,
+                      EntityType.SEMANTIC_MODEL,
+                      AuthorizationExpressionConstants
+                          .LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION))
+          .thenReturn(true);
+      assertFalse(OntologyRestSupport.canLoadMapping(mapping, false));
+      assertTrue(OntologyRestSupport.canLoadMapping(mapping, true));
+
+      auth.when(
+              () ->
+                  MetadataAuthzHelper.checkAccess(
+                      model,
+                      EntityType.SEMANTIC_MODEL,
+                      AuthorizationExpressionConstants
+                          .MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION))
+          .thenReturn(true);
+      assertTrue(OntologyRestSupport.canLoadMapping(mapping, false));
     }
   }
 

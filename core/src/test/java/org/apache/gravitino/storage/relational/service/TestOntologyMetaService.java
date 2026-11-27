@@ -37,6 +37,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiPredicate;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalOntologyMappingException;
@@ -56,6 +57,7 @@ import org.apache.gravitino.ontology.OssieOntologyDocuments;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
+import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -63,10 +65,10 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.function.Executable;
 
 /** Exercises the versioned ontology store on Gravitino's relational backends. */
 public class TestOntologyMetaService extends TestJDBCBackend {
@@ -87,22 +89,7 @@ public class TestOntologyMetaService extends TestJDBCBackend {
     createAndInsertMakeLake(METALAKE);
     createAndInsertCatalog(METALAKE, CATALOG);
     createAndInsertSchema(METALAKE, CATALOG, SCHEMA);
-    Dataset dataset =
-        Dataset.builder()
-            .withName("customer")
-            .withSource(NameIdentifier.of(CATALOG, SCHEMA, "customer"))
-            .build();
-    SemanticModelEntity entity =
-        SemanticModelEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withNamespace(NamespaceUtil.ofSemanticModel(METALAKE, CATALOG, SCHEMA))
-            .withName(MODEL.name())
-            .withDefinition(
-                SemanticModelDefinition.builder().withDatasets(new Dataset[] {dataset}).build())
-            .withProperties(Map.of())
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    SemanticModelMetaService.getInstance().insertSemanticModel(entity, false);
+    insertModel(MODEL, SemanticModel.Status.PUBLISHED);
   }
 
   /** Checks ID-based references, compatibility rollback, and both kinds of dropping. */
@@ -162,7 +149,7 @@ public class TestOntologyMetaService extends TestJDBCBackend {
                 STORE.alterOntology(
                     METALAKE,
                     ONTOLOGY,
-                    ignored -> true,
+                    (mapping, published) -> true,
                     OntologyChange.rename("Rejected"),
                     OntologyChange.replaceDefinition(definition("Other"))));
     assertTrue(visible.getMessage().contains(MAPPING));
@@ -170,14 +157,15 @@ public class TestOntologyMetaService extends TestJDBCBackend {
     OntologyInUseException hidden =
         assertThrows(
             OntologyInUseException.class,
-            () -> STORE.dropOntology(METALAKE, ONTOLOGY, ignored -> false));
+            () -> STORE.dropOntology(METALAKE, ONTOLOGY, (mapping, published) -> false));
     assertTrue(hidden.getMessage().contains("1 mapping the caller cannot load"));
     assertFalse(hidden.getMessage().contains(MAPPING));
     assertFalse(hidden.getMessage().contains(MODEL.name()));
     assertEquals(List.of(ONTOLOGY), STORE.listOntologies(METALAKE));
 
     OntologyEntity renamed =
-        STORE.alterOntology(METALAKE, ONTOLOGY, ignored -> true, OntologyChange.rename("NewSales"));
+        STORE.alterOntology(
+            METALAKE, ONTOLOGY, (mapping, published) -> true, OntologyChange.rename("NewSales"));
     assertEquals(original.id(), renamed.id());
     assertEquals(0, STORE.retireVersions(false, 1, 100));
     assertEquals("NewSales", STORE.loadMapping(MODEL, MAPPING).ontology());
@@ -208,8 +196,8 @@ public class TestOntologyMetaService extends TestJDBCBackend {
     assertEquals(1, STORE.retireVersions(true, 1, 100));
     assertTrue(SemanticModelMetaService.getInstance().deleteSemanticModel(MODEL));
     assertTrue(STORE.listOntologyMappings(METALAKE, renamed.name()).isEmpty());
-    assertTrue(STORE.dropOntology(METALAKE, renamed.name(), ignored -> true));
-    assertFalse(STORE.dropOntology(METALAKE, renamed.name(), ignored -> true));
+    assertTrue(STORE.dropOntology(METALAKE, renamed.name(), (mapping, published) -> true));
+    assertFalse(STORE.dropOntology(METALAKE, renamed.name(), (mapping, published) -> true));
     assertEquals(3, STORE.purge(true, System.currentTimeMillis() + 1000, 100));
   }
 
@@ -274,7 +262,7 @@ public class TestOntologyMetaService extends TestJDBCBackend {
                   STORE.alterOntology(
                       METALAKE,
                       ONTOLOGY,
-                      ignored -> true,
+                      (mapping, published) -> true,
                       OntologyChange.replaceDefinition(replacement)));
       assertTrue(
           conflict.getMessage().contains("$.conceptMappings[0].objectMappings[0].expression"));
@@ -311,7 +299,9 @@ public class TestOntologyMetaService extends TestJDBCBackend {
     OntologyInUseException conflict =
         assertThrows(
             OntologyInUseException.class,
-            () -> STORE.dropOntology(METALAKE, ONTOLOGY, expected::equals));
+            () ->
+                STORE.dropOntology(
+                    METALAKE, ONTOLOGY, (mapping, published) -> expected.equals(mapping)));
     assertTrue(
         conflict
             .getMessage()
@@ -330,10 +320,11 @@ public class TestOntologyMetaService extends TestJDBCBackend {
         STORE.alterOntology(
             METALAKE,
             ONTOLOGY,
-            ignored -> true,
+            (mapping, published) -> true,
             OntologyChange.updateComment("second"),
             OntologyChange.setProperty("owner", "team"));
-    STORE.alterOntology(METALAKE, ONTOLOGY, ignored -> true, OntologyChange.updateComment("third"));
+    STORE.alterOntology(
+        METALAKE, ONTOLOGY, (mapping, published) -> true, OntologyChange.updateComment("third"));
     assertEquals(0, STORE.retireVersions(false, 10, 100));
     assertEquals(2, STORE.retireVersions(false, 1, 100));
     assertEquals("team", updated.properties().get("owner"));
@@ -343,7 +334,7 @@ public class TestOntologyMetaService extends TestJDBCBackend {
         SchemaMetaService.getInstance()
             .deleteSchema(NameIdentifier.of(METALAKE, CATALOG, SCHEMA), true));
     assertTrue(STORE.listOntologyMappings(METALAKE, ONTOLOGY).isEmpty());
-    assertTrue(STORE.dropOntology(METALAKE, ONTOLOGY, ignored -> true));
+    assertTrue(STORE.dropOntology(METALAKE, ONTOLOGY, (mapping, published) -> true));
   }
 
   /** Checks the catalog and metalake cascade paths. */
@@ -386,7 +377,7 @@ public class TestOntologyMetaService extends TestJDBCBackend {
                   STORE.alterOntology(
                       METALAKE,
                       ONTOLOGY,
-                      ignored -> true,
+                      (mapping, published) -> true,
                       OntologyChange.replaceDefinition(definition("Other")));
                   return true;
                 } catch (OntologyInUseException expected) {
@@ -414,14 +405,14 @@ public class TestOntologyMetaService extends TestJDBCBackend {
     STORE.alterOntology(
         METALAKE,
         ONTOLOGY,
-        ignored -> true,
+        (mapping, published) -> true,
         OntologyChange.setProperty("owner", "team"),
         OntologyChange.updateComment("current"));
     OntologyEntity unchanged =
         STORE.alterOntology(
             METALAKE,
             ONTOLOGY,
-            ignored -> true,
+            (mapping, published) -> true,
             OntologyChange.setProperty("owner", "team"),
             OntologyChange.updateComment("current"),
             OntologyChange.removeProperty("missing"),
@@ -453,6 +444,45 @@ public class TestOntologyMetaService extends TestJDBCBackend {
     assertEquals(1, STORE.retireVersions(true, 1, 100));
   }
 
+  /** Checks conflict details before first publication and while a later draft is pending. */
+  @TestTemplate
+  public void testMappingConflictsFollowModelPublication() throws IOException {
+    NameIdentifier model = NameIdentifier.of(MODEL.namespace(), "deferred_model");
+    SemanticModelEntity draft = insertModel(model, SemanticModel.Status.DRAFT);
+    createOntology();
+    STORE.createMapping(
+        RandomIdGenerator.INSTANCE,
+        model,
+        MAPPING,
+        null,
+        ONTOLOGY,
+        MAPPING_DEFINITION,
+        Map.of(),
+        ignored -> {});
+
+    BiPredicate<NameIdentifier, Boolean> useOnly =
+        (mapping, modelHasPublishedRevision) -> modelHasPublishedRevision;
+    Executable drop = () -> STORE.dropOntology(METALAKE, ONTOLOGY, useOnly);
+    Executable replace =
+        () ->
+            STORE.alterOntology(
+                METALAKE, ONTOLOGY, useOnly, OntologyChange.replaceDefinition(definition("Other")));
+    String hidden = "Ontology Sales is used by 1 mapping the caller cannot load";
+    assertEquals(hidden, assertThrows(OntologyInUseException.class, drop).getMessage());
+    assertEquals(hidden, assertThrows(OntologyInUseException.class, replace).getMessage());
+
+    SemanticModelMetaService models = SemanticModelMetaService.getInstance();
+    models.publishRevision(model, 1, "publisher");
+    SemanticModelEntity nextDraft = models.updateSemanticModel(model, ignored -> draft);
+    assertEquals(2, nextDraft.revision());
+    assertEquals(SemanticModel.Status.DRAFT, nextDraft.status());
+    assertTrue(assertThrows(OntologyInUseException.class, drop).getMessage().contains(MAPPING));
+    assertTrue(
+        assertThrows(OntologyInUseException.class, replace)
+            .getMessage()
+            .contains(MAPPING + " at "));
+  }
+
   /** Verifies that conflict visibility is decided after the transaction releases its locks. */
   @TestTemplate
   public void testMappingVisibilityIsCheckedOutsideTransaction() {
@@ -467,7 +497,7 @@ public class TestOntologyMetaService extends TestJDBCBackend {
                 STORE.alterOntology(
                     METALAKE,
                     ONTOLOGY,
-                    mapping -> {
+                    (mapping, published) -> {
                       checked.set(true);
                       checkedInTransaction.compareAndSet(false, SessionUtils.isInTransaction());
                       return true;
@@ -480,7 +510,7 @@ public class TestOntologyMetaService extends TestJDBCBackend {
             STORE.dropOntology(
                 METALAKE,
                 ONTOLOGY,
-                mapping -> {
+                (mapping, published) -> {
                   checkedInTransaction.compareAndSet(false, SessionUtils.isInTransaction());
                   return false;
                 }));
@@ -525,7 +555,10 @@ public class TestOntologyMetaService extends TestJDBCBackend {
             OntologyAlreadyExistsException.class,
             () ->
                 STORE.alterOntology(
-                    METALAKE, ONTOLOGY, ignored -> true, OntologyChange.rename("Other")));
+                    METALAKE,
+                    ONTOLOGY,
+                    (mapping, published) -> true,
+                    OntologyChange.rename("Other")));
     assertTrue(ontologyConflict.getMessage().contains("'Other'"));
     OntologyMappingAlreadyExistsException mappingConflict =
         assertThrows(
@@ -559,14 +592,20 @@ public class TestOntologyMetaService extends TestJDBCBackend {
     createMapping();
     String version = "0.3.0.dev9";
     STORE.alterOntology(
-        METALAKE, ONTOLOGY, ignored -> true, OntologyChange.setProperty(VERSION_PROPERTY, version));
+        METALAKE,
+        ONTOLOGY,
+        (mapping, published) -> true,
+        OntologyChange.setProperty(VERSION_PROPERTY, version));
     STORE.alterMapping(
         MODEL,
         MAPPING,
         ignored -> {},
         OntologyMappingChange.setProperty(VERSION_PROPERTY, version));
     STORE.alterOntology(
-        METALAKE, ONTOLOGY, ignored -> true, OntologyChange.removeProperty(VERSION_PROPERTY));
+        METALAKE,
+        ONTOLOGY,
+        (mapping, published) -> true,
+        OntologyChange.removeProperty(VERSION_PROPERTY));
     STORE.alterMapping(
         MODEL, MAPPING, ignored -> {}, OntologyMappingChange.removeProperty(VERSION_PROPERTY));
 
@@ -597,7 +636,7 @@ public class TestOntologyMetaService extends TestJDBCBackend {
     STORE.alterOntology(
         METALAKE,
         ONTOLOGY,
-        mapping -> {
+        (mapping, published) -> {
           throw new AssertionError("The final definition is unchanged");
         },
         OntologyChange.setProperty("owner", "team"),
@@ -623,6 +662,28 @@ public class TestOntologyMetaService extends TestJDBCBackend {
     STORE.alterMapping(MODEL, MAPPING, ontology -> assertEquals(ONTOLOGY, ontology), changes);
     assertEquals(0, STORE.retireVersions(false, 1, 100));
     assertEquals(0, STORE.retireVersions(true, 1, 100));
+  }
+
+  private SemanticModelEntity insertModel(NameIdentifier model, SemanticModel.Status status)
+      throws IOException {
+    Dataset dataset =
+        Dataset.builder()
+            .withName("customer")
+            .withSource(NameIdentifier.of(CATALOG, SCHEMA, "customer"))
+            .build();
+    SemanticModelEntity entity =
+        SemanticModelEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withNamespace(model.namespace())
+            .withName(model.name())
+            .withDefinition(
+                SemanticModelDefinition.builder().withDatasets(new Dataset[] {dataset}).build())
+            .withProperties(Map.of())
+            .withAuditInfo(AUDIT_INFO)
+            .withRevision(1, status, null, null)
+            .build();
+    SemanticModelMetaService.getInstance().insertSemanticModel(entity, false);
+    return entity;
   }
 
   private OntologyEntity createOntology() {

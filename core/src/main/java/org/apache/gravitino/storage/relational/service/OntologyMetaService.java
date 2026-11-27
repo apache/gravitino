@@ -33,8 +33,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -231,14 +231,15 @@ public final class OntologyMetaService {
    *
    * @param metalake The containing metalake.
    * @param name The current ontology name.
-   * @param visibleMapping Checks whether the caller can load a mapping's parent model.
+   * @param visibleMapping Checks access given the mapping identifier and whether its model has a
+   *     published revision.
    * @param changes Changes to apply as one transaction.
    * @return The updated ontology.
    */
   public OntologyEntity alterOntology(
       String metalake,
       String name,
-      Predicate<NameIdentifier> visibleMapping,
+      BiPredicate<NameIdentifier, Boolean> visibleMapping,
       OntologyChange... changes) {
     long metalakeId = metalakeId(metalake);
     try {
@@ -291,11 +292,12 @@ public final class OntologyMetaService {
    *
    * @param metalake The containing metalake.
    * @param name The ontology name.
-   * @param visibleMapping Checks whether the caller can load a mapping's parent model.
+   * @param visibleMapping Checks access given the mapping identifier and whether its model has a
+   *     published revision.
    * @return Whether the ontology existed and was dropped.
    */
   public boolean dropOntology(
-      String metalake, String name, Predicate<NameIdentifier> visibleMapping) {
+      String metalake, String name, BiPredicate<NameIdentifier, Boolean> visibleMapping) {
     long metalakeId = metalakeId(metalake);
     try {
       return SessionUtils.doWithCommitAndFetchResult(
@@ -692,7 +694,9 @@ public final class OntologyMetaService {
           detail = " at " + e.getMessage();
         }
       }
-      conflicts.add(new MappingConflict(mappingIdentifier(metalake, row), detail));
+      conflicts.add(
+          new MappingConflict(
+              mappingIdentifier(metalake, row), row.getSemanticModelActiveVersion() > 0, detail));
     }
     if (!conflicts.isEmpty()) {
       throw new MappingsInUse(name, conflicts);
@@ -846,7 +850,8 @@ public final class OntologyMetaService {
   }
 
   @SuppressWarnings("UnusedVariable") // Read through the record accessors.
-  private record MappingConflict(NameIdentifier identifier, String detail) {}
+  private record MappingConflict(
+      NameIdentifier identifier, boolean modelHasPublishedRevision, String detail) {}
 
   /** Carries mapping conflicts out of the transaction so authorization runs without row locks. */
   private static final class MappingsInUse extends RuntimeException {
@@ -859,12 +864,13 @@ public final class OntologyMetaService {
       this.conflicts = conflicts;
     }
 
-    private OntologyInUseException toException(Predicate<NameIdentifier> visibleMapping) {
+    private OntologyInUseException toException(
+        BiPredicate<NameIdentifier, Boolean> visibleMapping) {
       List<String> visible = new ArrayList<>();
       int hidden = 0;
       for (MappingConflict conflict : conflicts) {
         NameIdentifier identifier = conflict.identifier();
-        if (visibleMapping.test(identifier)) {
+        if (visibleMapping.test(identifier, conflict.modelHasPublishedRevision())) {
           // Include the failing JSON path and reason only for a mapping the caller can load.
           visible.add(
               NameIdentifier.of(
