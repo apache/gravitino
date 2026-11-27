@@ -31,6 +31,7 @@ from mcp_server.client import (
 )
 from mcp_server.client.domain_operation import DomainOperation
 from mcp_server.client.job_operation import JobOperation
+from mcp_server.client.ontology_operation import OntologyOperation
 from mcp_server.client.plain.exception import GravitinoException
 from mcp_server.client.plain.plain_rest_client_catalog_operation import (
     PlainRESTClientCatalogOperation,
@@ -49,6 +50,9 @@ from mcp_server.client.plain.plain_rest_client_metalake_operation import (
 )
 from mcp_server.client.plain.plain_rest_client_model_operation import (
     PlainRESTClientModelOperation,
+)
+from mcp_server.client.plain.plain_rest_client_ontology_operation import (
+    PlainRESTClientOntologyOperation,
 )
 from mcp_server.client.plain.plain_rest_client_partition_operation import (
     PlainRESTClientPartitionOperation,
@@ -143,6 +147,9 @@ class PlainRESTClientOperation(GravitinoOperation):
         )
         # Kept so the shared connection pool can be closed (see close()).
         self._rest_client = _rest_client
+        self._ontology_operation = PlainRESTClientOntologyOperation(
+            metalake_name, _rest_client
+        )
         self._catalog_operation = PlainRESTClientCatalogOperation(
             metalake_name, _rest_client
         )
@@ -232,6 +239,9 @@ class PlainRESTClientOperation(GravitinoOperation):
 
     def as_view_operation(self):
         return self._view_operation
+
+    def as_ontology_operation(self) -> OntologyOperation:
+        return self._ontology_operation
 
     def as_semantic_model_operation(self) -> SemanticModelOperation:
         return self._semantic_model_operation

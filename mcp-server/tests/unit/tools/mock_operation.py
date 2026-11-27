@@ -43,6 +43,9 @@ class MockOperation(GravitinoOperation):
     ):
         pass
 
+    def as_ontology_operation(self):
+        raise NotImplementedError
+
     def as_table_operation(self) -> TableOperation:
         return MockTableOperation()
 
