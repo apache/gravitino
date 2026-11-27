@@ -58,7 +58,25 @@ class TestPolicyExecutionSpec(unittest.TestCase):
 
     def test_negative_min_interval_rejected(self) -> None:
         with self.assertRaises(IllegalArgumentException):
-            PolicyExecutionSpec.of(min_interval_ms=-1)
+            PolicyExecutionSpec.of(commit_trigger=True, min_interval_ms=-1)
+
+    def test_rejects_time_trigger_with_commit_trigger_true(self) -> None:
+        with self.assertRaises(IllegalArgumentException) as ctx:
+            PolicyExecutionSpec.of(time_trigger="0 0 * * *", commit_trigger=True)
+        self.assertIn("mutually exclusive", str(ctx.exception))
+
+    def test_rejects_min_interval_without_commit_trigger(self) -> None:
+        with self.assertRaises(IllegalArgumentException) as ctx:
+            PolicyExecutionSpec.of(time_trigger="0 0 * * *", min_interval_ms=1000)
+        self.assertIn("minIntervalMs", str(ctx.exception))
+        with self.assertRaises(IllegalArgumentException):
+            PolicyExecutionSpec.of(commit_trigger=False, min_interval_ms=1000)
+
+    def test_accepts_commit_trigger_with_min_interval(self) -> None:
+        spec = PolicyExecutionSpec.of(commit_trigger=True, min_interval_ms=1000)
+        self.assertIsNone(spec.time_trigger())
+        self.assertEqual(True, spec.commit_trigger())
+        self.assertEqual(1000, spec.min_interval_ms())
 
     def test_blank_option_key_or_value_rejected(self) -> None:
         with self.assertRaises(IllegalArgumentException):
@@ -187,11 +205,14 @@ class TestIcebergDataCompactionContent(unittest.TestCase):
         )
 
     def test_execution_peers_passed_through(self) -> None:
-        content = PolicyContents.iceberg_data_compaction(
-            time_trigger="0 0 * * *", min_interval_ms=1000
+        scheduled = PolicyContents.iceberg_data_compaction(time_trigger="0 0 * * *")
+        self.assertEqual("0 0 * * *", scheduled.execution_spec().time_trigger())
+        self.assertIsNone(scheduled.execution_spec().min_interval_ms())
+        on_commit = PolicyContents.iceberg_data_compaction(
+            commit_trigger=True, min_interval_ms=1000
         )
-        self.assertEqual("0 0 * * *", content.execution_spec().time_trigger())
-        self.assertEqual(1000, content.execution_spec().min_interval_ms())
+        self.assertEqual(True, on_commit.execution_spec().commit_trigger())
+        self.assertEqual(1000, on_commit.execution_spec().min_interval_ms())
 
     def test_validation_failures(self) -> None:
         with self.assertRaises(IllegalArgumentException):

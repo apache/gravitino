@@ -27,6 +27,8 @@ import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.requests.PolicyCreateRequest;
+import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.PolicyExecutionSpec;
@@ -322,5 +324,35 @@ public class TestPolicyDTO {
             .withExecutionSpec(PolicyExecutionSpec.of("a a a a a a", null, null, null, null))
             .build();
     Assertions.assertDoesNotThrow(opaqueCron::validate);
+  }
+
+  @Test
+  public void testRejectsExclusiveTriggerPeersOnCreateAndUpdate() throws JsonProcessingException {
+    String bothTriggers =
+        "{\"name\":\"p\",\"policyType\":\"system_iceberg_compaction\",\"enabled\":true,"
+            + "\"content\":{\"timeTrigger\":\"0 0 2 * * ?\",\"commitTrigger\":true}}";
+    PolicyCreateRequest createBoth =
+        JsonUtils.objectMapper().readValue(bothTriggers, PolicyCreateRequest.class);
+    IllegalArgumentException createBothEx =
+        Assertions.assertThrows(IllegalArgumentException.class, createBoth::validate);
+    Assertions.assertTrue(createBothEx.getMessage().contains("mutually exclusive"));
+
+    String minWithoutCommit =
+        "{\"name\":\"p\",\"policyType\":\"system_iceberg_compaction\",\"enabled\":true,"
+            + "\"content\":{\"timeTrigger\":\"0 0 2 * * ?\",\"minIntervalMs\":1000}}";
+    PolicyCreateRequest createMin =
+        JsonUtils.objectMapper().readValue(minWithoutCommit, PolicyCreateRequest.class);
+    IllegalArgumentException createMinEx =
+        Assertions.assertThrows(IllegalArgumentException.class, createMin::validate);
+    Assertions.assertTrue(createMinEx.getMessage().contains("minIntervalMs"));
+
+    String updateBoth =
+        "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_compaction\","
+            + "\"newContent\":{\"timeTrigger\":\"0 0 2 * * ?\",\"commitTrigger\":true}}";
+    PolicyUpdateRequest update =
+        JsonUtils.objectMapper().readValue(updateBoth, PolicyUpdateRequest.class);
+    IllegalArgumentException updateEx =
+        Assertions.assertThrows(IllegalArgumentException.class, update::validate);
+    Assertions.assertTrue(updateEx.getMessage().contains("mutually exclusive"));
   }
 }

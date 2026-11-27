@@ -51,8 +51,19 @@ class PolicyExecutionSpec:
         )
         normalized_job_options = dict(job_options) if job_options else {}
         normalized_updater_options = dict(updater_options) if updater_options else {}
-        if min_interval_ms is not None and min_interval_ms < 0:
-            raise IllegalArgumentException("minIntervalMs must be >= 0")
+        commit_triggered = commit_trigger is True
+        if normalized_time_trigger is not None and commit_triggered:
+            raise IllegalArgumentException(
+                "timeTrigger and commitTrigger=true are mutually exclusive; "
+                "set exactly one trigger mode"
+            )
+        if min_interval_ms is not None:
+            if min_interval_ms < 0:
+                raise IllegalArgumentException("minIntervalMs must be >= 0")
+            if not commit_triggered:
+                raise IllegalArgumentException(
+                    "minIntervalMs is only allowed when commitTrigger is true"
+                )
         self._validate_option_map(normalized_job_options, "jobOptions")
         self._validate_option_map(normalized_updater_options, "updaterOptions")
         self._time_trigger = normalized_time_trigger
@@ -75,7 +86,8 @@ class PolicyExecutionSpec:
             time_trigger: Optional cron expression.
             commit_trigger: Optional commit-trigger flag; any non-None value
                 (including False) is retained.
-            min_interval_ms: Optional cooldown in milliseconds.
+            min_interval_ms: Optional cooldown in milliseconds; only valid with
+                commit_trigger=True.
             job_options: Optional job options.
             updater_options: Optional updater options.
 
@@ -84,7 +96,9 @@ class PolicyExecutionSpec:
                 every peer is unset.
 
         Raises:
-            IllegalArgumentException: If min_interval_ms is negative or an
+            IllegalArgumentException: If time_trigger and commit_trigger=True
+                are both set, if min_interval_ms is set without
+                commit_trigger=True, if min_interval_ms is negative, or if an
                 option map has a blank key or value.
         """
         spec = PolicyExecutionSpec(

@@ -62,7 +62,7 @@ public final class MaintenanceCronSubmitPipeline {
   private final long claimTimeoutMs;
 
   /**
-   * @param actionManager occupancy checks (minInterval already applied at schedule)
+   * @param actionManager occupancy checks (expand/cron does not apply {@code minIntervalMs})
    * @param actionMetaService soft-slot claim
    * @param jobManager runJob + bind (and orphan cancel)
    * @param jobConfBuilder resolves schedule-time conf-key refs before submit
@@ -137,8 +137,9 @@ public final class MaintenanceCronSubmitPipeline {
       }
     }
 
-    // minInterval was gated at expand schedule; pick only blocks on occupied soft slots. Any
-    // occupied member aborts the whole pick so a batch row is not partially submitted then deleted.
+    // Expand/cron does not apply minIntervalMs (commitTrigger only). Pick blocks on occupied soft
+    // slots; any occupied member aborts the whole pick so a batch row is not partially submitted
+    // then deleted.
     for (Task task : spec.getTasks()) {
       if (actionManager.isOccupied(task.getTableId(), task.getPolicyId())) {
         LOG.info(
