@@ -294,8 +294,8 @@ public final class GlossaryManager {
 
   /**
    * Lists the visible term definitions in the given metalake. With a domain, lists only the terms
-   * of that domain and of its subdomains that the caller can see. A caller without glossary view
-   * access receives an empty list before the domain filter is evaluated.
+   * of that domain and of its subdomains that the caller can see. A metalake-wide denial of
+   * glossary view access returns an empty list before the domain filter is evaluated.
    *
    * @throws NoSuchMetalakeException if the metalake does not exist
    * @throws NoSuchDomainException if the domain does not exist or is a draft hidden from the caller
@@ -360,7 +360,9 @@ public final class GlossaryManager {
         ns,
         lake -> {
           GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
-          access.requireCreate();
+          if (spec == null || spec.domains().length == 0 || access.lakeViewDenied()) {
+            access.requireCreate(List.of());
+          }
           GlossaryTermEntity term = TermEdits.create(ids.nextId(), ns, spec);
           State state =
               resolvePublicationState(
@@ -390,6 +392,9 @@ public final class GlossaryManager {
                 TermDomains domains = planDomains(lake, term, domainEdits, access);
                 GlossaryTermEntity created =
                     domains.changed() ? TermEdits.withDomains(term, domains.names()) : term;
+                if (state == State.PUBLISHED && spec.status().isPresent()) {
+                  requireStatusAuthority(access, created, spec.status().get());
+                }
                 terms.validateTermNameSynonymsAndSourceRef(created);
                 checkTermNameReservation(lake, created);
                 if (state == State.PUBLISHED) {
@@ -476,7 +481,7 @@ public final class GlossaryManager {
           if (!access.canRead(root) || !readable.test(root)) {
             return false;
           }
-          if (!access.manage()) {
+          if (!access.canManage(root)) {
             throw new ForbiddenException("Deleting a glossary term requires MANAGE_DEFINITIONS");
           }
           if (policy.requiresApproval(metalake)) {
@@ -494,9 +499,15 @@ public final class GlossaryManager {
               locks,
               () -> {
                 GlossaryTermEntity locked = terms.get(ident);
-                // Content-only edits can change visibility while the hierarchy mutex is held.
-                if (!readable.test(locked)) {
+                // Content and domain membership can change while waiting for the term lock.
+                GlossaryAccess lockedAccess =
+                    GlossaryAccess.forRequest(metalake, authorizationEnabled);
+                if (!lockedAccess.canRead(locked) || !readable.test(locked)) {
                   return false;
+                }
+                if (!lockedAccess.canManage(locked)) {
+                  throw new ForbiddenException(
+                      "Deleting a glossary term requires MANAGE_DEFINITIONS");
                 }
                 handler.handle(
                     locked,
@@ -820,7 +831,7 @@ public final class GlossaryManager {
           }
 
           Set<Long> finalBoundIds = BINDINGS.listTermIds(metalakeId, targetType, targetId);
-          if (finalBoundIds.isEmpty() || !termAccess.canView()) {
+          if (finalBoundIds.isEmpty() || termAccess.lakeViewDenied()) {
             return new String[0];
           }
           return terms.listTermsByIds(ns, metalakeId, finalBoundIds).stream()
@@ -888,7 +899,7 @@ public final class GlossaryManager {
                   ? ids.entityId()
                   : resolveTargetId(ids.entityId(), targetObject, targetType, metricName);
           GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
-          if (!access.canView() || (model && metricName == null && !children)) {
+          if (access.lakeViewDenied() || (model && metricName == null && !children)) {
             return project.apply(new BoundTerms(metalakeId, access, List.of(), Map.of()));
           }
           BoundTerms bound =
@@ -1237,7 +1248,8 @@ public final class GlossaryManager {
           if (!canReadTermVersion(head, row, access, snapshot, term))
             throw new NoSuchTermException("Glossary version does not exist");
           TermPublication publication = GlossaryTermVersions.toPublicationResult(head, row);
-          if (!access.canEdit(term) && head.getPublishedVersion() != null) {
+          if (head.getPublishedVersion() != null
+              && !access.canEdit(versionAuthority(access, head, snapshot, term))) {
             publication =
                 new TermPublication(
                     termId, versionId, publication.state(), head.getPublishedVersion(), null);
@@ -1584,6 +1596,14 @@ public final class GlossaryManager {
     }
   }
 
+  private static void requireStatusAuthority(
+      GlossaryAccess access, GlossaryTermEntity term, GlossaryTerm.Status status) {
+    if (status != GlossaryTerm.Status.DRAFT && !access.canManage(term)) {
+      throw new ForbiddenException(
+          "Approving or deprecating a glossary term requires MANAGE_DEFINITIONS");
+    }
+  }
+
   private void checkRevision(
       NameIdentifier ident,
       GlossaryTermEntity before,
@@ -1627,6 +1647,14 @@ public final class GlossaryManager {
     for (TermChange change : request) {
       if (change instanceof TermChange.SetStatus status) {
         state = resolvePublicationState(approval, status.getNewStatus());
+        if (!approval && status.getNewStatus() != before.status()) {
+          GlossaryAccess access =
+              GlossaryAccess.forRequest(ident.namespace().level(0), authorizationEnabled);
+          requireStatusAuthority(access, before, status.getNewStatus());
+          if (membership) {
+            requireStatusAuthority(access, after, status.getNewStatus());
+          }
+        }
       }
     }
     long lake = lakeOf(ident);
@@ -1831,11 +1859,6 @@ public final class GlossaryManager {
       Version row,
       GlossaryAccess access,
       @Nullable Map<Long, Long> currentUserIds) {
-    if (!State.PUBLISHED.name().equals(row.getLifecycle())
-        && head.getPublishedVersion() != null
-        && !access.canEdit(head.getTermId())) {
-      return false;
-    }
     Snapshot snapshot = GlossaryTermVersions.decodeSnapshot(row);
     return canReadTermVersion(
         head,
@@ -1858,8 +1881,10 @@ public final class GlossaryManager {
       Snapshot snapshot,
       GlossaryTermEntity term,
       @Nullable Map<Long, Long> currentUserIds) {
-    if (!readable.test(term)) return false;
-    if (State.PUBLISHED.name().equals(row.getLifecycle())) return access.canRead(term);
+    if (!readable.test(term) || access.lakeViewDenied()) return false;
+    GlossaryTermEntity authority = versionAuthority(access, head, snapshot, term);
+    if (State.PUBLISHED.name().equals(row.getLifecycle()))
+      return access.canRead(term.id(), term.status(), List.of(authority.domains()));
     // A candidate's stored definition and its private DRAFT view must both pass the filter.
     if (readable != ALL_TERMS
         && !readable.test(
@@ -1867,11 +1892,11 @@ public final class GlossaryManager {
                 term, term.domains(), GlossaryTermVersions.toPublicationResult(head, row)))) {
       return false;
     }
-    if (head.getPublishedVersion() != null) return access.canEdit(term);
-    if (access.manage()) return true;
+    if (head.getPublishedVersion() != null) return access.canEdit(authority);
+    if (access.canManage(authority)) return true;
     String currentUser = PrincipalUtils.getCurrentUserName();
     if (!term.auditInfo().creator().equals(currentUser)) return false;
-    if (!access.canCreate()) return false;
+    if (!access.canCreate(List.of(authority.domains()))) return false;
     long metalakeId = snapshot.definition().getMetalakeId();
     Long currentUserId;
     if (currentUserIds != null && currentUserIds.containsKey(metalakeId)) {
@@ -1886,6 +1911,23 @@ public final class GlossaryManager {
       }
     }
     return currentUserId != null && currentUserId.equals(snapshot.creatorUserId());
+  }
+
+  private GlossaryTermEntity versionAuthority(
+      GlossaryAccess access, Head head, Snapshot snapshot, GlossaryTermEntity term) {
+    if (!access.needsDomainScopes()) return term;
+    if (head.getPublishedVersion() == null) {
+      return TermEdits.withDomains(term, snapshot.currentDomainNames());
+    }
+    return access.publishedTerm(
+        term.id(),
+        () ->
+            terms
+                .listTermsByIds(
+                    term.namespace(), snapshot.definition().getMetalakeId(), Set.of(term.id()))
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new NoSuchTermException("Glossary term does not exist")));
   }
 
   private TermPublication recordCandidateDecision(
@@ -1935,9 +1977,16 @@ public final class GlossaryManager {
                           GlossaryTermEntity after = snapshot.term(ns);
                           if (!readable.test(after))
                             throw new NoSuchTermException("Glossary term does not exist");
+                          GlossaryAccess access =
+                              GlossaryAccess.forRequest(metalake, authorizationEnabled);
+                          if (!access.canManage(
+                              versionAuthority(access, locked, snapshot, after))) {
+                            throw new ForbiddenException(
+                                "Deciding a glossary candidate requires MANAGE_DEFINITIONS");
+                          }
                           if (outcome == State.PUBLISHED) {
                             persistCandidateAsLiveTerm(
-                                metalake, lake, locked, row, snapshot, after);
+                                metalake, lake, locked, row, snapshot, after, access);
                             locked.setPublishedVersion(candidateVersionId);
                           }
                           locked.setCandidateVersion(null);
@@ -1963,7 +2012,8 @@ public final class GlossaryManager {
       Head head,
       Version row,
       Snapshot snapshot,
-      GlossaryTermEntity after) {
+      GlossaryTermEntity after,
+      GlossaryAccess access) {
     long id = head.getTermId();
     Namespace ns = after.namespace();
     GlossaryTermEntity before =
@@ -1981,7 +2031,6 @@ public final class GlossaryManager {
     addedBroader.removeAll(relations.broader());
     Set<Long> addedRelated = new HashSet<>(snapshot.related());
     addedRelated.removeAll(relations.related());
-    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
     if (!visibleEndpoints(lake, after, addedBroader, access).equals(addedBroader)
         || !visibleEndpoints(lake, after, addedRelated, access).equals(addedRelated))
       throw new NoSuchTermException("Referenced term is no longer visible");
@@ -1991,7 +2040,14 @@ public final class GlossaryManager {
     Map<Long, DomainPO> domainRows =
         DOMAINS.lockDomains(lake, current, snapshot.domainIds(), Set.of(), ignored -> {});
     Map<Long, String> oldNames = new HashMap<>(), newNames = new HashMap<>();
-    for (long domain : current) oldNames.put(domain, domainRows.get(domain).domainName());
+    for (long domain : current) {
+      DomainPO target = domainRows.get(domain);
+      oldNames.put(domain, target.domainName());
+      if (!snapshot.domainIds().contains(domain)) {
+        requireAccessToResolvedDomain(target.domainName(), target, access);
+        access.requireCreate(List.of(target.domainName()));
+      }
+    }
     for (long domain : snapshot.domainIds()) {
       DomainPO target = domainRows.get(domain);
       String frozenName = snapshot.domains().get(domain);
@@ -2000,6 +2056,7 @@ public final class GlossaryManager {
       }
       if (!current.contains(domain)) {
         requireAccessToResolvedDomain(frozenName, target, access);
+        access.requireCreate(List.of(target.domainName()));
       }
       newNames.put(domain, target.domainName());
     }
@@ -2012,6 +2069,9 @@ public final class GlossaryManager {
       lockCandidateCreator(lake, after.auditInfo().creator(), snapshot.creatorUserId());
     }
     GlossaryTermEntity resolvedAfter = TermEdits.withDomains(after, domains.names());
+    if (!access.canManage(resolvedAfter)) {
+      throw new ForbiddenException("Publishing a glossary term requires MANAGE_DEFINITIONS");
+    }
     checkTermNameReservation(lake, resolvedAfter);
     terms.validateTermNameSynonymsAndSourceRef(resolvedAfter);
     GlossaryTermEntity finalBefore = before;
@@ -2112,7 +2172,7 @@ public final class GlossaryManager {
 
   private GlossaryTermEntity loadRootForView(
       NameIdentifier ident, long metalakeId, GlossaryAccess access) {
-    if (!access.canView()) {
+    if (access.lakeViewDenied()) {
       throw missingRelationRoot(ident);
     }
     try {
@@ -2140,17 +2200,9 @@ public final class GlossaryManager {
    * locked. A missing domain and a hidden draft domain report the same error.
    */
   private TermDomains planDomains(
-      long lake, GlossaryTermEntity term, List<TermDomains.Edit> edits, GlossaryAccess access) {
-    Set<Long> members = term.domains().length == 0 ? Set.of() : DOMAINS.domainIds(lake, term.id());
-    return planDomains(lake, term.id(), members, edits, access);
-  }
-
-  private TermDomains planDomains(
-      long lake,
-      long termId,
-      Set<Long> members,
-      List<TermDomains.Edit> edits,
-      GlossaryAccess access) {
+      long lake, GlossaryTermEntity term, List<TermDomains.Edit> edits, GlossaryAccess termAccess) {
+    long termId = term.id();
+    Set<Long> members = term.domains().length == 0 ? Set.of() : DOMAINS.domainIds(lake, termId);
     Set<String> requested = new HashSet<>();
     for (TermDomains.Edit edit : edits) {
       requested.add(edit.domain());
@@ -2158,6 +2210,8 @@ public final class GlossaryManager {
     if (members.isEmpty() && requested.isEmpty()) {
       return new TermDomains(lake, termId, Map.of());
     }
+    // Parent changes take the domain row lock. Recheck against the parents observed after locking.
+    GlossaryAccess access = termAccess.forLockedTerm(termId);
     Map<String, DomainPO> targets = new HashMap<>();
     Map<Long, DomainPO> locked =
         DOMAINS.lockDomains(
@@ -2174,8 +2228,12 @@ public final class GlossaryManager {
       current.put(id, locked.get(id).domainName());
     }
     TermDomains plan = new TermDomains(lake, termId, current);
+    if (!members.isEmpty()) {
+      requireEdit(access, term.nameIdentifier(), TermEdits.withDomains(term, plan.originalNames()));
+    }
     for (TermDomains.Edit edit : edits) {
       DomainPO target = targets.get(edit.domain());
+      access.requireCreate(List.of(target.domainName()));
       plan.edit(edit, target.domainId(), target.domainName());
     }
     return plan;
@@ -2223,6 +2281,7 @@ public final class GlossaryManager {
       DomainPO target = originalId == null ? targets.get(edit.domain()) : locked.get(originalId);
       if (target != null) {
         requireAccessToResolvedDomain(edit.domain(), target, access);
+        access.requireCreate(List.of(target.domainName()));
         plan.edit(edit, target.domainId(), target.domainName());
       } else if (!edit.add() && originalId != null) {
         plan.edit(edit, originalId, edit.domain());

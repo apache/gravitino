@@ -205,6 +205,7 @@ public class TestTermOperations extends BaseOperationsTest {
         .thenReturn(new String[] {"Draft term"});
     try (Response response = target(BASE).request(ACCEPT_V1).get()) {
       assertEquals(200, response.getStatus());
+      assertTrue(MediaType.valueOf(ACCEPT_V1).isCompatible(response.getMediaType()));
       assertArrayEquals(
           new String[] {"Draft term"}, response.readEntity(NameListResponse.class).getNames());
     }

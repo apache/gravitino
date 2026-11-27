@@ -43,6 +43,11 @@ import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.ibatis.annotations.Param;
 
 public class OwnerMetaBaseSQLProvider {
+  /** Returns the dialect's index hint for owner cleanup within one metalake. */
+  protected String metalakeOwnerIndexHint() {
+    return "";
+  }
+
   protected String currentTimestampMillisExpression() {
     return DatabaseTimeSQL.MYSQL;
   }
@@ -232,6 +237,7 @@ public class OwnerMetaBaseSQLProvider {
     String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
+        + metalakeOwnerIndexHint()
         + " SET deleted_at = "
         + now
         + ", updated_at = "
@@ -239,15 +245,18 @@ public class OwnerMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
-  public String softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId) {
+  public String softDeleteOwnerRelByCatalogId(
+      @Param("metalakeId") Long metalakeId, @Param("catalogId") Long catalogId) {
     String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " ot SET ot.deleted_at = "
+        + " ot"
+        + metalakeOwnerIndexHint()
+        + " SET ot.deleted_at = "
         + now
         + ", ot.updated_at = "
         + now
-        + " WHERE ot.deleted_at = 0 AND EXISTS ("
+        + " WHERE ot.metalake_id = #{metalakeId} AND ot.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
         + " ct WHERE ct.catalog_id = #{catalogId} AND"
@@ -331,16 +340,19 @@ public class OwnerMetaBaseSQLProvider {
         + " WHERE job_template_id = #{jobTemplateId})";
   }
 
-  public String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+  public String softDeleteOwnerRelBySchemaIds(
+      @Param("metalakeId") Long metalakeId, @Param("schemaIds") List<Long> schemaIds) {
     String now = currentTimestampMillisExpression();
     return "<script>"
         + "UPDATE "
         + OWNER_TABLE_NAME
-        + " ot SET ot.deleted_at = "
+        + " ot"
+        + metalakeOwnerIndexHint()
+        + " SET ot.deleted_at = "
         + now
         + ", ot.updated_at = "
         + now
-        + " WHERE ot.deleted_at = 0 AND EXISTS ("
+        + " WHERE ot.metalake_id = #{metalakeId} AND ot.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.schema_id IN "

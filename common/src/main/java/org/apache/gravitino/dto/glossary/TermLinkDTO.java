@@ -20,9 +20,11 @@ package org.apache.gravitino.dto.glossary;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import org.apache.gravitino.glossary.TermLink;
+import org.apache.gravitino.json.JsonUtils.StrictStringDeserializer;
 
 /** A labeled glossary documentation link. */
 @Getter
@@ -38,7 +40,9 @@ public class TermLinkDTO {
    */
   @JsonCreator
   public TermLinkDTO(
-      @JsonProperty("label") @Nullable String label, @JsonProperty("url") String url) {
+      @JsonDeserialize(using = StrictStringDeserializer.class) @JsonProperty("label") @Nullable
+          String label,
+      @JsonDeserialize(using = StrictStringDeserializer.class) @JsonProperty("url") String url) {
     this.label = label;
     this.url = url;
   }

@@ -49,7 +49,13 @@ public class OwnerMetaSQLProviderFactory {
     return OWNER_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  static class OwnerMetaMySQLProvider extends OwnerMetaBaseSQLProvider {}
+  static class OwnerMetaMySQLProvider extends OwnerMetaBaseSQLProvider {
+    @Override
+    protected String metalakeOwnerIndexHint() {
+      // An UPDATE scanning the global deleted_at index locks owners in unrelated metalakes.
+      return " FORCE INDEX (idx_owner_meta_metalake)";
+    }
+  }
 
   static class OwnerMetaH2Provider extends OwnerMetaBaseSQLProvider {}
 
@@ -193,12 +199,14 @@ public class OwnerMetaSQLProviderFactory {
     return getProvider().softDeleteOwnerRelByMetalakeId(metalakeId);
   }
 
-  public static String softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId) {
-    return getProvider().softDeleteOwnerRelByCatalogId(catalogId);
+  public static String softDeleteOwnerRelByCatalogId(
+      @Param("metalakeId") Long metalakeId, @Param("catalogId") Long catalogId) {
+    return getProvider().softDeleteOwnerRelByCatalogId(metalakeId, catalogId);
   }
 
-  public static String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
-    return getProvider().softDeleteOwnerRelBySchemaIds(schemaIds);
+  public static String softDeleteOwnerRelBySchemaIds(
+      @Param("metalakeId") Long metalakeId, @Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteOwnerRelBySchemaIds(metalakeId, schemaIds);
   }
 
   public static String softDeleteOwnerRelOfJobsByTemplateId(

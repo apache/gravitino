@@ -485,25 +485,13 @@ class TestGlossaryBindings extends TestJDBCBackend {
    */
   @TestTemplate
   void testTwoPathAuthorizationAndAtomicity() throws Exception {
-    as(
-        "writer",
-        () ->
-            manager.createTerm(
-                LAKE,
-                TermSpec.builder("ApprovedTerm").withStatus(GlossaryTerm.Status.APPROVED).build()));
+    as("writer", () -> manager.createTerm(LAKE, TermSpec.builder("ApprovedTerm").build()));
     as(
         "writer",
         () ->
             manager.createTerm(
                 LAKE, TermSpec.builder("DraftTerm").withStatus(GlossaryTerm.Status.DRAFT).build()));
-    as(
-        "writer",
-        () ->
-            manager.createTerm(
-                LAKE,
-                TermSpec.builder("DeprecatedTerm")
-                    .withStatus(GlossaryTerm.Status.DEPRECATED)
-                    .build()));
+    as("writer", () -> manager.createTerm(LAKE, TermSpec.builder("DeprecatedTerm").build()));
     as(
         "writerAndTableAdmin",
         () ->
@@ -511,12 +499,16 @@ class TestGlossaryBindings extends TestJDBCBackend {
                 LAKE, TermSpec.builder("DualDraft").withStatus(GlossaryTerm.Status.DRAFT).build()));
     as(
         "writerAndTableAdmin",
-        () ->
-            manager.createTerm(
-                LAKE,
-                TermSpec.builder("DualDeprecated")
-                    .withStatus(GlossaryTerm.Status.DEPRECATED)
-                    .build()));
+        () -> manager.createTerm(LAKE, TermSpec.builder("DualDeprecated").build()));
+
+    as(
+        "admin",
+        () -> {
+          manager.alterTerm(
+              LAKE, "DeprecatedTerm", TermChange.setStatus(GlossaryTerm.Status.DEPRECATED));
+          return manager.alterTerm(
+              LAKE, "DualDeprecated", TermChange.setStatus(GlossaryTerm.Status.DEPRECATED));
+        });
 
     MetadataObject tableObj = MetadataObjects.of(List.of(CAT, SCH, TBL), MetadataObject.Type.TABLE);
 
@@ -546,7 +538,7 @@ class TestGlossaryBindings extends TestJDBCBackend {
                 "tableAdmin",
                 () ->
                     manager.associateTerms(LAKE, tableObj, new String[] {"DeprecatedTerm"}, null)));
-    assertEquals(1L, as("writer", () -> manager.getTerm(LAKE, "DeprecatedTerm")).version());
+    assertEquals(2L, as("writer", () -> manager.getTerm(LAKE, "DeprecatedTerm")).version());
 
     // T11.3: caller with neither authorization path gets 403 (ForbiddenException).
     assertThrows(
@@ -556,7 +548,7 @@ class TestGlossaryBindings extends TestJDBCBackend {
                 "viewerWithTableRead",
                 () ->
                     manager.associateTerms(LAKE, tableObj, new String[] {"DeprecatedTerm"}, null)));
-    assertEquals(1L, as("writer", () -> manager.getTerm(LAKE, "DeprecatedTerm")).version());
+    assertEquals(2L, as("writer", () -> manager.getTerm(LAKE, "DeprecatedTerm")).version());
 
     // T11.4: term editor with only read access to the object binds a DRAFT term.
     assertArrayEquals(
@@ -583,7 +575,7 @@ class TestGlossaryBindings extends TestJDBCBackend {
                 "glossaryOnlyAdmin",
                 () ->
                     manager.associateTerms(LAKE, tableObj, new String[] {"DeprecatedTerm"}, null)));
-    assertEquals(1L, as("writer", () -> manager.getTerm(LAKE, "DeprecatedTerm")).version());
+    assertEquals(2L, as("writer", () -> manager.getTerm(LAKE, "DeprecatedTerm")).version());
 
     // T11.5: one request binds two terms, caller fails authorization on the second -> 403 and
     // first term is NOT bound either.

@@ -119,6 +119,8 @@ public final class GlossaryTermDomainService {
                   !members.contains(id), "A glossary membership refers to a missing domain");
             }
           }
+          // A concurrent reparent or rename may have committed while we waited for a domain.
+          SessionUtils.clearSessionCache();
           for (String name : new TreeSet<>(requestedNames)) {
             DomainPO row = locked.get(observedIds.get(name));
             if (row == null || !name.equals(row.domainName())) {

@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.service;
 
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -51,9 +52,11 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -260,6 +263,68 @@ class TestOwnerMetaService extends TestJDBCBackend {
     entity = OwnerMetaService.getInstance().getOwner(role.nameIdentifier(), role.type()).get();
     Assertions.assertInstanceOf(UserEntity.class, entity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
+  }
+
+  @TestTemplate
+  void testCascadeDoesNotWaitForOwnerInAnotherMetalake() throws Exception {
+    BaseMetalake lake = createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    SchemaEntity schema = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    BaseMetalake other = createAndInsertMakeLake("other_owner_metalake");
+    UserEntity owner =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(lake.name()),
+            "owner",
+            AUDIT_INFO);
+    UserEntity otherOwner =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(other.name()),
+            "owner",
+            AUDIT_INFO);
+    backend.insert(owner, false);
+    backend.insert(otherOwner, false);
+    OwnerMetaService owners = OwnerMetaService.getInstance();
+    owners.setOwner(
+        other.nameIdentifier(), other.type(), otherOwner.nameIdentifier(), otherOwner.type());
+    owners.setOwner(lake.nameIdentifier(), lake.type(), owner.nameIdentifier(), owner.type());
+    owners.setOwner(catalog.nameIdentifier(), catalog.type(), owner.nameIdentifier(), owner.type());
+    owners.setOwner(schema.nameIdentifier(), schema.type(), owner.nameIdentifier(), owner.type());
+
+    SqlSessionFactory factory = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory();
+    try (SqlSession holder = factory.openSession(false);
+        SqlSession cleanup = factory.openSession(true);
+        PreparedStatement lookup =
+            holder
+                .getConnection()
+                .prepareStatement(
+                    "SELECT id FROM owner_meta WHERE metalake_id = ? AND deleted_at = 0");
+        PreparedStatement lock =
+            holder
+                .getConnection()
+                .prepareStatement("SELECT id FROM owner_meta WHERE id = ? FOR UPDATE")) {
+      lookup.setLong(1, other.id());
+      try (ResultSet ids = lookup.executeQuery()) {
+        Assertions.assertTrue(ids.next());
+        lock.setLong(1, ids.getLong(1));
+      }
+      try (ResultSet locked = lock.executeQuery()) {
+        Assertions.assertTrue(locked.next());
+      }
+      try {
+        OwnerMetaMapper mapper = cleanup.getMapper(OwnerMetaMapper.class);
+        mapper.softDeleteOwnerRelBySchemaIds(lake.id(), List.of(schema.id()));
+        Assertions.assertEquals(2, countActiveOwnerRel(owner.id()));
+        mapper.softDeleteOwnerRelByCatalogId(lake.id(), catalog.id());
+        Assertions.assertEquals(1, countActiveOwnerRel(owner.id()));
+        mapper.softDeleteOwnerRelByMetalakeId(lake.id());
+        Assertions.assertEquals(0, countActiveOwnerRel(owner.id()));
+        Assertions.assertEquals(1, countActiveOwnerRel(otherOwner.id()));
+      } finally {
+        holder.rollback(true);
+      }
+    }
   }
 
   @TestTemplate

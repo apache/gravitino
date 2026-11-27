@@ -181,7 +181,11 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
       for (GlossaryTerm.Status status : GlossaryTerm.Status.values()) {
         TermSpec spec =
             TermSpec.builder("created-" + actor.name() + "-" + status).withStatus(status).build();
-        if (actor.create()) {
+        if (actor.create() && status != GlossaryTerm.Status.DRAFT && !actor.manage()) {
+          assertThrows(
+              ForbiddenException.class,
+              () -> as(actor.name(), () -> manager.createTerm(LAKE, spec)));
+        } else if (actor.create()) {
           assertEquals(status, as(actor.name(), () -> manager.createTerm(LAKE, spec)).status());
           assertTrue(as("admin", () -> manager.dropTerm(LAKE, spec.name())));
         } else {
@@ -458,7 +462,7 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
     MetadataObject term = MetadataObjects.of(null, "term", MetadataObject.Type.GLOSSARY_TERM);
     GlossaryTermMetaService definitions = Mockito.mock(GlossaryTermMetaService.class);
     IllegalStateException failure = new IllegalStateException("Definition store unavailable");
-    Mockito.when(definitions.get(Mockito.any())).thenThrow(failure);
+    Mockito.when(definitions.get(Mockito.any(), Mockito.anyLong())).thenThrow(failure);
     try (MockedStatic<GlossaryTermMetaService> services =
         Mockito.mockStatic(GlossaryTermMetaService.class)) {
       services.when(GlossaryTermMetaService::getInstance).thenReturn(definitions);

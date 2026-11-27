@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,41 +33,51 @@ import org.apache.gravitino.dto.glossary.TermLinkDTO;
 import org.apache.gravitino.glossary.GlossaryTerm;
 import org.apache.gravitino.glossary.TermLink;
 import org.apache.gravitino.glossary.TermSpec;
+import org.apache.gravitino.json.JsonUtils.StrictStringDeserializer;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** The initial definition, relations and memberships of a term. */
 @Getter
 public class TermCreateRequest implements RESTRequest {
   @JsonProperty("name")
+  @JsonDeserialize(using = StrictStringDeserializer.class)
   private String name;
 
   @JsonProperty("definition")
+  @JsonDeserialize(using = StrictStringDeserializer.class)
   private @Nullable String definition;
 
   @JsonProperty("synonyms")
+  @JsonDeserialize(contentUsing = StrictStringDeserializer.class)
   private String[] synonyms = new String[0];
 
   @Nullable
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @JsonSetter(value = "status", nulls = Nulls.FAIL)
+  @JsonDeserialize(using = StrictStringDeserializer.class)
   private String status;
 
   @JsonProperty("domains")
+  @JsonDeserialize(contentUsing = StrictStringDeserializer.class)
   private String[] domains = new String[0];
 
   @JsonProperty("broader")
+  @JsonDeserialize(contentUsing = StrictStringDeserializer.class)
   private String[] broader = new String[0];
 
   @JsonProperty("related")
+  @JsonDeserialize(contentUsing = StrictStringDeserializer.class)
   private String[] related = new String[0];
 
   @JsonProperty("links")
   private TermLinkDTO[] links = new TermLinkDTO[0];
 
   @JsonProperty("sourceRef")
+  @JsonDeserialize(using = StrictStringDeserializer.class)
   private @Nullable String sourceRef;
 
   @JsonSetter(value = "properties", nulls = Nulls.FAIL)
+  @JsonDeserialize(contentUsing = StrictStringDeserializer.class)
   private Map<String, String> properties = Collections.emptyMap();
 
   /** Creates an empty request for deserialization. */

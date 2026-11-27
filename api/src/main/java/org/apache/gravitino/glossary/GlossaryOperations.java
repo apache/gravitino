@@ -34,18 +34,19 @@ import org.apache.gravitino.exceptions.TermVersionConflictException;
  * <p>A term that the caller cannot see, for example a {@link GlossaryTerm.Status#DRAFT} term of
  * another user, is left out of lists, and getting it throws {@link NoSuchTermException}.
  *
- * <p>With authorization enabled in Step 1, {@code VIEW_DEFINITION} permits reading approved and
- * deprecated terms. {@code CREATE_DEFINITION} includes view access and permits creating and
- * maintaining terms owned by the caller. {@code MANAGE_DEFINITIONS} includes create and view access
- * and permits managing all terms, including other owners' drafts. Ownership means the current
- * owner, including group members; ownership alone does not replace effective create access. Expand
- * allowed grant implications before applying explicit denies to each required capability. All reads
- * and writes of term definitions require effective {@code VIEW_DEFINITION}. Denying view hides
- * terms from reads and blocks writes even for an owner with create access. Denying create prevents
- * creation even with an allow on manage, but effective manage can still authorize edits. Denying
- * manage removes the all-term path without removing effective create access to own terms. These
- * privileges are granted on the metalake in Step 1. The metalake owner passes privilege checks, but
- * remains subject to the Step 2 workflow and no-self-approval rule.
+ * <p>With authorization enabled, {@code VIEW_DEFINITION} permits reading approved and deprecated
+ * terms. {@code CREATE_DEFINITION} includes view access and permits creating and maintaining terms
+ * owned by the caller. {@code MANAGE_DEFINITIONS} includes create and view access and permits
+ * managing all terms, including other owners' drafts. Ownership means the current owner, including
+ * group members; ownership alone does not replace effective create access. Expand allowed grant
+ * implications before applying explicit denies to each required capability. All reads and writes of
+ * term definitions require effective {@code VIEW_DEFINITION}. Denying view hides terms from reads
+ * and blocks writes even for an owner with create access. Denying create prevents creation even
+ * with an allow on manage, but effective manage can still authorize edits. Denying manage removes
+ * the all-term path without removing effective create access to own terms. These privileges apply
+ * across the metalake, each member domain and its current parent. An explicit deny on any
+ * applicable scope overrides an allow. The metalake owner passes privilege checks, but remains
+ * subject to the Step 2 workflow and no-self-approval rule.
  *
  * <p>The owner API permits the current term owner or metalake owner to transfer ownership
  * independently of glossary privileges.
@@ -92,8 +93,9 @@ public interface GlossaryOperations {
    *
    * <p>The caller needs effective {@code VIEW_DEFINITION}, effective {@code CREATE_DEFINITION}, and
    * read access to each requested domain ({@code USE_DOMAIN} for published domains, {@code
-   * MANAGE_DOMAIN} for drafts) and referenced broader or related term. Returned domains and
-   * relations follow the same visibility rules as reads.
+   * MANAGE_DOMAIN} for drafts) and referenced broader or related term. Each requested domain
+   * requires effective {@code CREATE_DEFINITION}. An unassigned term requires it on the metalake.
+   * Returned domains and relations follow the same visibility rules as reads.
    *
    * @param spec The content of the term.
    * @return The published term or candidate with its actual publication outcome.
@@ -122,8 +124,10 @@ public interface GlossaryOperations {
    *
    * <p>The caller needs effective {@code VIEW_DEFINITION}, plus effective {@code
    * MANAGE_DEFINITIONS} or current ownership with effective {@code CREATE_DEFINITION}. Read access
-   * to referenced terms and domains is also required. Returned domains and relations follow the
-   * same visibility rules as reads.
+   * to referenced terms and domains is also required. Adding or removing a domain requires
+   * effective {@code CREATE_DEFINITION} on that domain. Approving or deprecating a term requires
+   * {@code MANAGE_DEFINITIONS}. Returned domains and relations follow the same visibility rules as
+   * reads.
    *
    * @param name The name of the term.
    * @param changes The changes to apply.

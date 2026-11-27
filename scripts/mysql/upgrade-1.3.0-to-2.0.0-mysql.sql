@@ -1054,3 +1054,11 @@ CREATE TABLE IF NOT EXISTS kb_article_relation_meta (
     INDEX idx_kba_relation_metalake (metalake_id, deleted_at),
     INDEX idx_kba_relation_deleted (deleted_at, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Current Article bindings';
+
+-- Scope cascading owner cleanup to the metalake being deleted.
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'owner_meta' AND index_name = 'idx_owner_meta_metalake'),
+    'ALTER TABLE owner_meta ADD INDEX idx_owner_meta_metalake (metalake_id)', 'SELECT 1');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

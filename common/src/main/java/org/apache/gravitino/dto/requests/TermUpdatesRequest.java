@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Objects;
@@ -29,6 +30,7 @@ import javax.annotation.Nullable;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.glossary.TermChange;
+import org.apache.gravitino.json.JsonUtils.StrictStringDeserializer;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Ordered changes applied together, optionally against an expected revision. */
@@ -37,6 +39,7 @@ public class TermUpdatesRequest implements RESTRequest {
   @Nullable
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @JsonSetter(value = "expectedRevision", nulls = Nulls.FAIL)
+  @JsonDeserialize(using = StrictStringDeserializer.class)
   private String expectedRevision;
 
   @JsonProperty("updates")

@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Objects;
@@ -31,6 +32,7 @@ import org.apache.gravitino.dto.glossary.TermLinkDTO;
 import org.apache.gravitino.glossary.GlossaryTerm;
 import org.apache.gravitino.glossary.TermChange;
 import org.apache.gravitino.glossary.TermLink;
+import org.apache.gravitino.json.JsonUtils.StrictStringDeserializer;
 
 /** One typed edit in an atomic glossary update. */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "@type")
@@ -62,6 +64,7 @@ public interface TermUpdateRequest {
   /** The rename operation. */
   class Rename implements TermUpdateRequest {
     @JsonProperty("newName")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String newName;
 
     /**
@@ -85,6 +88,7 @@ public interface TermUpdateRequest {
     @Nullable
     @JsonInclude(JsonInclude.Include.ALWAYS)
     @JsonProperty("newDefinition")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String newDefinition;
 
     /**
@@ -107,6 +111,7 @@ public interface TermUpdateRequest {
   /** The setStatus operation. */
   class SetStatus implements TermUpdateRequest {
     @JsonProperty("status")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String status;
 
     /**
@@ -129,6 +134,7 @@ public interface TermUpdateRequest {
   /** The addSynonym operation. */
   class AddSynonym implements TermUpdateRequest {
     @JsonProperty("synonym")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String synonym;
 
     /**
@@ -150,6 +156,7 @@ public interface TermUpdateRequest {
   /** The removeSynonym operation. */
   class RemoveSynonym implements TermUpdateRequest {
     @JsonProperty("synonym")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String synonym;
 
     /**
@@ -171,6 +178,7 @@ public interface TermUpdateRequest {
   /** The addDomain operation. */
   class AddDomain implements TermUpdateRequest {
     @JsonProperty("domain")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String domain;
 
     /**
@@ -192,6 +200,7 @@ public interface TermUpdateRequest {
   /** The removeDomain operation. */
   class RemoveDomain implements TermUpdateRequest {
     @JsonProperty("domain")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String domain;
 
     /**
@@ -213,6 +222,7 @@ public interface TermUpdateRequest {
   /** The addBroader operation. */
   class AddBroader implements TermUpdateRequest {
     @JsonProperty("broader")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String broader;
 
     /**
@@ -234,6 +244,7 @@ public interface TermUpdateRequest {
   /** The removeBroader operation. */
   class RemoveBroader implements TermUpdateRequest {
     @JsonProperty("broader")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String broader;
 
     /**
@@ -255,6 +266,7 @@ public interface TermUpdateRequest {
   /** The addRelated operation. */
   class AddRelated implements TermUpdateRequest {
     @JsonProperty("related")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String related;
 
     /**
@@ -276,6 +288,7 @@ public interface TermUpdateRequest {
   /** The removeRelated operation. */
   class RemoveRelated implements TermUpdateRequest {
     @JsonProperty("related")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String related;
 
     /**
@@ -324,6 +337,7 @@ public interface TermUpdateRequest {
     @Nullable
     @JsonInclude(JsonInclude.Include.ALWAYS)
     @JsonProperty("sourceRef")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String sourceRef;
 
     /**
@@ -346,9 +360,11 @@ public interface TermUpdateRequest {
   /** The setProperty operation. */
   class SetProperty implements TermUpdateRequest {
     @JsonProperty("property")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String property;
 
     @JsonProperty("value")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String value;
 
     /**
@@ -374,6 +390,7 @@ public interface TermUpdateRequest {
   /** The removeProperty operation. */
   class RemoveProperty implements TermUpdateRequest {
     @JsonProperty("property")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private final String property;
 
     /**

@@ -1944,7 +1944,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return type == MetadataObject.Type.METALAKE;
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.DOMAIN;
     }
   }
 
@@ -1976,7 +1976,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return type == MetadataObject.Type.METALAKE;
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.DOMAIN;
     }
   }
 
@@ -2008,7 +2008,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return type == MetadataObject.Type.METALAKE;
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.DOMAIN;
     }
   }
 }

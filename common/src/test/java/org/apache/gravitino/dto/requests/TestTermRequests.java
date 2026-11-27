@@ -100,6 +100,41 @@ class TestTermRequests {
   }
 
   @Test
+  void testStringFieldsRejectJsonCoercion() {
+    for (String json :
+        new String[] {
+          "{\"name\":1}",
+          "{\"definition\":true}",
+          "{\"status\":3}",
+          "{\"synonyms\":[1]}",
+          "{\"domains\":[false]}",
+          "{\"broader\":[3]}",
+          "{\"related\":[true]}",
+          "{\"sourceRef\":42}",
+          "{\"properties\":{\"key\":false}}",
+          "{\"links\":[{\"label\":3,\"url\":\"https://example.org\"}]}",
+          "{\"links\":[{\"url\":true}]}"
+        }) {
+      assertThrows(
+          MismatchedInputException.class,
+          () -> mapper.readValue(json, TermCreateRequest.class),
+          json);
+    }
+    for (String json :
+        new String[] {
+          "{\"expectedRevision\":1,\"updates\":[]}",
+          "{\"updates\":[{\"@type\":\"updateDefinition\",\"newDefinition\":false}]}",
+          "{\"updates\":[{\"@type\":\"addSynonym\",\"synonym\":257}]}",
+          "{\"updates\":[{\"@type\":\"setProperty\",\"property\":\"q\",\"value\":true}]}"
+        }) {
+      assertThrows(
+          MismatchedInputException.class,
+          () -> mapper.readValue(json, TermUpdatesRequest.class),
+          json);
+    }
+  }
+
+  @Test
   void testOrderedUpdates() throws Exception {
     String json =
         "{\"expectedRevision\":\"token\",\"updates\":["

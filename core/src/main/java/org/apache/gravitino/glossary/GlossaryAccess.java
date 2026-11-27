@@ -19,13 +19,15 @@
 
 package org.apache.gravitino.glossary;
 
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
+import com.google.common.collect.Lists;
 import java.security.Principal;
+import java.util.Collection;
+import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.function.BiPredicate;
-import java.util.function.LongPredicate;
+import java.util.Objects;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -40,57 +42,53 @@ import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.relational.service.DomainMetaService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
+import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
-/** Metalake capabilities for one glossary operation. Term ownership follows the observed ID. */
+/** Effective definition privileges across the metalake and the current term's member domains. */
 public final class GlossaryAccess {
-  private static final GlossaryAccess UNRESTRICTED =
-      new GlossaryAccess(true, () -> true, () -> true, id -> true, (name, domain) -> true);
-  private static final GlossaryAccess DENIED =
-      new GlossaryAccess(false, () -> false, () -> false, id -> false, (name, domain) -> false);
+  private enum Decision {
+    ALLOW,
+    DENY,
+    UNSET
+  }
 
-  private final boolean view;
-  private final Supplier<Boolean> create;
-  private final Supplier<Boolean> manage;
-  private final LongPredicate owns;
-  private final BiPredicate<String, DomainEntity> domains;
+  private final GravitinoAuthorizer authorizer;
+  private final Principal principal;
+  private final String metalake;
+  private final MetadataObject lake;
+  private final AuthorizationRequestContext context;
+  private final boolean unrestricted;
+  private final Map<MetadataObject, Map<Name, Decision>> decisions = new HashMap<>();
+  private final Map<String, DomainEntity> domains = new HashMap<>();
   private final Map<String, Boolean> visibleDomains = new HashMap<>();
+  private final Map<Long, GlossaryTermEntity> publishedTerms = new HashMap<>();
   private final Map<Long, Boolean> ownedTerms = new HashMap<>();
 
   private GlossaryAccess(
-      boolean view,
-      Supplier<Boolean> create,
-      Supplier<Boolean> manage,
-      LongPredicate owns,
-      BiPredicate<String, DomainEntity> domains) {
-    this.view = view;
-    // A list or hierarchy walk can visit many drafts. Evaluate each required privilege once.
-    this.create = Suppliers.memoize(create);
-    this.manage = Suppliers.memoize(manage);
-    this.owns = owns;
-    this.domains = domains;
-  }
-
-  boolean canView() {
-    return view;
-  }
-
-  boolean manage() {
-    return manage.get();
+      @Nullable GravitinoAuthorizer authorizer,
+      Principal principal,
+      String metalake,
+      AuthorizationRequestContext context) {
+    this.authorizer = authorizer;
+    this.principal = principal;
+    this.metalake = metalake;
+    this.context = context;
+    lake = MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE);
+    unrestricted = authorizer == null || authorizer.isOwner(principal, metalake, lake, context);
   }
 
   static GlossaryAccess forRequest(String metalake, boolean enabled) {
-    if (!enabled) {
-      return UNRESTRICTED;
-    }
-    GravitinoAuthorizer authorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
-    Principal principal = PrincipalUtils.getCurrentPrincipal();
-    AuthorizationRequestContext context = new AuthorizationRequestContext();
-    return forPrincipal(authorizer, principal, metalake, context);
+    return new GlossaryAccess(
+        enabled ? Objects.requireNonNull(GravitinoEnv.getInstance().gravitinoAuthorizer()) : null,
+        PrincipalUtils.getCurrentPrincipal(),
+        metalake,
+        new AuthorizationRequestContext());
   }
 
-  /** Checks the same draft visibility used by glossary reads for generic metadata endpoints. */
+  /** Checks the same term visibility used by glossary reads for generic metadata endpoints. */
   public static boolean canRead(
       GravitinoAuthorizer authorizer,
       Principal principal,
@@ -100,123 +98,175 @@ public final class GlossaryAccess {
     if (object == null || object.type() != MetadataObject.Type.GLOSSARY_TERM) {
       return false;
     }
-    GlossaryAccess access = forPrincipal(authorizer, principal, metalake, context);
-    if (!access.canView()) {
+    Supplier<Boolean> read =
+        () ->
+            new GlossaryAccess(authorizer, principal, metalake, context)
+                .canReadNamedTerm(object.name());
+    return SqlSessions.hasActiveSession() ? read.get() : SqlSessions.readSnapshot(read);
+  }
+
+  boolean lakeViewDenied() {
+    return !unrestricted && decision(lake, Name.VIEW_DEFINITION) == Decision.DENY;
+  }
+
+  boolean needsDomainScopes() {
+    return !unrestricted;
+  }
+
+  /**
+   * Refreshes the domain scopes while retaining ownership already checked under this term's lock.
+   */
+  GlossaryAccess forLockedTerm(long termId) {
+    GlossaryAccess fresh =
+        new GlossaryAccess(authorizer, principal, metalake, new AuthorizationRequestContext());
+    Boolean owner = ownedTerms.get(termId);
+    if (owner != null) {
+      fresh.ownedTerms.put(termId, owner);
+    }
+    return fresh;
+  }
+
+  GlossaryTermEntity publishedTerm(long id, Supplier<GlossaryTermEntity> load) {
+    return publishedTerms.computeIfAbsent(id, ignored -> load.get());
+  }
+
+  private boolean canReadNamedTerm(String name) {
+    if (lakeViewDenied()) {
       return false;
     }
     GlossaryTermEntity term;
     try {
+      long lakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
       term =
           GlossaryTermMetaService.getInstance()
-              .get(NameIdentifierUtil.ofGlossaryTerm(metalake, object.name()));
+              .get(NameIdentifierUtil.ofGlossaryTerm(metalake, name), lakeId);
     } catch (NoSuchEntityException missing) {
       return false;
     }
-    return access.canRead(term);
+    return canRead(term);
   }
 
-  private static GlossaryAccess forPrincipal(
-      GravitinoAuthorizer authorizer,
-      Principal principal,
-      String metalake,
-      AuthorizationRequestContext context) {
-    MetadataObject lake = MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE);
-    if (authorizer.isOwner(principal, metalake, lake, context)) {
-      return UNRESTRICTED;
-    }
-    if (!effective(authorizer, principal, metalake, lake, Name.VIEW_DEFINITION, context)) {
-      return DENIED;
-    }
-    return new GlossaryAccess(
-        true,
-        () -> effective(authorizer, principal, metalake, lake, Name.CREATE_DEFINITION, context),
-        () -> effective(authorizer, principal, metalake, lake, Name.MANAGE_DEFINITIONS, context),
-        id -> authorizer.isGlossaryTermOwner(principal, metalake, id, context),
-        (name, snapshot) -> {
-          DomainEntity domain = snapshot;
-          if (domain == null) {
-            try {
-              domain =
-                  DomainMetaService.getInstance()
-                      .getDomainByIdentifier(NameIdentifierUtil.ofDomain(metalake, name));
-            } catch (NoSuchEntityException absent) {
-              return false;
-            }
-          }
-          context.rememberTargetId(
-              metalake,
-              MetadataObjects.of(null, domain.name(), MetadataObject.Type.DOMAIN),
-              domain.id());
-          return DomainAccess.allowed(
-              authorizer,
-              principal,
-              metalake,
-              DomainAccess.scopes(metalake, domain),
-              DomainAccess.readPrivilege(domain),
-              context);
-        });
+  private Decision decision(MetadataObject scope, Name privilege) {
+    return decisions
+        .computeIfAbsent(scope, ignored -> new EnumMap<>(Name.class))
+        .computeIfAbsent(
+            privilege,
+            key -> {
+              if (authorizer.deny(principal, metalake, scope, key, context)) return Decision.DENY;
+              return authorizer.authorize(principal, metalake, scope, key, context)
+                  ? Decision.ALLOW
+                  : Decision.UNSET;
+            });
   }
 
-  private static boolean effective(
-      GravitinoAuthorizer authorizer,
-      Principal principal,
-      String metalake,
-      MetadataObject lake,
-      Name privilege,
-      AuthorizationRequestContext context) {
-    return authorizer.authorize(principal, metalake, lake, privilege, context)
-        && !authorizer.deny(principal, metalake, lake, privilege, context);
+  void preloadDomains(Collection<String> names) {
+    if (unrestricted) return;
+    List<String> missing =
+        names.stream().distinct().filter(name -> !domains.containsKey(name)).toList();
+    for (List<String> batch : Lists.partition(missing, 500)) {
+      for (DomainEntity domain :
+          DomainMetaService.getInstance()
+              .batchGetDomainByIdentifier(
+                  batch.stream()
+                      .map(name -> NameIdentifierUtil.ofDomain(metalake, name))
+                      .toList())) {
+        rememberDomain(domain);
+      }
+    }
+  }
+
+  private DomainEntity rememberDomain(DomainEntity domain) {
+    domains.put(domain.name(), domain);
+    context.rememberTargetId(
+        metalake, MetadataObjects.of(null, domain.name(), MetadataObject.Type.DOMAIN), domain.id());
+    return domain;
+  }
+
+  @Nullable
+  private DomainEntity domain(String name) {
+    DomainEntity known = domains.get(name);
+    if (known != null) return known;
+    try {
+      return rememberDomain(
+          DomainMetaService.getInstance()
+              .getDomainByIdentifier(NameIdentifierUtil.ofDomain(metalake, name)));
+    } catch (NoSuchEntityException missing) {
+      return null;
+    }
+  }
+
+  private boolean effective(Name privilege, Collection<String> names) {
+    if (unrestricted) return true;
+    Decision global = decision(lake, privilege);
+    if (global == Decision.DENY) return false;
+    boolean allowed = global == Decision.ALLOW;
+    for (String name : names) {
+      DomainEntity domain = domain(name);
+      if (domain == null) return false;
+      for (MetadataObject scope : DomainAccess.scopes(metalake, domain)) {
+        Decision local = decision(scope, privilege);
+        if (local == Decision.DENY) return false;
+        allowed |= local == Decision.ALLOW;
+      }
+    }
+    return allowed;
   }
 
   boolean canRead(GlossaryTermEntity term) {
-    return canRead(term.id(), term.status());
+    return canRead(term.id(), term.status(), List.of(term.domains()));
   }
 
-  boolean canRead(long id, GlossaryTerm.Status status) {
-    return view && (status != GlossaryTerm.Status.DRAFT || canEdit(id));
+  boolean canRead(long id, GlossaryTerm.Status status, Collection<String> names) {
+    return effective(Name.VIEW_DEFINITION, names)
+        && (status != GlossaryTerm.Status.DRAFT || editable(id, names));
   }
 
   boolean canEdit(GlossaryTermEntity term) {
-    return canEdit(term.id());
+    List<String> names = List.of(term.domains());
+    return effective(Name.VIEW_DEFINITION, names) && editable(term.id(), names);
   }
 
-  boolean canEdit(long termId) {
-    // Listing drafts as a creator requires a current owner lookup per draft to observe transfers.
-    return manage()
-        || (create.get()
-            && (this == UNRESTRICTED
-                || (this != DENIED && ownedTerms.computeIfAbsent(termId, owns::test))));
+  private boolean editable(long id, Collection<String> names) {
+    return effective(Name.MANAGE_DEFINITIONS, names)
+        || (effective(Name.CREATE_DEFINITION, names)
+            && ownedTerms.computeIfAbsent(
+                id,
+                termId -> authorizer.isGlossaryTermOwner(principal, metalake, termId, context)));
   }
 
-  /**
-   * Whether the caller can see a domain through the ordinary domain-read check: USE_DOMAIN on a
-   * published domain, MANAGE_DOMAIN on a draft. A missing domain is not visible. Each name is
-   * checked once per request.
-   */
-  boolean canUseDomain(String domain) {
-    return canUseDomain(domain, null);
+  boolean canManage(GlossaryTermEntity term) {
+    List<String> names = List.of(term.domains());
+    return effective(Name.VIEW_DEFINITION, names) && effective(Name.MANAGE_DEFINITIONS, names);
   }
 
-  /** Uses the already loaded domain and parent in a subdomain listing. */
-  boolean canUseDomain(DomainEntity domain) {
-    return canUseDomain(domain.name(), domain);
+  boolean canCreate(Collection<String> names) {
+    return effective(Name.VIEW_DEFINITION, names) && effective(Name.CREATE_DEFINITION, names);
   }
 
-  private boolean canUseDomain(String name, @Nullable DomainEntity domain) {
-    if (this == UNRESTRICTED || this == DENIED) {
-      return this == UNRESTRICTED;
-    }
-    return visibleDomains.computeIfAbsent(name, key -> domains.test(key, domain));
-  }
-
-  boolean canCreate() {
-    return create.get();
-  }
-
-  void requireCreate() {
-    if (!create.get()) {
+  void requireCreate(Collection<String> names) {
+    if (!canCreate(names))
       throw new ForbiddenException(
-          "Creating a glossary term requires effective VIEW_DEFINITION and CREATE_DEFINITION");
-    }
+          "Creating or assigning a glossary term requires effective VIEW_DEFINITION and CREATE_DEFINITION");
+  }
+
+  boolean canUseDomain(String name) {
+    if (unrestricted) return true;
+    DomainEntity domain = domain(name);
+    return domain != null && canUseDomain(domain);
+  }
+
+  boolean canUseDomain(DomainEntity domain) {
+    if (unrestricted) return true;
+    rememberDomain(domain);
+    return visibleDomains.computeIfAbsent(
+        domain.name(),
+        ignored ->
+            DomainAccess.allowed(
+                authorizer,
+                principal,
+                metalake,
+                DomainAccess.scopes(metalake, domain),
+                DomainAccess.readPrivilege(domain),
+                context));
   }
 }

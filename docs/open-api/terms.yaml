@@ -26,8 +26,8 @@ paths:
       tags:
         - glossary
       summary: List glossary terms
-      description: Lists terms visible to the caller. Domain and status filters also
-        apply to detailed results.
+      description: Lists terms visible through their metalake, member domains or current parent domains.
+        An explicit deny on any of these scopes overrides an allow. Domain and status filters also apply to detailed results.
       parameters:
         - in: query
           name: details
@@ -104,7 +104,8 @@ paths:
       description: Creates the definition, memberships and relations atomically.
         Status defaults to APPROVED. With authorization enabled, the registered caller
         becomes the owner and needs effective VIEW_DEFINITION and CREATE_DEFINITION
-        plus read access to each requested domain and referenced term.
+        for each selected domain, or on the metalake for an unassigned term. Each domain and referenced term
+        must also be readable. Explicit APPROVED and DEPRECATED require MANAGE_DEFINITIONS under immediate publication.
         With authorization disabled, creation leaves the owner unset.
       requestBody:
         required: true
@@ -180,7 +181,9 @@ paths:
         preserves the revision. A stale expectedRevision returns 409. Clearing a
         definition or source reference requires an explicit null. With authorization enabled,
         editing requires effective VIEW_DEFINITION and either MANAGE_DEFINITIONS or
-        current ownership with CREATE_DEFINITION. Referenced terms and domains must be readable.
+        current ownership with CREATE_DEFINITION. Adding or removing a domain also requires effective
+        VIEW_DEFINITION and CREATE_DEFINITION on that domain. Referenced terms and domains must be readable.
+        Moving a term to APPROVED or DEPRECATED requires effective MANAGE_DEFINITIONS.
       requestBody:
         required: true
         content:
@@ -221,7 +224,9 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
-          description: The metalake does not exist. An absent or hidden term returns HTTP 200 with dropped=false.
+          description: With authorization disabled, a missing metalake returns 404. With authorization
+            enabled, the metalake membership check returns 403 for a missing metalake. An absent
+            or hidden term in an accessible metalake returns HTTP 200 with dropped=false.
           content:
             application/json:
               schema:
@@ -1031,7 +1036,8 @@ components:
           schema:
             $ref: ./openapi.yaml#/components/schemas/ErrorModel
     Forbidden:
-      description: The caller lacks the required privilege.
+      description: The caller lacks the required privilege. When authorization is enabled,
+        the metalake membership check also returns 403 for a missing metalake.
       content:
         application/json:
           schema:

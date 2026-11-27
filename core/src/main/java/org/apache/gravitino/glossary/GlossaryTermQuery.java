@@ -46,6 +46,7 @@ import org.apache.gravitino.storage.relational.mapper.GlossaryTermRelMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermBindingPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermRelPO;
+import org.apache.gravitino.storage.relational.service.GlossaryTermDomainService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -69,6 +70,7 @@ final class GlossaryTermQuery {
   private final Map<String, String> wordKeys;
   @Nullable private final TermLookupBudget budget;
   private final List<GlossaryTermPO> visible;
+  private final Map<Long, List<String>> memberships = new HashMap<>();
   // Column permissions follow the containing table, and metric permissions follow the model.
   private final Map<MetadataObject, Boolean> readableTargets = new HashMap<>();
 
@@ -86,7 +88,7 @@ final class GlossaryTermQuery {
     budget = wordKeys.isEmpty() ? null : new TermLookupBudget();
     lake = GlossaryManager.resolveMetalakeId(metalake);
     access = manager.accessForMetalake(metalake);
-    if (!access.canView()) {
+    if (access.lakeViewDenied()) {
       visible = List.of();
       return;
     }
@@ -113,12 +115,28 @@ final class GlossaryTermQuery {
       }
       rows = List.copyOf(distinct.values());
     }
-    visible =
+    loadMemberships(rows);
+    visible = rows.stream().filter(row -> canRead(row)).toList();
+  }
+
+  private boolean canRead(GlossaryTermPO row) {
+    return access.canRead(
+        row.getTermId(),
+        GlossaryTerm.Status.valueOf(row.getStatus()),
+        memberships.getOrDefault(row.getTermId(), List.of()));
+  }
+
+  private void loadMemberships(List<GlossaryTermPO> rows) {
+    if (!access.needsDomainScopes()) return;
+    List<Long> ids =
         rows.stream()
-            .filter(
-                row ->
-                    access.canRead(row.getTermId(), GlossaryTerm.Status.valueOf(row.getStatus())))
+            .map(GlossaryTermPO::getTermId)
+            .filter(id -> !memberships.containsKey(id))
             .toList();
+    countMemberships(ids);
+    Map<Long, List<String>> found = GlossaryTermDomainService.getInstance().domainNames(lake, ids);
+    for (long id : ids) memberships.put(id, found.getOrDefault(id, List.of()));
+    access.preloadDomains(found.values().stream().flatMap(Collection::stream).toList());
   }
 
   static Map<String, String> wordKeys(List<String> words) {
@@ -156,9 +174,10 @@ final class GlossaryTermQuery {
       List<GlossaryTermPO> endpoints =
           SessionUtils.getWithoutCommit(
               GlossaryTermMetaMapper.class, mapper -> mapper.listLookupEndpoints(lake, batch));
+      loadMemberships(endpoints);
       Set<Long> custom = new LinkedHashSet<>();
       for (GlossaryTermPO row : endpoints) {
-        if (access.canRead(row.getTermId(), GlossaryTerm.Status.valueOf(row.getStatus()))) {
+        if (canRead(row)) {
           if (manager.hasTermVisibilityFilter()) {
             custom.add(row.getTermId());
           } else {
@@ -339,6 +358,16 @@ final class GlossaryTermQuery {
   }
 
   private List<GlossaryTermEntity> loadDefinitions(Set<Long> ids, boolean projectDomains) {
+    if (!access.needsDomainScopes()) countMemberships(ids);
+    return GlossaryTermMetaService.getInstance()
+        .listTermsByIds(NamespaceUtil.ofGlossaryTerm(metalake), lake, ids)
+        .stream()
+        .filter(term -> manager.isTermVisible(term, access, null))
+        .map(term -> projectDomains ? GlossaryManager.visibleDomains(term, access) : term)
+        .collect(Collectors.toCollection(ArrayList::new));
+  }
+
+  private void countMemberships(Collection<Long> ids) {
     if (budget != null) {
       for (List<Long> batch : Lists.partition(List.copyOf(ids), ID_BATCH_SIZE)) {
         budget.consume(
@@ -347,12 +376,6 @@ final class GlossaryTermQuery {
                 mapper -> mapper.countLiveMemberships(lake, batch, budget.remaining() + 1)));
       }
     }
-    return GlossaryTermMetaService.getInstance()
-        .listTermsByIds(NamespaceUtil.ofGlossaryTerm(metalake), lake, ids)
-        .stream()
-        .filter(term -> manager.isTermVisible(term, access, null))
-        .map(term -> projectDomains ? GlossaryManager.visibleDomains(term, access) : term)
-        .collect(Collectors.toCollection(ArrayList::new));
   }
 
   private List<GlossaryTermPO> candidates(

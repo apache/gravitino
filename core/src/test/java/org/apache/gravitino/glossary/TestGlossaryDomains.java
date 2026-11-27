@@ -197,6 +197,165 @@ class TestGlossaryDomains extends TestJDBCBackend {
     }
   }
 
+  @TestTemplate
+  void testInheritedDefinitionGrantsAndMembershipWrites() throws Exception {
+    domainRole("salesCreate", "Sales", Privileges.CreateDefinition.allow());
+    domainRole("financeManage", "Finance", Privileges.ManageDefinitions.allow());
+    user("salesAuthor", "salesCreate", "useSales", "useFinance");
+    user("financeSteward", "financeManage", "useFinance", "useSales");
+    create("Both", "Retail", "Finance");
+    create("Unassigned");
+    as(
+        "salesAuthor",
+        () -> {
+          GlossaryTermEntity own =
+              manager.createTerm(
+                  LAKE,
+                  TermSpec.builder("Child term")
+                      .withDomains("Retail")
+                      .withStatus(GlossaryTerm.Status.DRAFT)
+                      .build());
+          assertEquals(
+              "edited",
+              manager
+                  .alterTerm(LAKE, own.name(), TermChange.updateDefinition("edited"))
+                  .definition());
+          assertThrows(
+              ForbiddenException.class,
+              () ->
+                  manager.alterTerm(
+                      LAKE, own.name(), TermChange.setStatus(GlossaryTerm.Status.APPROVED)));
+          assertThrows(
+              ForbiddenException.class,
+              () -> manager.alterTerm(LAKE, own.name(), TermChange.addDomain("Finance")));
+          assertThrows(
+              ForbiddenException.class,
+              () ->
+                  manager.createTerm(
+                      LAKE, TermSpec.builder("Mixed").withDomains("Retail", "Finance").build()));
+          assertThrows(
+              ForbiddenException.class,
+              () -> manager.createTerm(LAKE, TermSpec.builder("Unscoped").build()));
+          assertThrows(
+              ForbiddenException.class,
+              () -> manager.alterTerm(LAKE, "Both", TermChange.updateDefinition("denied")));
+          assertThrows(NoSuchTermException.class, () -> manager.getTerm(LAKE, "Unassigned"));
+          assertEquals(List.of("Both", "Child term"), names(manager.listTerms(LAKE)));
+          assertTrue(
+              owners
+                  .getOwner(
+                      LAKE, MetadataObjects.of(null, "Both", MetadataObject.Type.GLOSSARY_TERM))
+                  .isPresent());
+          return null;
+        });
+    as(
+        "financeSteward",
+        () -> {
+          assertEquals(
+              GlossaryTerm.Status.DEPRECATED,
+              manager
+                  .alterTerm(LAKE, "Both", TermChange.setStatus(GlossaryTerm.Status.DEPRECATED))
+                  .status());
+          assertThrows(NoSuchTermException.class, () -> manager.getTerm(LAKE, "Child term"));
+          assertThrows(
+              ForbiddenException.class,
+              () -> manager.alterTerm(LAKE, "Both", TermChange.removeDomain("Retail")));
+          manager.alterTerm(LAKE, "Both", TermChange.removeDomain("Finance"));
+          assertThrows(NoSuchTermException.class, () -> manager.getTerm(LAKE, "Both"));
+          return null;
+        });
+  }
+
+  @TestTemplate
+  void testDenyAcrossDomainsAndMetalake() throws Exception {
+    domainRole("salesManage", "Sales", Privileges.ManageDefinitions.allow());
+    domainRole("retailDenyView", "Retail", Privileges.ViewDefinition.deny());
+    domainRole("financeDenyManage", "Finance", Privileges.ManageDefinitions.deny());
+    metalakeRole("lakeDenyView", Privileges.ViewDefinition.deny());
+    user("steward", "salesManage", "financeDenyManage", "retailDenyView");
+    user("globalManager", "manage", "retailDenyView");
+    user("blocked", "salesManage", "lakeDenyView");
+    create("Parent term", "Sales");
+    create("Hidden child", "Retail");
+    create("Shared", "Sales", "Finance");
+    as(
+        "steward",
+        () -> {
+          assertArrayEquals(new String[0], manager.getTerm(LAKE, "Shared").domains());
+          assertThrows(ForbiddenException.class, () -> manager.dropTerm(LAKE, "Shared"));
+          assertThrows(NoSuchTermException.class, () -> manager.getTerm(LAKE, "Hidden child"));
+          assertEquals(List.of("Parent term", "Shared"), names(manager.listTerms(LAKE)));
+          return null;
+        });
+    assertThrows(
+        NoSuchTermException.class,
+        () -> as("globalManager", () -> manager.getTerm(LAKE, "Hidden child")));
+    assertTrue(as("blocked", () -> manager.listTerms(LAKE)).isEmpty());
+  }
+
+  @TestTemplate
+  void testHistoryAndApprovalFollowCurrentDomainIdentity() throws Exception {
+    domainRole("salesManage", "Sales", Privileges.ManageDefinitions.allow());
+    domainRole("financeManage", "Finance", Privileges.ManageDefinitions.allow());
+    user("salesSteward", "salesManage", "useSales");
+    user("financeSteward", "financeManage", "useFinance");
+    GlossaryManager gated =
+        new GlossaryManager(
+            ids::incrementAndGet,
+            true,
+            new TermPublicationPolicy() {
+              @Override
+              public boolean requiresApproval(String lake) {
+                return true;
+              }
+
+              @Override
+              public boolean canPublishOrRejectCandidate(String lake, long termId, long version) {
+                return true;
+              }
+            });
+    GlossaryTermEntity live = create("Regional", "Retail");
+    GlossaryTermEntity candidate =
+        as(
+            "salesSteward",
+            () -> gated.alterTerm(LAKE, live.name(), TermChange.updateDefinition("amended")));
+    long version = candidate.publication().versionId();
+    assertThrows(
+        ForbiddenException.class,
+        () -> as("financeSteward", () -> gated.publishCandidate(LAKE, live.id(), version)));
+
+    env.internalDomainDispatcher().attachDomain(LAKE, "Retail", "Finance");
+    assertThrows(
+        NoSuchTermException.class,
+        () -> as("salesSteward", () -> gated.getTermVersion(LAKE, live.id(), 1)));
+    assertThrows(
+        ForbiddenException.class,
+        () -> as("salesSteward", () -> gated.rejectCandidate(LAKE, live.id(), version)));
+    as("financeSteward", () -> gated.publishCandidate(LAKE, live.id(), version));
+    assertEquals(
+        "amended", as("financeSteward", () -> manager.getTerm(LAKE, live.name())).definition());
+
+    GlossaryTermEntity pending =
+        as(
+            "financeSteward",
+            () ->
+                gated.createTerm(LAKE, TermSpec.builder("Pending").withDomains("Finance").build()));
+    env.internalDomainDispatcher().alterDomain(LAKE, "Finance", DomainChange.rename("Treasury"));
+    GlossaryDomainFixtures.insertDomain(LAKE, "Finance", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    domainRole("replacementManage", "Finance", Privileges.ManageDefinitions.allow());
+    user("replacementSteward", "replacementManage");
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            as(
+                "replacementSteward",
+                () ->
+                    gated.publishCandidate(LAKE, pending.id(), pending.publication().versionId())));
+    assertThrows(
+        NoSuchTermException.class,
+        () -> as("replacementSteward", () -> gated.listTermVersions(LAKE, pending.id())));
+  }
+
   /** T7.1. */
   @TestTemplate
   void testCreateWithVisibleDomains() throws Exception {
@@ -232,7 +391,7 @@ class TestGlossaryDomains extends TestJDBCBackend {
       TermDTO[] details = as("viewer", () -> views.listTerms(LAKE, null, "EEd", null));
       assertEquals(1, details.length);
       assertArrayEquals(new String[] {"Sales"}, details[0].getDomains());
-      assertEquals(List.of("Sales"), lookups);
+      assertEquals(List.of(), lookups);
     }
   }
 
@@ -1286,6 +1445,42 @@ class TestGlossaryDomains extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testEditRechecksInheritedGrantWhenTheMemberDomainMoves() throws Exception {
+    domainRole("salesCreate", "Sales", Privileges.CreateDefinition.allow());
+    user("salesAuthor", "salesCreate", "useSales");
+    GlossaryTermEntity term =
+        as(
+            "salesAuthor",
+            () ->
+                manager.createTerm(
+                    LAKE,
+                    TermSpec.builder("Regional")
+                        .withDomains("Retail")
+                        .withDefinition("original")
+                        .build()));
+    GravitinoAuthorizer observed =
+        Mockito.mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(authorizer));
+    env.setGravitinoAuthorizer(observed);
+    // Move the member domain after the initial edit check resolves its parent, before its row lock.
+    Mockito.doAnswer(
+            call -> {
+              env.internalDomainDispatcher().attachDomain(LAKE, "Retail", "Finance");
+              return AdditionalAnswers.delegatesTo(authorizer).answer(call);
+            })
+        .when(observed)
+        .isGlossaryTermOwner(Mockito.any(), Mockito.eq(LAKE), Mockito.eq(term.id()), Mockito.any());
+    assertThrows(
+        NoSuchTermException.class,
+        () ->
+            as(
+                "salesAuthor",
+                () ->
+                    manager.alterTerm(LAKE, term.name(), TermChange.updateDefinition("changed"))));
+    assertEquals(
+        "original", as("lakeOwner", () -> manager.getTerm(LAKE, term.name())).definition());
+  }
+
+  @TestTemplate
   void testAlterResponseFollowsRenamedMemberWhenOldNameIsReused() throws Exception {
     GlossaryTermEntity before =
         as(
@@ -1707,10 +1902,11 @@ class TestGlossaryDomains extends TestJDBCBackend {
   }
 
   private void domainRole(String name, String domain) throws Exception {
-    role(
-        name,
-        SecurableObjects.parse(
-            domain, MetadataObject.Type.DOMAIN, List.of(Privileges.UseDomain.allow())));
+    domainRole(name, domain, Privileges.UseDomain.allow());
+  }
+
+  private void domainRole(String name, String domain, Privilege privilege) throws Exception {
+    role(name, SecurableObjects.parse(domain, MetadataObject.Type.DOMAIN, List.of(privilege)));
   }
 
   private void role(String name, SecurableObject object) throws Exception {

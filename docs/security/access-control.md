@@ -261,16 +261,40 @@ List results include only tags and policies the caller can read.
 
 ### Glossary Privileges
 
-Glossary privileges apply to a metalake. `VIEW_DEFINITION` grants access to approved and deprecated
-terms. `CREATE_DEFINITION` includes view access and lets callers create terms and edit their own
-terms, including drafts. Ownership can be held directly or through a group. `MANAGE_DEFINITIONS`
-includes both privileges and allows viewing, editing, and deleting any term in the metalake.
+Grant glossary privileges on a metalake or on a domain. A term uses the grants on its metalake,
+every domain in its term–domain membership, and each member domain's current parent. An unassigned
+term uses only the metalake. An allow on any of these scopes grants the privilege unless another
+applicable scope denies it. Domain ownership and backing-tag membership do not grant term access.
+The metalake owner retains access to all terms. Other users receive glossary access through
+role grants. This version has no built-in PUBLIC role.
 
-Deleting a term always requires effective `MANAGE_DEFINITIONS`, in every status. Owning a term
-with `CREATE_DEFINITION` allows editing it, including returning it to draft, but never deleting it.
+- `VIEW_DEFINITION` reads approved and deprecated terms.
+- `CREATE_DEFINITION` includes view, creates terms, and edits terms owned by the caller or their group.
+- `MANAGE_DEFINITIONS` includes create and view, edits other owners' terms, reads their drafts,
+  approves or deprecates terms, and deletes terms in any status.
 
-An explicit deny of view access hides every term and blocks changes to its definition. An explicit
-deny of create access prevents creation even for a manager. The metalake owner can manage all terms.
+An explicit view deny hides the term even from its owner. A create deny prevents creation but
+a manager can still edit an existing term. A manage deny leaves an owner's effective create
+privilege available. The default immediate-publication policy creates an approved term when status
+is omitted. Explicitly approving or deprecating a term requires management.
+
+Adding or removing a domain requires edit access to the existing term and effective
+`VIEW_DEFINITION` and `CREATE_DEFINITION` on each affected domain, inherited from its parent or
+metalake where applicable. Creation checks every selected domain the same way. The caller must
+also be able to see each selected domain (`USE_DOMAIN` for published domains, `MANAGE_DOMAIN`
+for drafts). A Finance author with only `USE_DOMAIN` on Sales cannot attach a term to Sales.
+Unchanged memberships, including hidden domains, are preserved on content edits.
+
+For example, grant a role access to published terms in Finance and its subdomains:
+
+```bash
+curl -X PUT -H 'Content-Type: application/json' \
+  -d '{"privileges":[{"name":"VIEW_DEFINITION","condition":"ALLOW"}]}' \
+  http://localhost:8090/api/metalakes/test/permissions/roles/reader/domain/Finance/grant
+```
+
+Domain creation, publication and changes of parent continue to require the privileges described in
+the domain authorization section. Moving a child changes the inherited grants on its terms.
 
 The current term owner or the metalake owner can transfer ownership. A term owner keeps this
 authority even if `VIEW_DEFINITION` is denied or `CREATE_DEFINITION` is revoked. After the
