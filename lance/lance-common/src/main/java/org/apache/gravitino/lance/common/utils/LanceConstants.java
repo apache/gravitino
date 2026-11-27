@@ -45,5 +45,13 @@ public class LanceConstants {
   /** Catalog-only opt-in for physically deleting external or registered Lance datasets. */
   public static final String LANCE_ALLOW_EXTERNAL_TABLE_PURGE = "lance.allow-external-table-purge";
 
+  /** Lance session metadata cache size in bytes. */
+  public static final String LANCE_SESSION_METADATA_CACHE_SIZE_BYTES =
+      "lance.session.metadata-cache-size-bytes";
+
+  /** Lance session index cache size in bytes. */
+  public static final String LANCE_SESSION_INDEX_CACHE_SIZE_BYTES =
+      "lance.session.index-cache-size-bytes";
+
   public static final String LANCE_TABLE_FORMAT = "lance";
 }
