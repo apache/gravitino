@@ -112,9 +112,18 @@ tasks {
     finalizedBy(copyDepends)
   }
 
-  register("copyLibs", Copy::class) {
+  // Only CLI-owned jars here; shared deps are loaded from ${GRAVITINO_HOME}/libs
+  // by bin/gravitino-optimizer.sh. Sync so a previous fat copy is trimmed.
+  register("copyLibs", Sync::class) {
     dependsOn(copyDepends, "build")
-    from("build/libs")
+    from("build/libs") {
+      include(
+        "gravitino-optimizer-*.jar",
+        "gravitino-updaters-*.jar",
+        "commons-cli-*.jar"
+      )
+      exclude("*-javadoc.jar", "*-sources.jar", "*-empty.jar")
+    }
     into("$rootDir/distribution/package/optimizer/libs")
   }
 
