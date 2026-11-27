@@ -72,11 +72,11 @@ public class TestS3PolicyPrefix {
 
   @Test
   void testListPrefixesForBucketRoot() {
-    // For the bucket root the empty prefix must be preserved so listing the whole bucket still
-    // works; "/*" alone would not match the empty list prefix.
-    List<String> prefixes = S3TokenGenerator.listPrefixes("", true);
-    Assertions.assertEquals(2, prefixes.size());
-    Assertions.assertTrue(prefixes.contains(""));
-    Assertions.assertTrue(prefixes.contains("/*"));
+    for (boolean includeLocation : List.of(false, true)) {
+      List<String> prefixes = S3TokenGenerator.listPrefixes("", includeLocation);
+      Assertions.assertEquals(List.of("", "*"), prefixes);
+      Assertions.assertEquals(
+          prefixes, AwsIrsaCredentialGenerator.listPrefixes("", includeLocation));
+    }
   }
 }

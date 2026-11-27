@@ -109,6 +109,11 @@ inventory. A dependency's POM license declaration may omit embedded third-party 
   The macOS supplement includes the full APSL-2.0 text and a source-availability link.
   The macOS-only dnsinfo inclusion follows [ASF LEGAL-613](https://issues.apache.org/jira/browse/LEGAL-613).
 
+- Paimon Format 2.1.0 bundles JTS 1.20.0. Its binary JAR omits the full JTS license.
+  The supplement selects the tagged [EDL 1.0 text](https://github.com/locationtech/jts/blob/1.20.0/LICENSE_EDLv1.txt)
+  and includes the [OSGeo BSD text](https://github.com/locationtech/jts/blob/1.20.0/OSGEO_LICENSE.txt)
+  for GeoTools contributions identified by JTS's [license inventory](https://github.com/locationtech/jts/blob/1.20.0/LICENSES.md).
+
 ## Copied-source provenance
 
 Root `LICENSE` records copied-source paths; root `NOTICE` and the module mappings

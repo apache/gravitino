@@ -18,9 +18,11 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils;
@@ -28,8 +30,12 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.credential.DlfSecretKeyCredential;
 import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.OSSTokenCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.rel.ViewCatalog;
 
 /**
@@ -57,6 +63,28 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
   @Override
   public boolean supportsPathBasedCredentials() {
     return false;
+  }
+
+  /**
+   * Accepts S3/OSS token providers used by the Paimon REST service's warehouse context.
+   *
+   * @param properties proposed catalog properties
+   */
+  @Override
+  public void validateCredentialProviders(Map<String, String> properties) {
+    if (properties == null) {
+      return;
+    }
+    Map<String, String> nativeProviders = new HashMap<>(properties);
+    nativeProviders.put(
+        CredentialConstants.CREDENTIAL_PROVIDERS,
+        CredentialUtils.getCredentialProvidersByOrder(() -> properties).stream()
+            .filter(
+                type ->
+                    !type.equals(S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE)
+                        && !type.equals(OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE))
+            .collect(Collectors.joining(",")));
+    super.validateCredentialProviders(nativeProviders);
   }
 
   /**
@@ -121,6 +149,8 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
   @Override
   public Map<String, String> propertiesWithCredentialProviders() {
     Map<String, String> props = super.propertiesWithCredentialProviders();
+    // Paimon's Hadoop FileIO probes the warehouse root as well as its descendants.
+    props.put(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX, "true");
     detectJdbcAndDlfProviders(props, type -> ensureCredentialProviderListed(props, type));
     return props;
   }

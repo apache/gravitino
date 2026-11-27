@@ -2466,6 +2466,27 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testExternalSchemaImportPreservesRenamedColumnIdentity() throws IOException {
+    NameIdentifier schema = NameIdentifier.of(metalake, catalog, "external_column_ids");
+    schemaOperationDispatcher.createSchema(
+        schema, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, schema.name(), "t");
+    createTable(ident);
+    Map<String, Long> ids = columnIds(ident);
+    String oldName = ids.keySet().iterator().next();
+    TestCatalog source =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    ((TestCatalogOperations) source.ops())
+        .alterTable(ident, TableChange.renameColumn(new String[] {oldName}, "renamed"));
+    tableOperationDispatcher.importTable(ident, AuditInfo.EMPTY, Map.of(oldName, "renamed"));
+    Assertions.assertEquals(ids.get(oldName), columnIds(ident).get("renamed"));
+    Assertions.assertFalse(columnIds(ident).containsKey(oldName));
+    tableOperationDispatcher.loadTable(ident);
+    Assertions.assertEquals(ids.get(oldName), columnIds(ident).get("renamed"));
+  }
+
+  @Test
   public void testAlterTableKeepsColumnIdsAcrossRenames() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema_column_rename");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");

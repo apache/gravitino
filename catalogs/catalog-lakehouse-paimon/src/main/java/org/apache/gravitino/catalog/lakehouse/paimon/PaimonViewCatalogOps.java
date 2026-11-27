@@ -39,6 +39,7 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.paimon.catalog.Catalog;
+import org.apache.paimon.rest.exceptions.NotImplementedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,6 +83,8 @@ final class PaimonViewCatalogOps {
       views = paimonCatalogOps.listViews(schemaIdentifier.name());
     } catch (Catalog.DatabaseNotExistException e) {
       throw new NoSuchSchemaException(e, NO_SUCH_SCHEMA_EXCEPTION, namespace.toString());
+    } catch (NotImplementedException e) {
+      throw new UnsupportedOperationException(e.getMessage(), e);
     }
 
     return views.stream()

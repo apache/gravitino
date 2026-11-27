@@ -88,6 +88,8 @@ public class PaimonCatalogOps implements AutoCloseable {
   }
 
   public Table loadTable(String tableName) throws TableNotExistException {
+    // REST mutations use another catalog instance. Refresh the connector cache before importing.
+    catalog.invalidateTable(tableIdentifier(tableName));
     return catalog.getTable(tableIdentifier(tableName));
   }
 

@@ -20,7 +20,6 @@ package org.apache.gravitino.s3.credential;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -262,11 +261,7 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
    * @return the allowed {@code s3:prefix} values
    */
   static List<String> listPrefixes(String rawPath, boolean includeLocationPrefix) {
-    String dirPrefix = rawPath.isEmpty() || rawPath.endsWith("/") ? rawPath : rawPath + "/";
-    if (includeLocationPrefix && !rawPath.equals(dirPrefix)) {
-      return Arrays.asList(rawPath, dirPrefix, addWildcardToPath(rawPath));
-    }
-    return Arrays.asList(dirPrefix, addWildcardToPath(rawPath));
+    return S3TokenGenerator.listPrefixes(rawPath, includeLocationPrefix);
   }
 
   private static String removeSchemaFromS3Uri(URI uri) {

@@ -56,6 +56,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -2506,6 +2507,11 @@ public class TestCatalogManager {
       Set<NameIdentifier> removedCatalogs = Sets.newConcurrentHashSet();
       manager.addCatalogCacheRemoveListener(removedCatalogs::add);
 
+      Set<NameIdentifier> stoppedServiceEvents = Sets.newConcurrentHashSet();
+      Consumer<NameIdentifier> stoppedService = stoppedServiceEvents::add;
+      manager.addCatalogCacheRemoveListener(stoppedService);
+      manager.removeCatalogCacheRemoveListener(stoppedService);
+
       // Invalidate the cache to trigger the removal listener
       manager.getCatalogCache().invalidate(ident);
 
@@ -2519,6 +2525,9 @@ public class TestCatalogManager {
                     "Listener should be notified of catalog removal");
                 Assertions.assertEquals(
                     1, removedCatalogs.size(), "Only one catalog should be removed");
+                Assertions.assertTrue(
+                    stoppedServiceEvents.isEmpty(),
+                    "Unregistered listeners must not receive events");
               });
     } finally {
       store.close();

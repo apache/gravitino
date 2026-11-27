@@ -38,6 +38,7 @@ public abstract class MetricsSource {
   // metrics source name
   public static final String ICEBERG_REST_SERVER_METRIC_NAME = "iceberg-rest-server";
   public static final String LANCE_REST_SERVER_METRIC_NAME = "lance-rest-server";
+  public static final String PAIMON_REST_SERVER_METRIC_NAME = "paimon-rest-server";
   public static final String GRAVITINO_SERVER_METRIC_NAME = "gravitino-server";
   public static final String GRAVITINO_RELATIONAL_STORE_METRIC_NAME = "gravitino-relational-store";
   public static final String GRAVITINO_CATALOG_METRIC_PREFIX = "gravitino-catalog";

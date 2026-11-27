@@ -90,6 +90,14 @@ public class TableEventDispatcher implements TableDispatcher {
     return dispatcher.importTable(ident, auditInfo);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public Table importTable(
+      NameIdentifier ident, AuditInfo auditInfo, Map<String, String> columnNameChanges)
+      throws NoSuchTableException {
+    return dispatcher.importTable(ident, auditInfo, columnNameChanges);
+  }
+
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     eventBus.dispatchEvent(new ListTablePreEvent(PrincipalUtils.getCurrentUserName(), namespace));

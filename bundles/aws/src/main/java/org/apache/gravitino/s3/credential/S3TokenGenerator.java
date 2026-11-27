@@ -167,6 +167,13 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
                   IamResource.create(getS3UriWithArn(arnPrefix, uri)));
               String bucketArn = arnPrefix + getBucketName(uri);
               String rawPath = trimLeadingSlash(uri.getPath());
+              if (listLocationPrefix && !rawPath.isEmpty()) {
+                // Hadoop probes the location itself before looking for a directory marker.
+                String locationKey =
+                    rawPath.endsWith("/") ? rawPath.substring(0, rawPath.length() - 1) : rawPath;
+                allowGetObjectStatementBuilder.addResource(
+                    IamResource.create(arnPrefix + getBucketName(uri) + "/" + locationKey));
+              }
               bucketListStatementBuilder
                   .computeIfAbsent(
                       bucketArn,
@@ -250,7 +257,10 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
    * @return the allowed {@code s3:prefix} values
    */
   static List<String> listPrefixes(String rawPath, boolean includeLocationPrefix) {
-    String dirPrefix = rawPath.isEmpty() || rawPath.endsWith("/") ? rawPath : rawPath + "/";
+    if (rawPath.isEmpty()) {
+      return Arrays.asList("", "*");
+    }
+    String dirPrefix = rawPath.endsWith("/") ? rawPath : rawPath + "/";
     if (includeLocationPrefix && !rawPath.equals(dirPrefix)) {
       return Arrays.asList(rawPath, dirPrefix, addWildcardToPath(rawPath));
     }

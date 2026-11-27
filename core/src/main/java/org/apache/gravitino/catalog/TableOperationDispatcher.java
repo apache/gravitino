@@ -206,6 +206,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return loadAndImportTable(ident, auditInfo);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public Table importTable(
+      NameIdentifier ident, AuditInfo auditInfo, Map<String, String> columnNameChanges)
+      throws NoSuchTableException {
+    Preconditions.checkArgument(auditInfo != null, "auditInfo must not be null");
+    return loadAndImportTable(ident, auditInfo, columnNameChanges);
+  }
+
   /**
    * Creates a new table in a schema.
    *
@@ -628,6 +637,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
   private Table loadAndImportTable(NameIdentifier ident, AuditInfo importAudit)
       throws NoSuchTableException {
+    return loadAndImportTable(ident, importAudit, Collections.emptyMap());
+  }
+
+  private Table loadAndImportTable(
+      NameIdentifier ident, AuditInfo importAudit, Map<String, String> columnNameChanges)
+      throws NoSuchTableException {
     EntityCombinedTable entityCombinedTable =
         TreeLockUtils.doWithTreeLock(
             ident,
@@ -674,7 +689,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Update the column entities in Gravitino store if the columns are different from the ones
     // fetching from the underlying source.
-    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
+    TableEntity updatedEntity =
+        updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable, columnNameChanges);
     updatedEntity =
         fillMissingCreationAudit(
             updatedEntity,
@@ -1440,12 +1456,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   }
 
   private TableEntity updateColumnsIfNecessaryWhenLoad(
-      NameIdentifier tableIdent, EntityCombinedTable combinedTable) {
+      NameIdentifier tableIdent,
+      EntityCombinedTable combinedTable,
+      Map<String, String> columnNameChanges) {
     Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
         updateColumnsIfNecessary(
             combinedTable.tableFromCatalog(),
             combinedTable.tableFromGravitino(),
-            Collections.emptyMap());
+            columnNameChanges);
 
     // No need to update the columns
     if (!columnsUpdateResult.getLeft()) {
@@ -1487,7 +1505,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                 .withProperties(entity.properties())
                                 .withColumns(
                                     updateColumnsIfNecessary(
-                                            tableFromCatalog, entity, Collections.emptyMap())
+                                            tableFromCatalog, entity, columnNameChanges)
                                         .getRight())
                                 .withPartitioning(entity.partitioning())
                                 .withDistribution(entity.distribution())
