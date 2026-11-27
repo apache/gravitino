@@ -72,7 +72,8 @@ class TestSubmitUpdateStatsJobCommand {
         "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\","
             + "\"auth_type\":\"basic\",\"username\":\"admin\","
             + "\"password\":\"YourSecureGravitinoPassword\","
-            + "\"oauth_credential\":\"id:secret\"}");
+            + "\"oauth_credential\":\"id:secret\","
+            + "\"gravitino.optimizer.jdbcMetrics.jdbcPassword\":\"jdbc-secret\"}");
     jobConfig.put(
         "spark_conf",
         "{\"spark.sql.catalog.rest.rest.auth.type\":\"basic\","
@@ -82,14 +83,15 @@ class TestSubmitUpdateStatsJobCommand {
     String updaterOptions = redacted.get("updater_options");
     Assertions.assertTrue(updaterOptions.contains("\"password\":\"******\""));
     Assertions.assertTrue(updaterOptions.contains("\"oauth_credential\":\"******\""));
+    Assertions.assertTrue(
+        updaterOptions.contains("\"gravitino.optimizer.jdbcMetrics.jdbcPassword\":\"******\""));
     Assertions.assertTrue(updaterOptions.contains("\"username\":\"admin\""));
     Assertions.assertTrue(
         jobConfig.get("updater_options").contains("\"password\":\"YourSecureGravitinoPassword\""));
-    // spark_conf keys are catalog-scoped (e.g. rest.auth.basic.password); only exact sensitive
-    // updater-option keys are redacted.
+    // Same substring matching as gravitino.secret.sensitiveKeyKeywords (default includes password).
     Assertions.assertTrue(
         redacted
             .get("spark_conf")
-            .contains("\"spark.sql.catalog.rest.rest.auth.basic.password\":\"spark-secret\""));
+            .contains("\"spark.sql.catalog.rest.rest.auth.basic.password\":\"******\""));
   }
 }

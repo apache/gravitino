@@ -73,6 +73,38 @@ class TestGravitinoClientUtils {
   }
 
   @Test
+  void testRequireJdbcMetricsConfigIfNeeded() {
+    Map<String, String> withoutJdbc = new HashMap<>();
+    withoutJdbc.put("gravitino_uri", "http://localhost:8090");
+    GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("stats", withoutJdbc);
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("metrics", withoutJdbc));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("all", withoutJdbc));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("ALL", withoutJdbc));
+
+    Map<String, String> urlOnly = new HashMap<>(withoutJdbc);
+    urlOnly.put(
+        OptimizerConfig.JDBC_METRICS_JDBC_URL, "jdbc:postgresql://localhost:5432/optimizer");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("metrics", urlOnly));
+
+    Map<String, String> withJdbc = new HashMap<>(urlOnly);
+    withJdbc.put(OptimizerConfig.JDBC_METRICS_JDBC_USER, "postgres");
+    withJdbc.put(OptimizerConfig.JDBC_METRICS_JDBC_DRIVER, "org.postgresql.Driver");
+    // Password may be omitted or blank.
+    GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("metrics", withJdbc);
+    withJdbc.put(OptimizerConfig.JDBC_METRICS_JDBC_PASSWORD, "");
+    GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("all", withJdbc);
+  }
+
+  @Test
   void testFetchSchemaSeparatorRejectsMissingKey() throws Exception {
     HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
     server.createContext(
