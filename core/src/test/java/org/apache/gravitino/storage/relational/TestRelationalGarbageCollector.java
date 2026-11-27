@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational;
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -60,6 +61,11 @@ public class TestRelationalGarbageCollector {
     Config config = mock(Config.class);
     when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
     when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+    for (MetadataObject.Type type : MetadataObject.Type.values()) {
+      doCallRealMethod()
+          .when(orphanedRelationCleanup)
+          .sweepOrphanedRelations(type, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+    }
     when(orphanedRelationCleanup.softDeleteOrphanedRelations(
             MetadataObject.Type.TABLE, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT))
         .thenReturn(2, 0);

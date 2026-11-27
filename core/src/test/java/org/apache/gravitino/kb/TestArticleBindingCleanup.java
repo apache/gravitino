@@ -65,6 +65,7 @@ import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRelationMapper;
+import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRelationMapper.ArticleBindingCandidate;
 import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRelationMapper.RetiredTarget;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
@@ -152,7 +153,12 @@ class TestArticleBindingCleanup extends TestJDBCBackend {
       var mapper = firstSession.getMapper(OrphanedMetadataObjectRelationMapper.class);
       String table = "glossary_term_meta";
       String type = "GLOSSARY_TERM";
-      var ids = mapper.orphanedArticleBindingIds(table, "term_id", type, 1);
+      var candidates =
+          mapper.articleBindingCandidates(table, "term_id", type, 0, Long.MAX_VALUE, 10).stream()
+              .filter(ArticleBindingCandidate::orphaned)
+              .map(ArticleBindingCandidate::id)
+              .toList();
+      var ids = mapper.lockLiveArticleBindingIds(candidates.subList(0, 1));
       assertEquals(1, mapper.retireOrphanedArticleBindings(table, "term_id", type, ids, deletedAt));
       assertEquals(
           List.of(new RetiredTarget(lake, first, 1)),
@@ -165,7 +171,7 @@ class TestArticleBindingCleanup extends TestJDBCBackend {
                 try (var session = sessions.openSession(TransactionIsolationLevel.READ_COMMITTED)) {
                   var concurrent = session.getMapper(OrphanedMetadataObjectRelationMapper.class);
                   started.countDown();
-                  var batch = concurrent.orphanedArticleBindingIds(table, "term_id", type, 10);
+                  var batch = concurrent.lockLiveArticleBindingIds(candidates);
                   assertEquals(
                       1,
                       concurrent.retireOrphanedArticleBindings(
@@ -215,6 +221,26 @@ class TestArticleBindingCleanup extends TestJDBCBackend {
         "first", articles.listArticlesForTerm(LAKE, "Cost", false, 10, 0).articles().get(0).name());
     assertEquals(2, KnowledgeBaseArticleMetaService.getInstance().collect(Long.MAX_VALUE, 10));
     assertEquals(0, KnowledgeBaseArticleMetaService.getInstance().collect(Long.MAX_VALUE, 10));
+  }
+
+  @TestTemplate
+  void sweepContinuesPastLivePagesAndRestartsFromTheBeginning() throws Exception {
+    createAndInsertMakeLake(LAKE);
+    var glossary = new GlossaryManager(ids::incrementAndGet, false);
+    glossary.createTerm(LAKE, TermSpec.builder("Kept").build());
+    glossary.createTerm(LAKE, TermSpec.builder("Dropped").build());
+    articles.createArticle(LAKE, request("first").addTerms("Kept").build());
+    articles.createArticle(LAKE, request("second").addTerms("Kept").build());
+    articles.createArticle(LAKE, request("third").addTerms("Dropped").build());
+    assertTrue(glossary.dropTerm(LAKE, "Dropped"));
+    var cleanup = OrphanedMetadataObjectRelationService.getInstance();
+    cleanup.sweepOrphanedRelations(MetadataObject.Type.GLOSSARY_TERM, 1);
+    assertEquals(
+        2, countActiveRowsWhere("kb_article_relation_meta", "target_type='GLOSSARY_TERM'"));
+    assertTrue(glossary.dropTerm(LAKE, "Kept"));
+    cleanup.sweepOrphanedRelations(MetadataObject.Type.GLOSSARY_TERM, 1);
+    assertEquals(
+        0, countActiveRowsWhere("kb_article_relation_meta", "target_type='GLOSSARY_TERM'"));
   }
 
   @TestTemplate
@@ -312,7 +338,13 @@ class TestArticleBindingCleanup extends TestJDBCBackend {
     try (var sweepSession =
         SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession()) {
       var mapper = sweepSession.getMapper(OrphanedMetadataObjectRelationMapper.class);
-      var candidates = mapper.orphanedArticleBindingIds("table_meta", "table_id", "TABLE", 10);
+      var candidates =
+          mapper
+              .articleBindingCandidates("table_meta", "table_id", "TABLE", 0, Long.MAX_VALUE, 10)
+              .stream()
+              .filter(ArticleBindingCandidate::orphaned)
+              .map(ArticleBindingCandidate::id)
+              .toList();
       assertEquals(2, candidates.size());
       backend.insert(createTableEntity(99L, NS, "orders", AUDIT_INFO), false);
       backend.insert(createTableEntity(77L, NS, "restored", AUDIT_INFO), false);

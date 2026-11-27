@@ -30,14 +30,14 @@ import org.apache.ibatis.annotations.Param;
 /** Provides SQL for collecting orphaned metadata-object relations. */
 public class OrphanedMetadataObjectRelationSQLProvider {
 
-  /**
-   * Locks a bounded batch of live binding rows so concurrent sweeps cannot claim the same removal.
-   */
-  public static String orphanedArticleBindingIds(
+  /** Checks target liveness for the next page of binding row IDs. */
+  public static String articleBindingCandidates(
       @Param("entityTable") String entityTable, @Param("entityIdColumn") String entityIdColumn) {
-    return "SELECT id FROM kb_article_relation_meta WHERE "
-        + orphanedArticleBinding(entityTable, entityIdColumn)
-        + " ORDER BY id LIMIT #{limit} FOR UPDATE";
+    // A scalar lookup keeps PostgreSQL from hashing the entire target table for each binding page.
+    return "SELECT id, ("
+        + liveArticleTarget(entityTable, entityIdColumn)
+        + " LIMIT 1) IS NULL AS orphaned FROM kb_article_relation_meta WHERE deleted_at=0 AND target_type=#{metadataObjectType}"
+        + " AND id > #{after} AND id <= #{last} ORDER BY id LIMIT #{limit}";
   }
 
   /** Retires only the original binding rows that still reference a retired target. */
@@ -45,8 +45,9 @@ public class OrphanedMetadataObjectRelationSQLProvider {
       @Param("entityTable") String entityTable, @Param("entityIdColumn") String entityIdColumn) {
     return "<script>UPDATE kb_article_relation_meta SET deleted_at=#{deletedAt} WHERE id IN "
         + "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach> AND "
-        + orphanedArticleBinding(entityTable, entityIdColumn)
-        + "</script>";
+        + "deleted_at=0 AND target_type=#{metadataObjectType} AND NOT EXISTS ("
+        + liveArticleTarget(entityTable, entityIdColumn)
+        + ")</script>";
   }
 
   /** Returns SQL that soft-deletes orphaned owner relations. */
@@ -78,16 +79,15 @@ public class OrphanedMetadataObjectRelationSQLProvider {
     return softDeleteOrphans(SECURABLE_OBJECT_TABLE_NAME, "type", entityTable, entityIdColumn);
   }
 
-  private static String orphanedArticleBinding(String entityTable, String entityIdColumn) {
+  private static String liveArticleTarget(String entityTable, String entityIdColumn) {
     checkEntityTable(entityTable, entityIdColumn);
-    return "deleted_at=0 AND target_type=#{metadataObjectType} AND NOT EXISTS (SELECT 1 FROM "
+    return "SELECT 1 FROM "
         + entityTable
         + " entity WHERE entity."
         + entityIdColumn
         + "=kb_article_relation_meta.target_id"
         + " AND entity.metalake_id=kb_article_relation_meta.metalake_id AND entity.deleted_at=0"
-        + liveEntityCondition(entityTable)
-        + ")";
+        + liveEntityCondition(entityTable);
   }
 
   private static String softDeleteOrphans(

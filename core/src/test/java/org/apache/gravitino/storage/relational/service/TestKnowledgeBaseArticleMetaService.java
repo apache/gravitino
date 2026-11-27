@@ -131,6 +131,22 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void metadataEditResolvesDecomposedArticleName() throws IOException {
+    createAndInsertMakeLake("lake");
+    var original = article(31, "café");
+    STORE.insert(original, false);
+    var edited =
+        STORE.editMetadata(
+            NameIdentifier.of("lake", "cafe\u0301"),
+            state -> state.article().toBuilder().withTitle("Updated").build(),
+            (before, after) -> {},
+            missing -> missing);
+    assertEquals(original.id(), edited.article().id());
+    assertEquals(2L, edited.article().revision());
+    assertEquals("Updated", STORE.get(original.nameIdentifier()).title());
+  }
+
+  @TestTemplate
   void testSupplementaryCharactersInArticleBody() throws IOException {
     createAndInsertMakeLake("lake");
     var markdown = ArticleBody.of(ArticleBody.Format.MARKDOWN, "a😀b");
@@ -169,6 +185,55 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
     }
     assertFalse(backend.exists(fresh.nameIdentifier(), TYPE));
     assertEquals(original, STORE.get(original.nameIdentifier()));
+  }
+
+  @TestTemplate
+  void testMalformedMetadataCannotChangeStoredTitleOrRevision() throws IOException {
+    createAndInsertMakeLake("lake");
+    String malformed = "Guide\uD800";
+    var original = article(31, "guide").toBuilder().withTitle("Guide😀").build();
+    var fresh = article(32, "other").toBuilder().withTitle(malformed).build();
+    STORE.insert(original, false);
+    assertThrows(IllegalArgumentException.class, () -> STORE.insert(fresh, false));
+    assertFalse(backend.exists(fresh.nameIdentifier(), TYPE));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            STORE.update(
+                original.nameIdentifier(),
+                (KnowledgeBaseArticleEntity current) ->
+                    current.toBuilder().withTitle(malformed).build()));
+    var stored = STORE.get(original.nameIdentifier());
+    assertEquals("Guide😀", stored.title());
+    assertEquals(original.revision(), stored.revision());
+  }
+
+  @TestTemplate
+  void testInvalidSynonymsAndPropertiesCannotChangeStoredValuesOrRevision() throws IOException {
+    createAndInsertMakeLake("lake");
+    var original =
+        article(31, "guide").toBuilder()
+            .withSynonyms(List.of("Guide😀"))
+            .withProperties(Map.of("x😀", "v😀", "x?", "other"))
+            .build();
+    STORE.insert(original, false);
+    var fresh = article(32, "other");
+    String invalid = "x\uD800";
+    for (var edit :
+        List.<UnaryOperator<KnowledgeBaseArticleEntity>>of(
+            a -> a.toBuilder().withSynonyms(List.of(invalid)).build(),
+            a -> a.toBuilder().withProperties(Map.of(invalid, "v", "x?", "other")).build(),
+            a -> a.toBuilder().withProperties(Map.of("k", invalid)).build(),
+            a -> a.toBuilder().withProperties(Map.of(" ", "v")).build())) {
+      assertThrows(IllegalArgumentException.class, () -> STORE.insert(edit.apply(fresh), false));
+      assertThrows(
+          IllegalArgumentException.class, () -> STORE.update(original.nameIdentifier(), edit));
+    }
+    assertFalse(backend.exists(fresh.nameIdentifier(), TYPE));
+    var stored = STORE.get(original.nameIdentifier());
+    assertEquals(original.synonyms(), stored.synonyms());
+    assertEquals(original.properties(), stored.properties());
+    assertEquals(original.revision(), stored.revision());
   }
 
   @TestTemplate

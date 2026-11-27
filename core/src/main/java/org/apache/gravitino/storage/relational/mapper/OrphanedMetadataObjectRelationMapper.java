@@ -29,15 +29,37 @@ import org.apache.ibatis.annotations.UpdateProvider;
 /** A MyBatis mapper for collecting orphaned metadata-object relations. */
 public interface OrphanedMetadataObjectRelationMapper {
 
-  /** Locks a bounded batch of live Article binding row IDs whose registered targets are gone. */
+  /** The binding row and whether its target was missing when this page was read. */
+  record ArticleBindingCandidate(long id, boolean orphaned) {}
+
+  /** Captures a finite upper bound so concurrent inserts cannot prolong the sweep. */
+  @Select(
+      "SELECT COALESCE(MAX(id), 0) FROM kb_article_relation_meta WHERE target_type=#{type} AND deleted_at=0")
+  long lastLiveArticleBindingId(@Param("type") String type);
+
+  /** Reads a page of active bindings, including those whose targets still exist. */
+  @ConstructorArgs({
+    @Arg(column = "id", javaType = long.class),
+    @Arg(column = "orphaned", javaType = boolean.class)
+  })
   @SelectProvider(
       type = OrphanedMetadataObjectRelationSQLProvider.class,
-      method = "orphanedArticleBindingIds")
-  List<Long> orphanedArticleBindingIds(
+      method = "articleBindingCandidates")
+  List<ArticleBindingCandidate> articleBindingCandidates(
       @Param("entityTable") String entityTable,
       @Param("entityIdColumn") String entityIdColumn,
       @Param("metadataObjectType") String metadataObjectType,
+      @Param("after") long after,
+      @Param("last") long last,
       @Param("limit") int limit);
+
+  /** Locks the still-active candidate rows before collecting this sweep's diagnostics. */
+  @Select({
+    "<script>SELECT id FROM kb_article_relation_meta WHERE deleted_at=0 AND id IN",
+    "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>",
+    "ORDER BY id FOR UPDATE</script>"
+  })
+  List<Long> lockLiveArticleBindingIds(@Param("ids") List<Long> ids);
 
   /** Rechecks each candidate row and its target before retiring the binding. */
   @UpdateProvider(

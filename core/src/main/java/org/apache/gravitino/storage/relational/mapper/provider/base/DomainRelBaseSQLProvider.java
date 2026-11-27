@@ -183,4 +183,14 @@ public class DomainRelBaseSQLProvider {
         + DOMAIN_REL_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  /** Bounds authorization work before reading the subdomains of a domain filter. */
+  public String countLiveChildren() {
+    return """
+        SELECT COUNT(*) FROM (SELECT 1 FROM %s r JOIN %s d
+          ON d.domain_id=r.child_id AND d.deleted_at=0 AND d.metalake_id=#{metalakeId}
+          WHERE r.parent_id=#{parentId} AND r.deleted_at=0 LIMIT #{limit}) children
+        """
+        .formatted(DOMAIN_REL_TABLE_NAME, DomainMetaMapper.DOMAIN_TABLE_NAME);
+  }
 }

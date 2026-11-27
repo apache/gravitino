@@ -36,4 +36,11 @@ public interface SupportsOrphanedRelationCleanup {
    * @return number of relation rows soft-deleted
    */
   int softDeleteOrphanedRelations(MetadataObject.Type metadataObjectType, int limit);
+
+  /** Drains orphaned relations for one target type, committing work in bounded batches. */
+  default void sweepOrphanedRelations(MetadataObject.Type type, int limit) {
+    while (softDeleteOrphanedRelations(type, limit) > 0) {
+      // Continue until the backend reports an empty batch.
+    }
+  }
 }
