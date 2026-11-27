@@ -22,6 +22,7 @@ import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIM
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -83,9 +84,9 @@ public class TestRelationalGarbageCollector {
   public void testFailedSweepIdentifiesSystemActorAndTargetType() throws IOException {
     var backend = mock(JDBCBackend.class);
     var config = new Config(false) {};
-    when(backend.softDeleteOrphanedRelations(
-            MetadataObject.Type.TABLE, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT))
-        .thenThrow(new IllegalStateException("sweep failed"));
+    doThrow(new IllegalStateException("sweep failed"))
+        .when(backend)
+        .sweepOrphanedRelations(MetadataObject.Type.TABLE, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
     var logs = new StringWriter();
     var appender =
         WriterAppender.newBuilder()
