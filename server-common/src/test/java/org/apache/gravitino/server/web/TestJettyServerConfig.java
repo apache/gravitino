@@ -192,4 +192,21 @@ public class TestJettyServerConfig {
         JettyServerConfig.fromServiceConfig(serviceConfig, "gravitino.lance-rest.")
             .getTrustedProxies());
   }
+
+  @Test
+  void testRequestHeaderAllowlist() {
+    Config config = new Config() {};
+    Assertions.assertTrue(
+        JettyServerConfig.fromConfig(config, "").getRequestHeaderCapture().headerNames().isEmpty());
+    config.set(JettyServerConfig.REQUEST_HEADER_ALLOWLIST, Arrays.asList("X-Job-Id", "x-job-id"));
+    Assertions.assertEquals(
+        Collections.singletonList("x-job-id"),
+        JettyServerConfig.fromConfig(config, "").getRequestHeaderCapture().headerNames());
+    config.set(
+        JettyServerConfig.REQUEST_HEADER_ALLOWLIST, Collections.singletonList("Authorization"));
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> JettyServerConfig.fromConfig(config, ""));
+    Assertions.assertTrue(error.getMessage().contains("requestHeaderAllowlist"));
+  }
 }

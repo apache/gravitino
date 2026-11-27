@@ -146,11 +146,17 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     // Registered before HttpAuditFilter so audit events dispatched during this request carry the
     // request's query parameters and remote address, exactly as on the main server.
     ClientAddressResolver clientAddressResolver = serverConfig.getClientAddressResolver();
-    server.addFilter(new RequestContextFilter(eventBus, clientAddressResolver), LANCE_SPEC);
+    server.addFilter(
+        new RequestContextFilter(
+            eventBus, clientAddressResolver, serverConfig.getRequestHeaderCapture()),
+        LANCE_SPEC);
     server.addFilter(createHttpAuditFilter(eventBus, clientAddressResolver), LANCE_SPEC);
     if (metricsEnabled) {
       for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
-        server.addFilter(new RequestContextFilter(eventBus, clientAddressResolver), pathSpec);
+        server.addFilter(
+            new RequestContextFilter(
+                eventBus, clientAddressResolver, serverConfig.getRequestHeaderCapture()),
+            pathSpec);
         server.addFilter(createHttpAuditFilter(eventBus, clientAddressResolver), pathSpec);
       }
     }

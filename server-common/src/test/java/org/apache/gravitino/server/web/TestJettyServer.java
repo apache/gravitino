@@ -55,6 +55,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
+import org.slf4j.MDC;
 
 public class TestJettyServer {
 
@@ -380,6 +381,50 @@ public class TestJettyServer {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) {
       throw new IllegalStateException("servlet failure");
+    }
+  }
+
+  @Test
+  void testRequestHeadersThroughHttp() throws Exception {
+    Config config = new Config() {};
+    int port = RESTUtils.findAvailablePort(5000, 6000);
+    config.set(JettyServerConfig.WEBSERVER_HOST, "127.0.0.1");
+    config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, port);
+    config.set(JettyServerConfig.REQUEST_HEADER_ALLOWLIST, Arrays.asList("X-Job-Id", "x-job-id"));
+    JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
+    jettyServer.initialize(serverConfig, "test", false);
+    jettyServer.addFilter(
+        new RequestContextFilter(
+            null, serverConfig.getClientAddressResolver(), serverConfig.getRequestHeaderCapture()),
+        "/headers");
+    jettyServer.addServlet(
+        new HttpServlet() {
+          /** Echoes captured request headers from both audit and logging contexts. */
+          @Override
+          protected void doGet(HttpServletRequest request, HttpServletResponse response)
+              throws IOException {
+            String value = RequestContext.getRequestHeaders().getOrDefault("x-job-id", "");
+            String logged = MDC.get(RequestContext.REQUEST_HEADER_PREFIX + "x-job-id");
+            response.getWriter().write(value + ":" + (logged == null ? "" : logged));
+          }
+        },
+        "/headers");
+    jettyServer.start();
+    for (String job : Arrays.asList("job-123", null)) {
+      HttpURLConnection connection =
+          (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/headers").openConnection();
+      try {
+        if (job != null) {
+          connection.setRequestProperty("X-JoB-ID", job);
+        }
+        assertEquals(HttpServletResponse.SC_OK, connection.getResponseCode());
+        try (Reader body =
+            new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8)) {
+          assertEquals(job == null ? ":" : job + ":" + job, CharStreams.toString(body));
+        }
+      } finally {
+        connection.disconnect();
+      }
     }
   }
 }

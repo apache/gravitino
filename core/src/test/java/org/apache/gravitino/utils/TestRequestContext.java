@@ -20,6 +20,7 @@
 package org.apache.gravitino.utils;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -213,5 +214,25 @@ public class TestRequestContext {
     Assertions.assertTrue(RequestContext.isOperationFailureFired(), "failure must remain recorded");
     Assertions.assertFalse(
         RequestContext.isOperationSuccessFired(), "success must not overwrite a recorded failure");
+  }
+
+  @Test
+  void testRequestHeaderSnapshotIsImmutableAndCleared() {
+    Map<String, String> original = new HashMap<>();
+    original.put("x-job-id", "job-1");
+    RequestContext.setRequestHeaders(original);
+    original.put("x-job-id", "changed");
+    Assertions.assertEquals("job-1", RequestContext.getRequestHeaders().get("x-job-id"));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> RequestContext.getRequestHeaders().put("other", "value"));
+    RequestContext.clear();
+    Assertions.assertTrue(RequestContext.getRequestHeaders().isEmpty());
+    RequestContext.setRequestHeaders(original);
+    RequestContext.setRequestHeaders(null);
+    Assertions.assertTrue(RequestContext.getRequestHeaders().isEmpty());
+    RequestContext.setRequestHeaders(original);
+    RequestContext.setRequestHeaders(Collections.emptyMap());
+    Assertions.assertTrue(RequestContext.getRequestHeaders().isEmpty());
   }
 }

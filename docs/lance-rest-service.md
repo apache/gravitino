@@ -150,17 +150,18 @@ locations they can register. Underlying storage permissions still apply.
 
 To enable the Lance REST service within Gravitino server, configure the following properties in your Gravitino configuration file `${GRAVITINO_HOME}/conf/gravitino.conf`:
 
-| Configuration Property                    | Description                                                                  | Default Value           | Required |
-| ----------------------------------------- | ---------------------------------------------------------------------------- | ----------------------- | -------- |
-| `gravitino.auxService.names`              | Auxiliary services to run. Include `lance-rest` to enable Lance REST service | iceberg-rest,lance-rest | Yes      |
-| `gravitino.lance-rest.classpath`          | Classpath for Lance REST service, relative to Gravitino home directory       | lance-rest-server/libs  | Yes      |
-| `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | No       |
-| `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | No       |
-| `gravitino.lance-rest.includeErrorStackTrace` | Whether eligible backend errors include stack traces in `detail`; request/validation errors always omit them. Set this to `false` in new deployments | true | No |
-| `gravitino.lance-rest.trustedProxies`     | Comma-separated IP addresses or CIDR blocks of reverse proxies whose `X-Forwarded-For` is trusted for audit client addresses | (none) | No |
-| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (currently only `gravitino` is supported)         | gravitino               | Yes      |
-| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI. Not required in auxiliary mode.                        | http://localhost:8090   | No       |
-| `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      |
+| Configuration Property                        | Description                                                                                                                                                                                              | Default Value           | Required |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | -------- |
+| `gravitino.auxService.names`                  | Auxiliary services to run. Include `lance-rest` to enable Lance REST service                                                                                                                             | iceberg-rest,lance-rest | Yes      |
+| `gravitino.lance-rest.classpath`              | Classpath for Lance REST service, relative to Gravitino home directory                                                                                                                                   | lance-rest-server/libs  | Yes      |
+| `gravitino.lance-rest.httpPort`               | Port number for Lance REST service                                                                                                                                                                       | 9101                    | No       |
+| `gravitino.lance-rest.host`                   | Hostname for Lance REST service                                                                                                                                                                          | 0.0.0.0                 | No       |
+| `gravitino.lance-rest.includeErrorStackTrace` | Whether eligible backend errors include stack traces in `detail`; request/validation errors always omit them. Set this to `false` in new deployments                                                     | true                    | No       |
+| `gravitino.lance-rest.trustedProxies`         | Comma-separated IP addresses or CIDR blocks of reverse proxies whose `X-Forwarded-For` is trusted for audit client addresses                                                                             | (none)                  | No       |
+| `gravitino.lance-rest.requestHeaderAllowlist` | Comma-separated HTTP header names to capture in request MDC and audit events; sensitive names are rejected. See [request correlation headers](./gravitino-server-config.md#request-correlation-headers). | (none)                  | No       |
+| `gravitino.lance-rest.namespace-backend`      | Namespace metadata backend (currently only `gravitino` is supported)                                                                                                                                     | gravitino               | Yes      |
+| `gravitino.lance-rest.gravitino-uri`          | Gravitino server URI. Not required in auxiliary mode.                                                                                                                                                    | http://localhost:8090   | No       |
+| `gravitino.lance-rest.gravitino-metalake`     | Gravitino metalake name (required when namespace-backend is `gravitino`)                                                                                                                                 | (none)                  | Yes      |
 
 **Authentication to the Gravitino Server**
 
@@ -204,16 +205,17 @@ To run Lance REST service independently without Gravitino server (You need to st
 
 Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-server.conf` or passing command-line arguments:
 
-| Configuration Property                        | Description                                  | Default Value          | Required |
-|-----------------------------------------------|----------------------------------------------|------------------------|----------|
-| `gravitino.lance-rest.namespace-backend`      | Namespace metadata backend                   | gravitino              | Yes      |
-| `gravitino.lance-rest.gravitino-uri`          | Gravitino server URI                         | http://localhost:8090  | Yes      |
-| `gravitino.lance-rest.gravitino-metalake`     | Gravitino metalake name                      | (none)                 | Yes      |
-| `gravitino.lance-rest.httpPort`               | Service port number                          | 9101                   | No       |
-| `gravitino.lance-rest.host`                   | Service hostname                             | 0.0.0.0                | No       |
-| `gravitino.lance-rest.includeErrorStackTrace` | Whether eligible backend errors include stack traces; request/validation errors always omit them | true                   | No       |
-| `gravitino.lance-rest.metrics.enabled`        | Enable standalone metrics endpoints          | false                  | No       |
-| `gravitino.lance-rest.trustedProxies`         | Reverse proxies trusted for X-Forwarded-For  | (none)                 | No       |
+| Configuration Property                          | Description                                                                                                                                                                                              | Default Value            | Required   |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ---------- |
+| `gravitino.lance-rest.namespace-backend`        | Namespace metadata backend                                                                                                                                                                               | gravitino                | Yes        |
+| `gravitino.lance-rest.gravitino-uri`            | Gravitino server URI                                                                                                                                                                                     | http://localhost:8090    | Yes        |
+| `gravitino.lance-rest.gravitino-metalake`       | Gravitino metalake name                                                                                                                                                                                  | (none)                   | Yes        |
+| `gravitino.lance-rest.httpPort`                 | Service port number                                                                                                                                                                                      | 9101                     | No         |
+| `gravitino.lance-rest.host`                     | Service hostname                                                                                                                                                                                         | 0.0.0.0                  | No         |
+| `gravitino.lance-rest.includeErrorStackTrace`   | Whether eligible backend errors include stack traces; request/validation errors always omit them                                                                                                         | true                     | No         |
+| `gravitino.lance-rest.metrics.enabled`          | Enable standalone metrics endpoints                                                                                                                                                                      | false                    | No         |
+| `gravitino.lance-rest.trustedProxies`           | Reverse proxies trusted for X-Forwarded-For                                                                                                                                                              | (none)                   | No         |
+| `gravitino.lance-rest.requestHeaderAllowlist`   | Comma-separated HTTP header names to capture in request MDC and audit events; sensitive names are rejected. See [request correlation headers](./gravitino-server-config.md#request-correlation-headers). | (none)                   | No         |
 
 `trustedProxies` works as described for
 [`gravitino.server.webserver.trustedProxies`](./gravitino-server-config.md#http-server). When it is
