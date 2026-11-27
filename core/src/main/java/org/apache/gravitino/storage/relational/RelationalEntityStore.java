@@ -162,7 +162,6 @@ public class RelationalEntityStore
     RelationalEntityStore store = new RelationalEntityStore();
     store.backend = backend;
     store.cache = new NoOpsCache(config);
-    SqlSessions.addClosedListener(store.sessionClosedListener);
     EntityIdService.initialize(new RelationalEntityStoreIdResolver());
     return store;
   }
@@ -208,7 +207,9 @@ public class RelationalEntityStore
 
     this.entityChangeLogPoller.start();
     this.entityChangeLogCleaner.start();
-    SqlSessions.addClosedListener(sessionClosedListener);
+    if (cache.coherence() != Coherence.NONE) {
+      SqlSessions.addClosedListener(sessionClosedListener);
+    }
   }
 
   /**
@@ -365,7 +366,7 @@ public class RelationalEntityStore
     Entity.EntityType type = e.type();
     // Captured before this call opens its own session. An already-open session is the caller's
     // transaction: the backend will not commit, so the block stays until that session closes.
-    boolean deferRelease = SessionUtils.isInTransaction();
+    boolean deferRelease = shouldDeferCacheRelease();
     try {
       if (overwritten) {
         // Drop the cache and block refill before the overwrite commits. Do not publish {@code e}:
@@ -409,7 +410,7 @@ public class RelationalEntityStore
     // Populated inside the wrapped updater when it renames. The updater runs inside the backend
     // before a backend-owned commit, so the new name is pending before the renamed row is visible
     // to other connections. An outer session keeps both names pending until that session closes.
-    boolean deferRelease = SessionUtils.isInTransaction();
+    boolean deferRelease = shouldDeferCacheRelease();
     NameIdentifier[] renamedTo = new NameIdentifier[1];
     beginOrDeferWrite(ident, entityType, deferRelease);
     try {
@@ -523,7 +524,7 @@ public class RelationalEntityStore
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
-    boolean deferRelease = SessionUtils.isInTransaction();
+    boolean deferRelease = shouldDeferCacheRelease();
     beginOrDeferWrite(ident, entityType, deferRelease);
     try {
       return backend.delete(ident, entityType, cascade);
@@ -543,7 +544,7 @@ public class RelationalEntityStore
       Class<E> clazz,
       Consumer<E> postDeleteAction)
       throws IOException {
-    boolean deferRelease = SessionUtils.isInTransaction();
+    boolean deferRelease = shouldDeferCacheRelease();
     beginOrDeferWrite(ident, entityType, deferRelease);
     try {
       return backend.deleteAndGet(ident, entityType, clazz, postDeleteAction);
@@ -558,7 +559,7 @@ public class RelationalEntityStore
   public Optional<SchemaEntity> deleteSchemaAndGet(
       NameIdentifier ident, boolean cascadeFunctions, Consumer<SchemaEntity> postDeleteAction)
       throws IOException {
-    boolean deferRelease = SessionUtils.isInTransaction();
+    boolean deferRelease = shouldDeferCacheRelease();
     beginOrDeferWrite(ident, Entity.EntityType.SCHEMA, deferRelease);
     try {
       return backend.deleteSchemaAndGet(ident, cascadeFunctions, postDeleteAction);
@@ -1077,6 +1078,11 @@ public class RelationalEntityStore
     }
   }
 
+  private boolean shouldDeferCacheRelease() {
+    // An uncached store has nothing to fence across the caller's commit.
+    return SessionUtils.isInTransaction() && cache.coherence() != Coherence.NONE;
+  }
+
   /**
    * Marks {@code ident} pending. When {@code deferRelease} is true, the block stays until the
    * outermost SQL session on this thread closes, including when this call throws afterwards.
@@ -1226,7 +1232,9 @@ public class RelationalEntityStore
   }
 
   private boolean isPendingWrite(NameIdentifier ident, Entity.EntityType entityType) {
-    releaseDeadPending();
+    if (!deferredWrites.isEmpty()) {
+      releaseDeadPending();
+    }
     AtomicInteger exact = cacheBlocks.get("w\0" + entityType.name() + "\0" + ident);
     if (exact != null && exact.get() > 0) {
       return true;

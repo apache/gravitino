@@ -23,12 +23,12 @@ import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -47,16 +47,19 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.EntityIdResolver;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,6 +72,7 @@ import org.mockito.Mockito;
  * the previous cache entry blocked until the outermost session closes, so a peer cannot refill it
  * in the gap between the backend call and the outer commit.
  */
+@CoreBackend.H2
 public class TestRelationalEntityStoreUncommittedCache {
 
   private static final String METALAKE = "metalake_uncommitted_cache";
@@ -83,6 +87,7 @@ public class TestRelationalEntityStoreUncommittedCache {
   private String dbPath;
   private Object previousConfig;
   private Object previousIdGenerator;
+  private EntityIdResolver previousIdResolver;
   private ExecutorService peer;
 
   @BeforeEach
@@ -111,6 +116,7 @@ public class TestRelationalEntityStoreUncommittedCache {
       try {
         store.close();
       } finally {
+        EntityIdService.initialize(previousIdResolver);
         FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
         FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousIdGenerator, true);
         FileUtils.deleteDirectory(new File(dbPath));
@@ -178,6 +184,26 @@ public class TestRelationalEntityStoreUncommittedCache {
     store.put(policy(ident), false);
     Assertions.assertTrue(cached(ident));
     Assertions.assertTrue(peerCanRead(ident));
+  }
+
+  @Test
+  void testNestedOverwriteKeepsTheOldRowOutOfCacheUntilCommit() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "nested_overwrite");
+    PolicyEntity original = policy(ident);
+    store.put(original, false);
+
+    SessionUtils.beginTransaction();
+    try {
+      store.put(withComment(original, "overwritten"), true);
+      Assertions.assertEquals(original.comment(), peerGet(ident).comment());
+      Assertions.assertFalse(cached(ident));
+      SessionUtils.commitTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+
+    Assertions.assertEquals("overwritten", peerGet(ident).comment());
+    Assertions.assertTrue(cached(ident));
   }
 
   @Test
@@ -414,25 +440,26 @@ public class TestRelationalEntityStoreUncommittedCache {
     store.put(policy(ident), false);
     Assertions.assertTrue(peerCanRead(ident));
 
-    Thread owner =
-        new Thread(
+    // Close the actual MyBatis session to return its connection, but deliberately bypass
+    // SqlSessions' thread-local close notification to simulate an abandoned cache block.
+    FutureTask<Void> write =
+        new FutureTask<>(
             () -> {
-              SessionUtils.beginTransaction();
-              try {
+              try (SqlSession session = SqlSessions.getSqlSession()) {
                 store.update(
                     ident,
                     PolicyEntity.class,
                     Entity.EntityType.POLICY,
                     current -> withComment(current, "committed-without-close"));
-                SqlSessions.currentConnection().commit();
-              } catch (IOException | SQLException e) {
-                throw new IllegalStateException(e);
+                session.commit();
               }
-            },
-            "dead-pending-owner");
+              return null;
+            });
+    Thread owner = new Thread(write, "dead-pending-owner");
     owner.start();
-    owner.join();
+    owner.join(TimeUnit.SECONDS.toMillis(30));
     Assertions.assertFalse(owner.isAlive());
+    write.get();
     Assertions.assertTrue(writeBlocked(ident), "the dead thread never reached session close");
 
     Assertions.assertEquals("committed-without-close", peerGet(ident).comment());
@@ -526,6 +553,9 @@ public class TestRelationalEntityStoreUncommittedCache {
     config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.h2.Driver");
     config.set(Configs.CACHE_ENABLED, true);
 
+    previousIdResolver =
+        (EntityIdResolver)
+            FieldUtils.readStaticField(EntityIdService.class, "entityIdResolver", true);
     previousConfig = FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
     previousIdGenerator = FieldUtils.readField(GravitinoEnv.getInstance(), "idGenerator", true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);

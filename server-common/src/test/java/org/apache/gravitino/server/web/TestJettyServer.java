@@ -37,23 +37,32 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.servlet.Filter;
 import javax.servlet.Servlet;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.RequestContext;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedStatic;
 
 public class TestJettyServer {
@@ -113,6 +122,59 @@ public class TestJettyServer {
     // TODO add asserts
 
     jettyServer.stop();
+  }
+
+  /** A forward on the servlet thread must leave the caller's SQL session usable on return. */
+  @Test
+  public void testForwardPreservesOuterSqlTransaction(@TempDir Path dbDir) throws Exception {
+    int port = RESTUtils.findAvailablePort(5000, 6000);
+    Config config = new Config(false) {};
+    config.set(JettyServerConfig.WEBSERVER_HOST, "127.0.0.1");
+    config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, port);
+    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, "jdbc:h2:" + dbDir.resolve("forward"));
+    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.h2.Driver");
+    SqlSessionFactoryHelper factory = SqlSessionFactoryHelper.getInstance();
+    factory.init(config);
+    try {
+      jettyServer.initialize(JettyServerConfig.fromConfig(config), "test", false);
+      jettyServer.addFilter(new RequestContextFilter(), "/outer");
+      jettyServer.addFilter(new RequestContextFilter(), "/inner");
+      CompletableFuture<Boolean> sameConnection = new CompletableFuture<>();
+      jettyServer.addServlet(
+          new HttpServlet() {
+            @Override
+            protected void doGet(HttpServletRequest request, HttpServletResponse response)
+                throws ServletException, IOException {
+              SessionUtils.beginTransaction();
+              try {
+                Connection connection = SqlSessions.currentConnection();
+                request.getRequestDispatcher("/inner").forward(request, response);
+                sameConnection.complete(
+                    SqlSessions.hasActiveSession()
+                        && connection == SqlSessions.currentConnection());
+              } catch (SQLException e) {
+                throw new ServletException(e);
+              } finally {
+                SessionUtils.rollbackTransaction();
+              }
+            }
+          },
+          "/outer");
+      jettyServer.addServlet(
+          new HttpServlet() {
+            @Override
+            protected void doGet(HttpServletRequest request, HttpServletResponse response) {
+              response.setStatus(HttpServletResponse.SC_OK);
+            }
+          },
+          "/inner");
+      jettyServer.start();
+      assertEquals(HttpServletResponse.SC_OK, requestStatus(port, "/outer"));
+      assertTrue(sameConnection.get(10, TimeUnit.SECONDS));
+    } finally {
+      jettyServer.stop();
+      factory.close();
+    }
   }
 
   @Test

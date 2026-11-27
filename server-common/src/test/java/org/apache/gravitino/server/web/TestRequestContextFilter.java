@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
@@ -29,9 +30,11 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import javax.servlet.DispatcherType;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -60,6 +63,7 @@ public class TestRequestContextFilter {
   @Test
   public void testRollsBackSqlSessionLeftOpenByTheRequest() throws IOException, ServletException {
     HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getDispatcherType()).thenReturn(DispatcherType.REQUEST);
     HttpServletResponse resp = mock(HttpServletResponse.class);
     when(req.getHeader("X-Forwarded-For")).thenReturn(null);
     when(req.getRemoteAddr()).thenReturn("192.168.1.1");
@@ -81,6 +85,7 @@ public class TestRequestContextFilter {
   @Test
   public void testRequestEndRollbackOutOfMemoryIsRecorded() throws Exception {
     HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getDispatcherType()).thenReturn(DispatcherType.REQUEST);
     HttpServletResponse resp = mock(HttpServletResponse.class);
     when(req.getHeader("X-Forwarded-For")).thenReturn(null);
     when(req.getRemoteAddr()).thenReturn("192.168.1.1");
@@ -100,6 +105,55 @@ public class TestRequestContextFilter {
       }
     }
     Assertions.assertNull(RequestContext.getRemoteAddress());
+  }
+
+  /** The outer request cleans up a session first opened during a nested dispatch. */
+  @Test
+  public void testNestedDispatchLeavesCleanupToOuterRequest() throws Exception {
+    HttpServletRequest outer = mock(HttpServletRequest.class);
+    HttpServletRequest inner = mock(HttpServletRequest.class);
+    when(outer.getDispatcherType()).thenReturn(DispatcherType.REQUEST);
+    when(inner.getDispatcherType()).thenReturn(DispatcherType.INCLUDE);
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    AtomicBoolean active = new AtomicBoolean();
+    try (MockedStatic<SqlSessions> sessions = mockStatic(SqlSessions.class)) {
+      sessions.when(SqlSessions::hasActiveSession).thenAnswer(invocation -> active.get());
+      sessions
+          .when(SqlSessions::rollbackAndCloseSqlSession)
+          .thenAnswer(invocation -> active.getAndSet(false));
+      filter.doFilter(
+          outer,
+          response,
+          (request, resp) -> {
+            filterWithEventBus.doFilter(inner, resp, (nested, ignored) -> active.set(true));
+            Assertions.assertTrue(active.get());
+          });
+      Assertions.assertFalse(active.get());
+      sessions.verify(SqlSessions::rollbackAndCloseSqlSession);
+    }
+  }
+
+  /** A forward can be the first dispatch that matches the filter mapping. */
+  @Test
+  public void testFirstFilteredForwardCleansOnlyItsOwnLeakedSession() throws Exception {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getDispatcherType()).thenReturn(DispatcherType.FORWARD);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    AtomicBoolean active = new AtomicBoolean(true);
+    try (MockedStatic<SqlSessions> sessions = mockStatic(SqlSessions.class)) {
+      sessions.when(SqlSessions::hasActiveSession).thenAnswer(invocation -> active.get());
+      sessions
+          .when(SqlSessions::rollbackAndCloseSqlSession)
+          .thenAnswer(invocation -> active.getAndSet(false));
+      filter.doFilter(req, resp, (request, response) -> {});
+      Assertions.assertTrue(active.get());
+      sessions.verify(SqlSessions::rollbackAndCloseSqlSession, never());
+
+      active.set(false);
+      filter.doFilter(req, resp, (request, response) -> active.set(true));
+      Assertions.assertFalse(active.get());
+      sessions.verify(SqlSessions::rollbackAndCloseSqlSession);
+    }
   }
 
   @Test
