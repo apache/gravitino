@@ -39,10 +39,12 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.ontology.OntologyDTO;
 import org.apache.gravitino.dto.requests.OntologyCreateRequest;
 import org.apache.gravitino.dto.requests.OntologyUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
+import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OntologyResponse;
 import org.apache.gravitino.ontology.OntologyDispatcher;
@@ -272,6 +274,34 @@ public class OntologyOperations {
         () -> {
           return OntologyRestSupport.exported(
               dispatcher.exportOntology(metalake, ontology, OntologyRestSupport.format(format)));
+        });
+  }
+
+  /**
+   * Lists the ontology mappings readable by the caller.
+   *
+   * @param metalake The containing metalake.
+   * @param ontology The ontology name.
+   * @return The REST response.
+   */
+  @GET
+  @Path("{ontology}/mappings")
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_ONTOLOGY_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.ONTOLOGY)
+  public Response listMappings(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("ontology") @AuthorizationMetadata(type = Entity.EntityType.ONTOLOGY)
+          String ontology) {
+    return OntologyRestSupport.run(
+        request,
+        () -> {
+          NameIdentifier[] visible =
+              dispatcher
+                  .listOntologyMappings(metalake, ontology, OntologyRestSupport::canLoadMapping)
+                  .toArray(NameIdentifier[]::new);
+          return Utils.ok(new EntityListResponse(visible));
         });
   }
 }

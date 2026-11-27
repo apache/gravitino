@@ -47,10 +47,12 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.requests.OntologyCreateRequest;
 import org.apache.gravitino.dto.requests.OntologyUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
+import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OntologyResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalOntologyException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchOntologyException;
@@ -127,9 +129,11 @@ public class TestOntologyOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testListAndLoad() {
+  public void testListLoadAndListMappings() {
     when(dispatcher.listOntologies(METALAKE)).thenReturn(List.of("Sales", "Hr"));
     when(dispatcher.loadOntology(METALAKE, "Sales")).thenReturn(ontology());
+    when(dispatcher.listOntologyMappings(eq(METALAKE), eq("Sales"), any()))
+        .thenReturn(List.of(NameIdentifier.of(METALAKE, "cat", "sch", "model", "customers")));
 
     try (Response response = target(BASE).request(GRAVITINO_JSON).get()) {
       assertEquals(200, response.getStatus());
@@ -142,6 +146,13 @@ public class TestOntologyOperations extends BaseOperationsTest {
       result.validate();
       assertEquals("Sales", result.ontology().name());
       assertEquals(DEFINITION, result.ontology().definition().fields());
+    }
+    try (Response response = target(ITEM + "/mappings").request(GRAVITINO_JSON).get()) {
+      assertEquals(200, response.getStatus());
+      NameIdentifier[] identifiers = response.readEntity(EntityListResponse.class).identifiers();
+      assertArrayEquals(
+          new NameIdentifier[] {NameIdentifier.of(METALAKE, "cat", "sch", "model", "customers")},
+          identifiers);
     }
   }
 
@@ -285,6 +296,13 @@ public class TestOntologyOperations extends BaseOperationsTest {
       assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
       assertEquals(IllegalOntologyException.class.getSimpleName(), error.getType());
     }
+
+    when(dispatcher.listOntologyMappings(eq(METALAKE), eq("Sales"), any()))
+        .thenThrow(new ForbiddenException("Cannot load ontology Sales"));
+    assertError(
+        target(ITEM + "/mappings").request(GRAVITINO_JSON),
+        ErrorConstants.FORBIDDEN_CODE,
+        ForbiddenException.class);
 
     when(dispatcher.listOntologies(METALAKE))
         .thenThrow(new MetalakeNotInUseException("Metalake lake is not in use"));

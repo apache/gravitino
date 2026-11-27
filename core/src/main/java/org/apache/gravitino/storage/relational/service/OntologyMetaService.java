@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -325,35 +326,45 @@ public final class OntologyMetaService {
   }
 
   /**
-   * Lists every mapping of an ontology, using current model names.
+   * Lists visible mappings of an ontology, using current model names.
    *
    * @param metalake The containing metalake.
    * @param name The ontology name.
+   * @param visible Checks access given the mapping identifier and its model's publication state.
    * @return Mapping identifiers including the metalake.
    */
-  public List<NameIdentifier> listOntologyMappings(String metalake, String name) {
+  public List<NameIdentifier> listOntologyMappings(
+      String metalake, String name, BiPredicate<NameIdentifier, Boolean> visible) {
     long metalakeId = metalakeId(metalake);
-    return SessionUtils.getWithoutCommit(
-        OntologyMapper.class,
-        mapper -> {
-          Long id = mapper.getOntologyId(metalakeId, name);
-          if (id == null) {
-            throw missingOntology(name);
-          }
-          return mapper.listOntologyMappingIdentities(id).stream()
-              .map(mapping -> mappingIdentifier(metalake, mapping))
-              .toList();
-        });
+    List<OntologySnapshotPO> mappings =
+        SessionUtils.getWithoutCommit(
+            OntologyMapper.class,
+            mapper -> {
+              Long id = mapper.getOntologyId(metalakeId, name);
+              if (id == null) {
+                throw missingOntology(name);
+              }
+              return mapper.listOntologyMappingIdentities(id);
+            });
+    List<NameIdentifier> result = new ArrayList<>();
+    for (OntologySnapshotPO row : mappings) {
+      NameIdentifier mapping = mappingIdentifier(metalake, row);
+      if (visible.test(mapping, row.getSemanticModelActiveVersion() > 0)) {
+        result.add(mapping);
+      }
+    }
+    return List.copyOf(result);
   }
 
   /**
    * Lists mappings under a semantic model.
    *
    * @param model The parent model identifier.
+   * @param canModify Checks whether the caller can read a never-published model.
    * @return The live names in that model.
    */
-  public List<String> listModelMappings(NameIdentifier model) {
-    long id = requireModel(model).getSemanticModelId();
+  public List<String> listModelMappings(NameIdentifier model, Predicate<NameIdentifier> canModify) {
+    long id = readableModelId(model, canModify);
     return SessionUtils.getWithoutCommit(
         OntologyMapper.class, mapper -> mapper.listModelMappings(id));
   }
@@ -363,10 +374,12 @@ public final class OntologyMetaService {
    *
    * @param model The parent model identifier.
    * @param name The mapping name.
+   * @param canModify Checks whether the caller can read a never-published model.
    * @return The current mapping.
    */
-  public OntologyMapping loadMapping(NameIdentifier model, String name) {
-    long id = requireModel(model).getSemanticModelId();
+  public OntologyMapping loadMapping(
+      NameIdentifier model, String name, Predicate<NameIdentifier> canModify) {
+    long id = readableModelId(model, canModify);
     return SessionUtils.getWithoutCommit(
         OntologyMapper.class, mapper -> mapping(requireMapping(mapper, id, name)));
   }
@@ -636,6 +649,14 @@ public final class OntologyMetaService {
     } catch (NoSuchEntityException e) {
       throw new NoSuchSemanticModelException(e, "Semantic model '%s' does not exist", model);
     }
+  }
+
+  private static long readableModelId(NameIdentifier model, Predicate<NameIdentifier> canModify) {
+    SemanticModelPO parent = requireModel(model);
+    if (parent.getActiveVersion() == 0 && !canModify.test(model)) {
+      throw new NoSuchSemanticModelException("Semantic model '%s' does not exist", model);
+    }
+    return parent.getSemanticModelId();
   }
 
   private static SemanticModelPO lockModel(NameIdentifier model) {
