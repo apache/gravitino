@@ -39,7 +39,7 @@ bin="$(cd "${bin}">/dev/null; pwd)"
 
 . "${bin}/common.sh"
 
-# Exact runtime classpath generated at package time.
+# Shared jars from root libs/ (exact list generated at package time).
 OPTIMIZER_ENV_SH="${GRAVITINO_HOME}/optimizer/env.sh"
 if [[ ! -f "${OPTIMIZER_ENV_SH}" ]]; then
   echo "ERROR: missing ${OPTIMIZER_ENV_SH}. Rebuild the distribution (optimizer:copyLibAndConfigs)."
@@ -87,6 +87,12 @@ if [[ "$JVM_VERSION" -eq 17 ]]; then
   JAVA_OPTS+=" --add-opens java.base/sun.security.action=ALL-UNNAMED"
   JAVA_OPTS+=" --add-opens java.base/sun.util.calendar=ALL-UNNAMED"
   JAVA_OPTS+=" --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED"
+fi
+
+# Module-owned jars first, then shared jars already added via optimizer/env.sh.
+if [ -d "${GRAVITINO_HOME}/optimizer/libs" ]; then
+  addJarInDir "${GRAVITINO_HOME}/optimizer/libs"
+  addDirToClasspath "${GRAVITINO_HOME}/optimizer/conf"
 fi
 
 ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_OPTIMIZER_NAME} "$@"
