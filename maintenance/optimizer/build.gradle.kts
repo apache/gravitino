@@ -127,7 +127,6 @@ tasks {
       )
     }
     into("$rootDir/distribution/package/optimizer/libs")
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   }
 
   register("copyLibAndConfigs", Copy::class) {
