@@ -176,6 +176,20 @@ public class SemanticModelMetaService {
     return fromSemanticModelPO(po, identifier.namespace());
   }
 
+  /**
+   * Resolves a live Semantic Model ID from its identity row, including a model with only drafts.
+   *
+   * @param identifier The Semantic Model identifier.
+   * @return The stable Semantic Model ID.
+   * @throws NoSuchEntityException If the Semantic Model or its schema does not exist.
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getSemanticModelIdByIdentifier")
+  public long getSemanticModelIdByIdentifier(NameIdentifier identifier) {
+    return selectModel(identifier, identityOps).getSemanticModelId();
+  }
+
   /** Checks for a live identity, including a model with only drafts. */
   public boolean semanticModelExists(NameIdentifier identifier) {
     try {
