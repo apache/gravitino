@@ -128,6 +128,7 @@ public final class ArticleManager {
     ArticleDomains domains = new ArticleDomains(metalake, authorizationEnabled);
     Supplier<ArticleDomains.Replacement> plan =
         Suppliers.memoize(() -> domains.resolve(List.of(request.domains())));
+    Supplier<ArticleBody> body = Suppliers.memoize(() -> edits.storedBody(request.body()));
     for (int attempt = 0; ; attempt++) {
       NameIdentifier ident = ident(metalake, name);
       long articleId = ids.nextId();
@@ -140,7 +141,7 @@ public final class ArticleManager {
                     ArticleAccess.forRequest(metalake).requireCreate();
                   }
                   Set<Long> initial = domains.check(plan.get(), Set.of(), true);
-                  return edits.create(metalake, articleId, ident.name(), request, initial);
+                  return edits.create(metalake, articleId, ident.name(), request, initial, body);
                 },
                 expectedMetalakeId,
                 (before, created) -> {
@@ -234,10 +235,9 @@ public final class ArticleManager {
               domain == null
                   ? articles.list(namespace)
                   : articles.listByDomains(namespace, domains.scope(domain));
-          return candidates.stream()
-              .filter(article -> access == null || access.canRead(article.id(), article.status()))
-              .map(domains::visible)
-              .toList();
+          List<KnowledgeBaseArticleEntity> visible =
+              access == null ? candidates : access.visibleArticles(candidates);
+          return visible.stream().map(domains::visible).toList();
         });
   }
 

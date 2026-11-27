@@ -64,7 +64,7 @@ public class UserMetaBaseSQLProvider {
   }
 
   /** Returns SQL that selects an active user by ID. */
-  protected String selectUserMetaById(Long userId) {
+  public String selectUserMetaById(Long userId) {
     return "SELECT user_id as userId, user_name as userName,"
         + " metalake_id as metalakeId,"
         + " audit_info as auditInfo, current_version as currentVersion,"

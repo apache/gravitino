@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.AuditInfo;
@@ -78,7 +79,12 @@ final class ArticleEdits {
   }
 
   KnowledgeBaseArticleEntity create(
-      String metalake, long id, String name, ArticleCreate request, Set<Long> domains) {
+      String metalake,
+      long id,
+      String name,
+      ArticleCreate request,
+      Set<Long> domains,
+      Supplier<ArticleBody> body) {
     Preconditions.checkArgument(
         request.terms().isEmpty() && request.objects().isEmpty(),
         "Initial Article relations require endpoint resolution");
@@ -88,7 +94,7 @@ final class ArticleEdits {
         .withDomainIds(domains)
         .withName(name)
         .withTitle(request.title())
-        .withBodyUpdate(storedBody(request.body()))
+        .withBodyUpdate(body.get())
         .withStatus(request.status())
         .withComment(request.comment())
         .withSynonyms(request.synonyms())
@@ -144,7 +150,7 @@ final class ArticleEdits {
         .build();
   }
 
-  private ArticleBody storedBody(ArticleBody body) {
+  ArticleBody storedBody(ArticleBody body) {
     checkSize(body.content());
     if (body.format() == ArticleBody.Format.MARKDOWN) {
       return body;
