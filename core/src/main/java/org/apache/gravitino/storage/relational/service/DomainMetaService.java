@@ -38,6 +38,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
+import org.apache.gravitino.domain.DefinitionMemberPage;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
@@ -57,6 +58,7 @@ import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
@@ -127,6 +129,30 @@ public class DomainMetaService {
     String metalakeName = ident.namespace().level(0);
     DomainPO domainPO = getDomainPOByMetalakeAndName(metalakeName, ident.name());
     return fromDomainPOWithParent(domainPO, ident.namespace());
+  }
+
+  /** Lists direct definitions after checking management access in the same database snapshot. */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listDefinitionMembers")
+  public DefinitionMemberPage listDefinitionMembers(
+      NameIdentifier ident, int limit, int offset, Consumer<DomainEntity> authorize) {
+    Preconditions.checkArgument(limit >= 1 && limit <= 1000, "limit must be between 1 and 1000");
+    Preconditions.checkArgument(offset >= 0, "offset must be nonnegative");
+    return SqlSessions.readSnapshot(
+        () -> {
+          DomainPO domain = getDomainPOByMetalakeAndName(ident.namespace().level(0), ident.name());
+          authorize.accept(fromDomainPOWithParent(domain, ident.namespace()));
+          List<DomainMemberMapper.NamedMember> members =
+              SessionUtils.getWithoutCommit(
+                  DomainMemberMapper.class,
+                  mapper ->
+                      mapper.liveMembers(
+                          domain.metalakeId(), domain.domainId(), limit + 1, offset));
+          boolean hasMore = members.size() > limit;
+          return new DefinitionMemberPage(
+              List.copyOf(hasMore ? members.subList(0, limit) : members), hasMore);
+        });
   }
 
   /**

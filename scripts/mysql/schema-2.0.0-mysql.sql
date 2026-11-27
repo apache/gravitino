@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'column audit info',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_tid_ver_cid_del` (`table_id`, `table_version`, `column_id`, `deleted_at`),
+    INDEX idx_column_liveness (column_id, deleted_at, table_id, table_version),
     KEY `table_column_version_info_idx_mid` (`metalake_id`),
     KEY `table_column_version_info_idx_cid` (`catalog_id`),
     KEY `table_column_version_info_idx_sid` (`schema_id`)
@@ -945,5 +946,6 @@ CREATE TABLE IF NOT EXISTS kb_article_relation_meta (
     CONSTRAINT uk_kba_binding UNIQUE (article_id, target_id, target_type, live_key),
     INDEX idx_kba_target (target_id, target_type, deleted_at),
     INDEX idx_kba_relation_metalake (metalake_id, deleted_at),
+    INDEX idx_kba_binding_scan (target_type, deleted_at, id),
     INDEX idx_kba_relation_deleted (deleted_at, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Current Article bindings';
