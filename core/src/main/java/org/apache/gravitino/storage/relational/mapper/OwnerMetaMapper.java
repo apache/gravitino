@@ -31,6 +31,7 @@ import org.apache.gravitino.storage.relational.po.auth.ChangedOwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -152,6 +153,27 @@ public interface OwnerMetaMapper {
   OwnerInfo selectOwnerByMetadataObjectIdAndType(
       @Param("metadataObjectId") long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
+
+  /**
+   * Reads live ownership assignments, newest first for each object, matching the single-object
+   * lookup even when multiple assignments are live.
+   *
+   * @param ids stable metadata object IDs
+   * @param type the metadata object type
+   * @return object and owner identities ordered by object and assignment recency
+   */
+  @Select(
+      """
+      <script>
+      SELECT metadata_object_id AS metadataObjectId, owner_id AS ownerId, owner_type AS ownerType
+      FROM owner_meta
+      WHERE metadata_object_type=#{type} AND deleted_at=0 AND metadata_object_id IN
+      <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
+      ORDER BY metadata_object_id, updated_at DESC, id DESC
+      </script>
+      """)
+  List<OwnerRelPO> listCurrentOwnerAssignments(
+      @Param("ids") List<Long> ids, @Param("type") String type);
 
   /** Resolves the current term identity and owner in one read, including after name reuse. */
   @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectGlossaryTermOwner")

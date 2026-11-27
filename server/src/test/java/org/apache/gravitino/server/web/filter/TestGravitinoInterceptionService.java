@@ -41,6 +41,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.servlet.http.HttpServletRequest;
@@ -139,6 +140,8 @@ import org.glassfish.hk2.api.Descriptor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -1996,20 +1999,46 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
+  @ResourceLock(Resources.LOCALE)
+  public void testArticleOwnerGetUsesLocaleIndependentType() throws Throwable {
+    Method method =
+        OwnerOperations.class.getMethod(
+            "getOwnerForObject", String.class, String.class, String.class);
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    when(authorizer.canAccessArticle(any(), ArgumentMatchers.eq("metalake"), any(), any()))
+        .thenReturn(true);
+    Locale previous = Locale.getDefault();
+    try {
+      for (Locale locale : List.of(Locale.ROOT, Locale.forLanguageTag("tr-TR"))) {
+        Locale.setDefault(locale);
+        MethodInvocation invocation = mock(MethodInvocation.class);
+        when(invocation.getMethod()).thenReturn(method);
+        when(invocation.getArguments())
+            .thenReturn(new Object[] {"metalake", "knowledge_base_article", "guide"});
+        when(invocation.proceed()).thenReturn(Response.ok().build());
+        assertEquals(
+            200, invokeWithAuthorizer(authorizer, mock(EventBus.class), invocation).getStatus());
+        verify(invocation).proceed();
+      }
+    } finally {
+      Locale.setDefault(previous);
+    }
+  }
+
+  @Test
   public void testExistingCatalogConnectionAllowsUseCatalogWithoutProposedChanges()
       throws Throwable {
     GravitinoAuthorizer authorizer = catalogConnectionAuthorizer(true, false);
 
     MethodInvocation noBody = testExistingConnectionInvocation(null);
-    Response noBodyResponse =
-        invokeTestExistingConnection(authorizer, mock(EventBus.class), noBody);
+    Response noBodyResponse = invokeWithAuthorizer(authorizer, mock(EventBus.class), noBody);
     assertEquals(Response.Status.OK.getStatusCode(), noBodyResponse.getStatus());
     verify(noBody).proceed();
 
     MethodInvocation emptyChanges =
         testExistingConnectionInvocation(new CatalogUpdatesRequest(Collections.emptyList()));
     Response emptyChangesResponse =
-        invokeTestExistingConnection(authorizer, mock(EventBus.class), emptyChanges);
+        invokeWithAuthorizer(authorizer, mock(EventBus.class), emptyChanges);
     assertEquals(Response.Status.OK.getStatusCode(), emptyChangesResponse.getStatus());
     verify(emptyChanges).proceed();
   }
@@ -2020,8 +2049,7 @@ public class TestGravitinoInterceptionService {
     MethodInvocation invocation = testExistingConnectionInvocation(proposedCatalogChanges());
 
     Response response =
-        invokeTestExistingConnection(
-            catalogConnectionAuthorizer(true, false), eventBus, invocation);
+        invokeWithAuthorizer(catalogConnectionAuthorizer(true, false), eventBus, invocation);
 
     assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
     verify(invocation, never()).proceed();
@@ -2040,7 +2068,7 @@ public class TestGravitinoInterceptionService {
     MethodInvocation invocation = testExistingConnectionInvocation(proposedCatalogChanges());
 
     Response response =
-        invokeTestExistingConnection(
+        invokeWithAuthorizer(
             catalogConnectionAuthorizer(false, true), mock(EventBus.class), invocation);
 
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -2192,7 +2220,7 @@ public class TestGravitinoInterceptionService {
     return authorizer;
   }
 
-  private Response invokeTestExistingConnection(
+  private Response invokeWithAuthorizer(
       GravitinoAuthorizer authorizer, EventBus eventBus, MethodInvocation invocation)
       throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
