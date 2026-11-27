@@ -43,6 +43,7 @@ dependencies {
   testAnnotationProcessor(libs.lombok)
 
   testImplementation(project(":core"))
+  testImplementation(testFixtures(project(":common")))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))

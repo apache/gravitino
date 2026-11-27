@@ -157,6 +157,10 @@ from gravitino.rest.rest_utils import (
     encode_metadata_object_name,
     encode_string,
 )
+from gravitino.name_identifier import NameIdentifier
+from gravitino.api.ontology.ontology import Ontology
+from gravitino.api.ontology.ontology_change import OntologyChange
+from gravitino.client.ontology_operations import SupportsOntologies
 from gravitino.utils.http_client import HTTPClient
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.string_utils import StringUtils
@@ -222,6 +226,7 @@ class GravitinoMetalake(
             _audit=metalake.audit_info(),
         )
         self.rest_client = client
+        self._ontology_operations = SupportsOntologies(client, self.name())
         metalake_object = MetadataObjects.of(
             [self.name()], MetadataObject.Type.METALAKE
         )
@@ -231,6 +236,46 @@ class GravitinoMetalake(
         self._object_secret_operations = MetadataObjectSecretOperations(
             self.name(), metalake_object, client
         )
+
+    def list_ontologies(self) -> list[str]:
+        """Lists visible ontology names."""
+        return self._ontology_operations.list_ontologies()
+
+    def load_ontology(self, name: str) -> Ontology:
+        """Loads the latest ontology snapshot."""
+        return self._ontology_operations.load_ontology(name)
+
+    def create_ontology(
+        self,
+        name: str,
+        comment: Optional[str],
+        definition: dict,
+        properties: Optional[dict[str, str]] = None,
+    ) -> Ontology:
+        """Creates an ontology."""
+        return self._ontology_operations.create_ontology(
+            name, comment, definition, properties
+        )
+
+    def import_ontology(self, document: str, document_format: str = "yaml") -> Ontology:
+        """Imports an Ossie ontology document."""
+        return self._ontology_operations.import_ontology(document, document_format)
+
+    def export_ontology(self, name: str, document_format: str = "yaml") -> str:
+        """Exports the ontology as an Ossie document."""
+        return self._ontology_operations.export_ontology(name, document_format)
+
+    def alter_ontology(self, name: str, *changes: OntologyChange) -> Ontology:
+        """Applies an ordered batch of changes."""
+        return self._ontology_operations.alter_ontology(name, *changes)
+
+    def drop_ontology(self, name: str) -> bool:
+        """Drops an ontology with no live mappings."""
+        return self._ontology_operations.drop_ontology(name)
+
+    def list_ontology_mappings(self, name: str) -> list[NameIdentifier]:
+        """Lists the visible mapping identifiers, relative to the metalake."""
+        return self._ontology_operations.list_ontology_mappings(name)
 
     def list_catalogs(self) -> List[str]:
         """List all the catalogs under this metalake.

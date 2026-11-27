@@ -31,6 +31,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.SupportsDomains;
+import org.apache.gravitino.ontology.SupportsOntologyMappings;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -54,6 +55,7 @@ class GenericSemanticModel
   @Nullable private final String publishedBy;
   @Nullable private final Instant publishedAt;
   private final MetadataObjectDomainOperations objectDomainOperations;
+  private final SupportsOntologyMappings mappingOperations;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
@@ -63,6 +65,8 @@ class GenericSemanticModel
   GenericSemanticModel(
       SemanticModel semanticModel, RESTClient restClient, Namespace semanticModelNamespace) {
     this.name = semanticModel.name();
+    this.mappingOperations =
+        new OntologyMappingClientOperations(restClient, semanticModelNamespace, name);
     this.comment = semanticModel.comment();
     this.definition = semanticModel.definition();
     Map<String, String> sourceProperties = semanticModel.properties();
@@ -88,6 +92,12 @@ class GenericSemanticModel
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(
             semanticModelNamespace.level(0), metadataObject, restClient);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SupportsOntologyMappings supportsOntologyMappings() {
+    return mappingOperations;
   }
 
   /** {@inheritDoc} */

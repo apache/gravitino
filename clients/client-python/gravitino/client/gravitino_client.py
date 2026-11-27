@@ -33,6 +33,8 @@ from gravitino.api.job.job_template import JobTemplate
 from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.ontology.ontology import Ontology
+from gravitino.api.ontology.ontology_change import OntologyChange
 from gravitino.api.policy.policy import Policy
 from gravitino.api.policy.policy_association_selector import PolicyAssociationSelector
 from gravitino.api.policy.policy_operations import PolicyOperations
@@ -45,6 +47,7 @@ from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
+from gravitino.name_identifier import NameIdentifier
 
 from ..api.tag.tag import Tag
 
@@ -288,6 +291,46 @@ class GravitinoClient(
             NoSuchJobException: If no job with the specified ID exists.
         """
         return self.get_metalake().cancel_job(job_id)
+
+    def list_ontologies(self) -> list[str]:
+        """List the visible ontologies in the current metalake."""
+        return self.get_metalake().list_ontologies()
+
+    def load_ontology(self, name: str) -> Ontology:
+        """Load the current ontology by name."""
+        return self.get_metalake().load_ontology(name)
+
+    def create_ontology(
+        self,
+        name: str,
+        comment: str | None,
+        definition: dict,
+        properties: dict[str, str] | None = None,
+    ) -> Ontology:
+        """Create an ontology from a Gravitino definition."""
+        return self.get_metalake().create_ontology(
+            name, comment, definition, properties
+        )
+
+    def import_ontology(self, document: str, document_format: str = "yaml") -> Ontology:
+        """Create an ontology from an Ossie document."""
+        return self.get_metalake().import_ontology(document, document_format)
+
+    def export_ontology(self, name: str, document_format: str = "yaml") -> str:
+        """Export an ontology in the requested Ossie format."""
+        return self.get_metalake().export_ontology(name, document_format)
+
+    def alter_ontology(self, name: str, *changes: OntologyChange) -> Ontology:
+        """Apply ontology changes in order."""
+        return self.get_metalake().alter_ontology(name, *changes)
+
+    def drop_ontology(self, name: str) -> bool:
+        """Drop an ontology and return whether it existed."""
+        return self.get_metalake().drop_ontology(name)
+
+    def list_ontology_mappings(self, name: str) -> list[NameIdentifier]:
+        """List the visible mappings that reference an ontology."""
+        return self.get_metalake().list_ontology_mappings(name)
 
     # Tag operations
     def list_tags(self) -> list[str]:

@@ -132,6 +132,24 @@ public class TestGravitinoMetalake extends TestBase {
     gravitinoClient.close();
   }
 
+  /** Verifies that full and relative REST identifiers use the same client representation. */
+  @Test
+  public void testListOntologyMappingsRelativeToMetalake() throws JsonProcessingException {
+    String path = "/api/metalakes/" + metalakeName + "/ontologies/Sales/mappings";
+    NameIdentifier relative = NameIdentifier.of("catalog", "schema", "model", "mapping");
+    NameIdentifier full = NameIdentifier.of(metalakeName, "catalog", "schema", "model", "mapping");
+    for (NameIdentifier identifier : List.of(full, relative)) {
+      buildMockResource(
+          Method.GET,
+          path,
+          null,
+          new EntityListResponse(new NameIdentifier[] {identifier}),
+          HttpStatus.SC_OK);
+      Assertions.assertArrayEquals(
+          new NameIdentifier[] {relative}, gravitinoClient.listOntologyMappings("Sales"));
+    }
+  }
+
   @Test
   public void testListCatalogs() throws JsonProcessingException {
     String path = "/api/metalakes/" + metalakeName + "/catalogs";
