@@ -93,7 +93,9 @@ public interface KnowledgeBaseArticleMapper {
   /** Reads metadata and relations together in a caller's transaction. */
   @SelectProvider(type = KnowledgeBaseArticleLookupSQL.class, method = "joined")
   List<KnowledgeBaseArticlePO> joined(
-      @Param("metalake") String metalake, @Param("name") @Nullable String name);
+      @Param("metalake") String metalake,
+      @Param("name") @Nullable String name,
+      @Param("domains") @Nullable List<Long> domains);
 
   /** Reads metadata and relations for a batch of Articles from the same snapshot. */
   @SelectProvider(type = KnowledgeBaseArticleLookupSQL.class, method = "joinedBatch")

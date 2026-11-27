@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Set;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.junit.jupiter.api.Test;
@@ -88,6 +89,7 @@ class TestArticleEdits {
         edits
             .apply(
                 existing,
+                existing.domainIds(),
                 new KnowledgeBaseArticleChange[] {KnowledgeBaseArticleChange.updateTitle("new")})
             .bodyUpdate());
     assertEquals(
@@ -95,6 +97,7 @@ class TestArticleEdits {
         edits
             .apply(
                 existing,
+                existing.domainIds(),
                 new KnowledgeBaseArticleChange[] {
                   KnowledgeBaseArticleChange.updateBody(existing.bodyUpdate())
                 })
@@ -126,6 +129,7 @@ class TestArticleEdits {
         1,
         "guide",
         ArticleCreate.builder().withTitle("Guide").withBody(body).build(),
+        Set.of(),
         () -> edits.storedBody(body));
   }
 }

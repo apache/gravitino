@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.kb;
 
+import static org.apache.gravitino.storage.relational.service.GlossaryDomainFixtures.insertDomain;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -48,6 +50,7 @@ import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaS
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.MissingArticleScopeException;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.NameConflictException;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -377,6 +380,64 @@ class TestArticleManager extends TestJDBCBackend {
     assertEquals(3, article.revision());
     assertEquals("New title", article.title());
     assertEquals("New comment", article.comment());
+  }
+
+  @TestTemplate
+  void domainReadsWithoutAuthorizationRequireASnapshot() throws Exception {
+    createAndInsertMakeLake(LAKE);
+    insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    var created = manager.createArticle(LAKE, request().addDomains("Sales").build());
+    SqlSessions.getSqlSession();
+    try {
+      assertThrows(IllegalStateException.class, () -> manager.loadArticle(LAKE, "guide"));
+      assertThrows(IllegalStateException.class, () -> manager.listArticles(LAKE, "Sales"));
+      assertEquals(
+          created.revisionToken(), manager.getArticleContent(LAKE, "guide").revisionToken());
+    } finally {
+      SqlSessions.closeSqlSession();
+    }
+    SqlSessions.readSnapshot(
+        () -> {
+          assertEquals(List.of("Sales"), manager.loadArticle(LAKE, "guide").article().domains());
+          CompletableFuture.runAsync(() -> manager.detachDomain(LAKE, "guide", "Sales"))
+              .orTimeout(15, TimeUnit.SECONDS)
+              .join();
+          assertEquals(List.of("Sales"), manager.listArticles(LAKE, "Sales").get(0).domains());
+          return null;
+        });
+    assertTrue(manager.listArticles(LAKE, "Sales").isEmpty());
+  }
+
+  @TestTemplate
+  void concurrentDomainReplacementsWithoutTokensFollowCommitOrder() throws Exception {
+    createAndInsertMakeLake(LAKE);
+    insertDomain(LAKE, "one", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    insertDomain(LAKE, "two", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    manager.createArticle(LAKE, request().build());
+    var first =
+        CompletableFuture.supplyAsync(
+            () ->
+                manager.alterArticle(
+                    LAKE,
+                    "guide",
+                    null,
+                    KnowledgeBaseArticleChange.updateDomains(new String[] {"one"}),
+                    KnowledgeBaseArticleChange.updateTitle("Edited")));
+    var second =
+        manager.alterArticle(
+            LAKE,
+            "guide",
+            null,
+            KnowledgeBaseArticleChange.updateDomains(new String[] {"two"}),
+            KnowledgeBaseArticleChange.updateComment("Changed"));
+    var peer = first.get(15, TimeUnit.SECONDS);
+    assertEquals(Set.of(2L, 3L), Set.of(peer.article().revision(), second.article().revision()));
+    var current = manager.loadArticle(LAKE, "guide");
+    assertEquals(
+        peer.article().revision() == 3 ? List.of("one") : List.of("two"),
+        current.article().domains());
+    assertEquals("Edited", current.article().title());
+    assertEquals("Changed", current.article().comment());
   }
 
   @TestTemplate

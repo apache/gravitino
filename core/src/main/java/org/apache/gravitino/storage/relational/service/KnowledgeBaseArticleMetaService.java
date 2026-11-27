@@ -36,14 +36,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
@@ -52,6 +55,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -161,6 +165,22 @@ public final class KnowledgeBaseArticleMetaService {
   /** Lists stored metadata and binding identities. */
   public List<KnowledgeBaseArticleEntity> list(Namespace namespace) {
     return readAll(namespace);
+  }
+
+  /** Selects Article candidates matching any visible Domain ID in the caller's snapshot. */
+  public List<KnowledgeBaseArticleEntity> listByDomains(Namespace namespace, Set<Long> domains) {
+    String lake = metalakeName(namespace);
+    Map<Long, KnowledgeBaseArticleEntity> matches = new TreeMap<>();
+    return SessionUtils.getWithoutCommit(
+        KnowledgeBaseArticleMapper.class,
+        mapper -> {
+          for (List<Long> batch : Lists.partition(List.copyOf(domains), LOOKUP_BATCH_SIZE)) {
+            for (var article : aggregate(namespace, mapper.joined(lake, null, batch))) {
+              matches.put(article.id(), article);
+            }
+          }
+          return List.copyOf(matches.values());
+        });
   }
 
   /** Reads the Article and the identity used for its editing token from one snapshot. */
@@ -295,7 +315,8 @@ public final class KnowledgeBaseArticleMetaService {
         overwrite,
         hook,
         () -> lockMetalake(entity.namespace()),
-        (id, conflict) -> conflict);
+        (id, conflict) -> conflict,
+        UnaryOperator.identity());
   }
 
   /**
@@ -316,7 +337,12 @@ public final class KnowledgeBaseArticleMetaService {
       BiFunction<Long, NameConflictException, RuntimeException> onNameConflict)
       throws IOException {
     return createScoped(
-        entity.nameIdentifier(), () -> entity, expectedMetalakeId, hook, onNameConflict);
+        entity.nameIdentifier(),
+        () -> entity,
+        expectedMetalakeId,
+        hook,
+        onNameConflict,
+        UnaryOperator.identity());
   }
 
   /** Prepares the new Article under the metalake lock on each name allocation attempt. */
@@ -325,7 +351,8 @@ public final class KnowledgeBaseArticleMetaService {
       Supplier<KnowledgeBaseArticleEntity> prepare,
       @Nullable Long expectedMetalakeId,
       TransactionHook hook,
-      BiFunction<Long, NameConflictException, RuntimeException> onNameConflict)
+      BiFunction<Long, NameConflictException, RuntimeException> onNameConflict,
+      UnaryOperator<KnowledgeBaseArticleEntity> project)
       throws IOException {
     return insertScoped(
         ident,
@@ -345,7 +372,8 @@ public final class KnowledgeBaseArticleMetaService {
           }
           return id;
         },
-        onNameConflict);
+        onNameConflict,
+        project);
   }
 
   private ScopedArticle insertScoped(
@@ -354,7 +382,8 @@ public final class KnowledgeBaseArticleMetaService {
       boolean overwrite,
       TransactionHook hook,
       LongSupplier lockParent,
-      BiFunction<Long, NameConflictException, RuntimeException> onNameConflict)
+      BiFunction<Long, NameConflictException, RuntimeException> onNameConflict,
+      UnaryOperator<KnowledgeBaseArticleEntity> project)
       throws IOException {
     record InsertConflict(long metalakeId, EntityAlreadyExistsException failure) {}
     AtomicReference<InsertConflict> insertConflict = new AtomicReference<>();
@@ -377,7 +406,8 @@ public final class KnowledgeBaseArticleMetaService {
             if (before != null) {
               KnowledgeBaseArticlePO row =
                   lockForChange(mapper, metalakeId, before, entity.domainIds(), null);
-              return new ScopedArticle(metalakeId, replace(mapper, row, before, entity, hook));
+              return new ScopedArticle(
+                  metalakeId, project.apply(replace(mapper, row, before, entity, hook)));
             }
             entity.validateTextForWrite(null);
             requireDomainsLive(lockLiveDomains(metalakeId, entity.domainIds()));
@@ -405,7 +435,7 @@ public final class KnowledgeBaseArticleMetaService {
             addBindings(mapper, row, initial.bindings());
             changeMemberships(row, Set.of(), initial.domainIds());
             hook.onChange(null, initial);
-            return new ScopedArticle(metalakeId, initial);
+            return new ScopedArticle(metalakeId, project.apply(initial));
           });
     } catch (RuntimeException e) {
       // A duplicate from a binding or extension belongs to that write.
@@ -499,18 +529,88 @@ public final class KnowledgeBaseArticleMetaService {
       Function<ScopedArticle, KnowledgeBaseArticleEntity> edit,
       TransactionHook hook,
       Function<NoSuchEntityException, RuntimeException> onMissingTarget) {
-    return withLockedRow(
-        ident,
-        onMissingTarget,
-        (mapper, row) -> {
-          long lake = row.getMetalakeId();
-          KnowledgeBaseArticleEntity before = materialize(ident.namespace(), row, mapper);
+    return editScoped(ident, null, edit, hook, UnaryOperator.identity(), onMissingTarget);
+  }
+
+  /**
+   * Locks the planned Domains before the Article and projects the committed metadata under lock.
+   */
+  public ScopedArticle editScoped(
+      NameIdentifier ident,
+      @Nullable Set<Long> requestedDomains,
+      Function<ScopedArticle, KnowledgeBaseArticleEntity> edit,
+      TransactionHook hook,
+      UnaryOperator<KnowledgeBaseArticleEntity> project,
+      Function<NoSuchEntityException, RuntimeException> onMissingTarget) {
+    return write(
+        mapper -> {
+          long lake;
+          try {
+            lake = lockMetalake(ident.namespace());
+          } catch (NoSuchEntityException missing) {
+            throw onMissingTarget.apply(missing);
+          }
+          KnowledgeBaseArticleEntity before;
+          KnowledgeBaseArticlePO row;
+          if (requestedDomains == null) {
+            row = mapper.lock(lake, KnowledgeBaseArticle.normalizeName(ident.name()));
+            if (row == null) {
+              throw onMissingTarget.apply(missing(ident));
+            }
+            before = materialize(ident.namespace(), row, mapper);
+          } else {
+            before = observe(ident);
+            if (before == null) {
+              throw onMissingTarget.apply(missing(ident));
+            }
+            // Revalidate the observed revision before reporting a missing Domain. A peer may
+            // have removed the membership and dropped the Domain while this plan waited.
+            Long missingDomain =
+                lockLiveDomains(lake, Sets.union(before.domainIds(), requestedDomains));
+            row = lockForChange(mapper, lake, before, before.domainIds(), null);
+            if (missingDomain != null) {
+              throw new NoSuchDomainException("Requested Domain does not exist");
+            }
+          }
           KnowledgeBaseArticleEntity after = edit.apply(new ScopedArticle(lake, before));
           Preconditions.checkArgument(
-              before.domainIds().equals(after.domainIds())
-                  && before.bindings().equals(after.bindings()),
+              before.bindings().equals(after.bindings())
+                  && (requestedDomains == null
+                      ? before.domainIds().equals(after.domainIds())
+                      : Sets.union(before.domainIds(), requestedDomains)
+                          .containsAll(after.domainIds())),
               "Relation changes require endpoint lock planning");
-          return new ScopedArticle(lake, replace(mapper, row, before, after, hook));
+          return new ScopedArticle(lake, project.apply(replace(mapper, row, before, after, hook)));
+        });
+  }
+
+  /** Locks and checks the Domain before looking up the member, including on an absent member. */
+  public void detachDomain(
+      NameIdentifier ident,
+      long domainId,
+      LongConsumer lockDomain,
+      Function<KnowledgeBaseArticleEntity, AuditInfo> modifiedAudit,
+      TransactionHook hook) {
+    write(
+        mapper -> {
+          long lake = lockMetalake(ident.namespace());
+          lockDomain.accept(lake);
+          KnowledgeBaseArticlePO row =
+              mapper.lock(lake, KnowledgeBaseArticle.normalizeName(ident.name()));
+          if (row != null) {
+            KnowledgeBaseArticleEntity before = materialize(ident.namespace(), row, mapper);
+            if (before.domainIds().contains(domainId)) {
+              Set<Long> remaining = new HashSet<>(before.domainIds());
+              remaining.remove(domainId);
+              KnowledgeBaseArticleEntity after =
+                  before.toBuilder()
+                      .withDomainIds(remaining)
+                      .withAuditInfo(modifiedAudit.apply(before))
+                      .build();
+              replace(mapper, row, before, after, hook);
+            }
+          }
+          return null;
         });
   }
 
@@ -735,7 +835,7 @@ public final class KnowledgeBaseArticleMetaService {
       return SessionUtils.getWithoutCommitFresh(
           KnowledgeBaseArticleMapper.class,
           m -> {
-            List<KnowledgeBaseArticlePO> rows = m.joined(metalake, null);
+            List<KnowledgeBaseArticlePO> rows = m.joined(metalake, null, null);
             if (rows.isEmpty()) {
               throw new NoSuchEntityException(
                   NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "metalake", metalake);
@@ -837,7 +937,7 @@ public final class KnowledgeBaseArticleMetaService {
     List<KnowledgeBaseArticlePO> rows =
         SessionUtils.getWithoutCommitFresh(
             KnowledgeBaseArticleMapper.class,
-            mapper -> mapper.joined(metalakeName(namespace), name));
+            mapper -> mapper.joined(metalakeName(namespace), name, null));
     return rows.isEmpty()
         ? null
         : new ScopedArticle(rows.get(0).getMetalakeId(), aggregate(namespace, rows).get(0));
@@ -887,6 +987,9 @@ public final class KnowledgeBaseArticleMetaService {
 
   @Nullable
   private Long lockLiveDomains(long metalakeId, Set<Long> ids) {
+    if (ids.isEmpty()) {
+      return null;
+    }
     return SessionUtils.getWithoutCommit(
         DomainMetaMapper.class,
         mapper -> {

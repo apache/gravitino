@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -78,13 +79,19 @@ final class ArticleEdits {
   }
 
   KnowledgeBaseArticleEntity create(
-      String metalake, long id, String name, ArticleCreate request, Supplier<ArticleBody> body) {
+      String metalake,
+      long id,
+      String name,
+      ArticleCreate request,
+      Set<Long> domains,
+      Supplier<ArticleBody> body) {
     Preconditions.checkArgument(
-        request.domains().isEmpty() && request.terms().isEmpty() && request.objects().isEmpty(),
+        request.terms().isEmpty() && request.objects().isEmpty(),
         "Initial Article relations require endpoint resolution");
     return KnowledgeBaseArticleEntity.builder()
         .withNamespace(Namespace.of(metalake))
         .withId(id)
+        .withDomainIds(domains)
         .withName(name)
         .withTitle(request.title())
         .withBodyUpdate(body.get())
@@ -102,7 +109,7 @@ final class ArticleEdits {
   }
 
   KnowledgeBaseArticleEntity apply(
-      KnowledgeBaseArticleEntity current, KnowledgeBaseArticleChange[] changes) {
+      KnowledgeBaseArticleEntity current, Set<Long> domains, KnowledgeBaseArticleChange[] changes) {
     var builder = current.toBuilder().withBodyUpdate(null);
     Map<String, String> properties = new HashMap<>(current.properties());
     for (KnowledgeBaseArticleChange change : changes) {
@@ -122,19 +129,24 @@ final class ArticleEdits {
         properties.put(property.getProperty(), property.getValue());
       } else if (change instanceof KnowledgeBaseArticleChange.RemoveProperty property) {
         properties.remove(property.getProperty());
-      } else {
+      } else if (!(change instanceof KnowledgeBaseArticleChange.UpdateDomains)) {
+        // Domain replacements are resolved together before the Article is locked.
         throw new IllegalArgumentException("Unsupported Article change: " + change);
       }
     }
     return builder
+        .withDomainIds(domains)
         .withProperties(properties)
-        .withAuditInfo(
-            AuditInfo.builder()
-                .withCreator(current.auditInfo().creator())
-                .withCreateTime(current.auditInfo().createTime())
-                .withLastModifier(PrincipalUtils.getCurrentUserName())
-                .withLastModifiedTime(Instant.now())
-                .build())
+        .withAuditInfo(modifiedAudit(current))
+        .build();
+  }
+
+  static AuditInfo modifiedAudit(KnowledgeBaseArticleEntity current) {
+    return AuditInfo.builder()
+        .withCreator(current.auditInfo().creator())
+        .withCreateTime(current.auditInfo().createTime())
+        .withLastModifier(PrincipalUtils.getCurrentUserName())
+        .withLastModifiedTime(Instant.now())
         .build();
   }
 

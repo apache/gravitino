@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.kb;
 
+import static org.apache.gravitino.storage.relational.service.GlossaryDomainFixtures.insertDomain;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -31,10 +32,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -57,10 +60,14 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.PolicyManager;
@@ -70,6 +77,8 @@ import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.service.DomainMetaService;
+import org.apache.gravitino.storage.relational.service.DomainRelService;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.TransactionHook;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
@@ -893,10 +902,259 @@ class TestArticleAuthorization extends TestJDBCBackend {
             .name());
   }
 
-  private static ArticleCreate article(String name, ArticleStatus status) {
+  @TestTemplate
+  void domainVisibilityAndOrderedReplacements() throws Exception {
+    insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    long retail = insertDomain(LAKE, "Retail", Domain.Status.PUBLISHED, "Sales", AUDIT_INFO);
+    long hidden = insertDomain(LAKE, "Secret", Domain.Status.DRAFT, "Sales", AUDIT_INFO);
+    role(
+        "salesReader",
+        SecurableObjects.parse(
+            "Sales", MetadataObject.Type.DOMAIN, List.of(Privileges.allow("USE_DOMAIN"))));
+    user("editor", "manage", "salesReader");
+    var initial =
+        as(
+            "lakeOwner",
+            () ->
+                manager.createArticle(
+                    LAKE, article("guide", ArticleStatus.PUBLISHED, "Secret", "Retail")));
+    as(
+        "lakeOwner",
+        () ->
+            manager.createArticle(LAKE, article("secretOnly", ArticleStatus.PUBLISHED, "Secret")));
+    assertEquals(List.of("Retail", "Secret"), initial.article().domains());
+    as(
+        "editor",
+        () -> {
+          var guide = manager.loadArticle(LAKE, "guide");
+          assertEquals(Set.of(retail), guide.article().domainIds());
+          assertEquals(List.of("Retail"), guide.article().domains());
+          assertEquals(List.of(guide.article()), manager.listArticles(LAKE, "Sales"));
+          assertEquals(List.of(guide.article()), manager.listArticles(LAKE, "Retail"));
+          assertThrows(NoSuchDomainException.class, () -> manager.listArticles(LAKE, "Secret"));
+          assertThrows(NoSuchDomainException.class, () -> manager.listArticles(LAKE, "sales"));
+          var roundtrip =
+              manager.alterArticle(LAKE, "guide", guide.revisionToken(), domains("Retail"));
+          assertEquals(guide.revisionToken(), roundtrip.revisionToken());
+          assertEquals(List.of("Retail"), roundtrip.article().domains());
+          assertThrows(
+              ForbiddenException.class, () -> manager.alterArticle(LAKE, "guide", null, domains()));
+          assertThrows(
+              ForbiddenException.class,
+              () ->
+                  manager.alterArticle(
+                      LAKE, "guide", null, domains("Sales", "Retail"), domains("Retail")));
+          assertThrows(
+              ForbiddenException.class,
+              () -> manager.createArticle(LAKE, article("denied", ArticleStatus.DRAFT, "Retail")));
+          return null;
+        });
+    assertTrue(as("outsider", () -> manager.listArticles(LAKE, "missing")).isEmpty());
+    as(
+        "lakeOwner",
+        () -> {
+          assertEquals(
+              Set.of(retail, hidden), manager.loadArticle(LAKE, "guide").article().domainIds());
+          assertEquals(
+              initial.revisionToken(),
+              manager
+                  .alterArticle(LAKE, "guide", null, domains(), domains("Secret", "Retail"))
+                  .revisionToken());
+          assertThrows(
+              NoSuchDomainException.class,
+              () -> manager.alterArticle(LAKE, "guide", null, domains("missing"), domains()));
+          assertThrows(
+              NoSuchDomainException.class,
+              () -> manager.createArticle(LAKE, article("bad", ArticleStatus.DRAFT, "missing")));
+          assertThrows(
+              NoSuchKnowledgeBaseArticleException.class, () -> manager.loadArticle(LAKE, "bad"));
+          var changed =
+              manager.alterArticle(
+                  LAKE,
+                  "guide",
+                  initial.revisionToken(),
+                  KnowledgeBaseArticleChange.updateComment("updated"),
+                  domains("Retail"));
+          assertEquals(2L, changed.article().revision());
+          assertEquals(List.of("Retail"), changed.article().domains());
+          assertThrows(
+              ArticleRevisionConflictException.class,
+              () -> manager.alterArticle(LAKE, "guide", initial.revisionToken(), domains()));
+          DomainMetaService.getInstance()
+              .updateDomain(
+                  NameIdentifierUtil.ofDomain(LAKE, "Retail"),
+                  (DomainEntity current) -> current.toBuilder().withName("Stores").build());
+          insertDomain(LAKE, "Retail", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+          assertTrue(manager.listArticles(LAKE, "Retail").isEmpty());
+          var renamed = manager.loadArticle(LAKE, "guide");
+          assertEquals(changed.revisionToken(), renamed.revisionToken());
+          assertEquals(List.of("Stores"), renamed.article().domains());
+          assertEquals(Set.of(retail), renamed.article().domainIds());
+          return null;
+        });
+  }
+
+  @TestTemplate
+  void retainingAManagedDomainWithUseDeniedIsANoOp() throws Exception {
+    insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    role(
+        "salesSteward",
+        SecurableObjects.parse(
+            "Sales",
+            MetadataObject.Type.DOMAIN,
+            List.of(Privileges.allow("MANAGE_DOMAIN"), Privileges.deny("USE_DOMAIN"))));
+    user("steward", "create", "salesSteward");
+    as(
+        "steward",
+        () -> {
+          manager.createArticle(LAKE, article("guide", ArticleStatus.PUBLISHED));
+          var added = manager.alterArticle(LAKE, "guide", null, domains("Sales"));
+          var retained = manager.alterArticle(LAKE, "guide", null, domains("Sales"));
+          assertEquals(added.revisionToken(), retained.revisionToken());
+          assertTrue(added.article().domains().isEmpty());
+          assertTrue(retained.article().domains().isEmpty());
+          assertTrue(retained.article().domainIds().isEmpty());
+          return null;
+        });
+    assertEquals(
+        List.of("Sales"),
+        as("lakeOwner", () -> manager.loadArticle(LAKE, "guide")).article().domains());
+  }
+
+  @TestTemplate
+  void domainAdminDetachesHiddenDraftWithoutArticlePrivileges() throws Exception {
+    insertDomain(LAKE, "Sales", Domain.Status.DRAFT, null, AUDIT_INFO);
+    role("domainAdmin", Privileges.allow("MANAGE_DOMAIN"));
+    user("steward", "domainAdmin");
+    var draft =
+        as(
+            "lakeOwner",
+            () -> manager.createArticle(LAKE, article("draft", ArticleStatus.DRAFT, "Sales")));
+    as(
+        "outsider",
+        () -> {
+          assertThrows(
+              NoSuchDomainException.class, () -> manager.detachDomain(LAKE, "missing", "Sales"));
+          return null;
+        });
+    as(
+        "steward",
+        () -> {
+          assertThrows(
+              NoSuchKnowledgeBaseArticleException.class, () -> manager.loadArticle(LAKE, "draft"));
+          manager.detachDomain(LAKE, "missing", "Sales");
+          manager.detachDomain(LAKE, "draft", "Sales");
+          manager.detachDomain(LAKE, "draft", "Sales");
+          return null;
+        });
+    var after = as("lakeOwner", () -> manager.loadArticle(LAKE, "draft"));
+    assertEquals(draft.article().revision() + 1, after.article().revision());
+    assertEquals("steward", after.article().auditInfo().lastModifier());
+    assertTrue(after.article().domainIds().isEmpty());
+    assertTrue(
+        DomainMetaService.getInstance().deleteDomain(NameIdentifierUtil.ofDomain(LAKE, "Sales")));
+  }
+
+  @TestTemplate
+  void reparentRevokesInheritedAuthorityBeforeAlterAndDetach() throws Exception {
+    insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    insertDomain(LAKE, "Finance", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    role(
+        "salesAdmin",
+        SecurableObjects.parse(
+            "Sales", MetadataObject.Type.DOMAIN, List.of(Privileges.allow("MANAGE_DOMAIN"))));
+    user("salesWriter", "manage", "salesAdmin");
+    for (boolean detach : List.of(false, true)) {
+      String name = detach ? "detach" : "alter";
+      insertDomain(LAKE, name, Domain.Status.PUBLISHED, "Sales", AUDIT_INFO);
+      var before =
+          as(
+              "lakeOwner",
+              () ->
+                  manager.createArticle(
+                      LAKE,
+                      article(
+                          name,
+                          ArticleStatus.PUBLISHED,
+                          detach ? new String[] {name} : new String[0])));
+      var observed = Mockito.mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(nodeA));
+      var moved = new AtomicBoolean();
+      var worker = Executors.newSingleThreadExecutor();
+      try {
+        // Commit the move after the initial inherited grant, before the write takes endpoint locks.
+        Mockito.doAnswer(
+                call -> {
+                  boolean granted =
+                      nodeA.authorize(
+                          call.getArgument(0),
+                          LAKE,
+                          call.getArgument(2),
+                          Privilege.Name.MANAGE_DOMAIN,
+                          call.getArgument(4));
+                  if (granted && moved.compareAndSet(false, true)) {
+                    worker
+                        .submit(
+                            () ->
+                                DomainRelService.getInstance()
+                                    .setDomainParentAndGet(
+                                        NameIdentifierUtil.ofDomain(LAKE, name),
+                                        NameIdentifierUtil.ofDomain(LAKE, "Finance"),
+                                        AUDIT_INFO,
+                                        ignored -> {}))
+                        .get(30, TimeUnit.SECONDS);
+                  }
+                  return granted;
+                })
+            .when(observed)
+            .authorize(
+                Mockito.any(),
+                Mockito.eq(LAKE),
+                Mockito.eq(MetadataObjects.of(null, "Sales", MetadataObject.Type.DOMAIN)),
+                Mockito.eq(Privilege.Name.MANAGE_DOMAIN),
+                Mockito.any());
+        env.setGravitinoAuthorizer(observed);
+        as(
+            "salesWriter",
+            () -> {
+              assertThrows(
+                  ForbiddenException.class,
+                  () -> {
+                    if (detach) {
+                      manager.detachDomain(LAKE, name, name);
+                    } else {
+                      manager.alterArticle(
+                          LAKE,
+                          name,
+                          before.revisionToken(),
+                          KnowledgeBaseArticleChange.updateBody(
+                              ArticleBody.of(ArticleBody.Format.MARKDOWN, "changed")),
+                          domains(name));
+                    }
+                  });
+              return null;
+            });
+        assertTrue(moved.get());
+      } finally {
+        env.setGravitinoAuthorizer(nodeA);
+        worker.shutdownNow();
+      }
+      var after = as("lakeOwner", () -> manager.loadArticle(LAKE, name));
+      assertEquals(before.revisionToken(), after.revisionToken());
+      assertEquals(before.article().domainIds(), after.article().domainIds());
+      assertEquals(
+          "body", as("lakeOwner", () -> manager.getArticleContent(LAKE, name)).body().content());
+    }
+  }
+
+  private static KnowledgeBaseArticleChange domains(String... names) {
+    return KnowledgeBaseArticleChange.updateDomains(names);
+  }
+
+  private static ArticleCreate article(String name, ArticleStatus status, String... domains) {
     return ArticleCreate.builder()
         .withName(name)
         .withTitle(name)
+        .addDomains(domains)
         .withStatus(status)
         .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
         .build();
@@ -945,13 +1203,17 @@ class TestArticleAuthorization extends TestJDBCBackend {
   }
 
   private void role(String name, Privilege privilege) throws Exception {
+    role(name, SecurableObjects.ofMetalake(LAKE, List.of(privilege)));
+  }
+
+  private void role(String name, SecurableObject object) throws Exception {
     backend.insert(
         createRoleEntity(
             ids.incrementAndGet(),
             AuthorizationUtils.ofRoleNamespace(LAKE),
             name,
             AUDIT_INFO,
-            List.of(SecurableObjects.ofMetalake(LAKE, List.of(privilege))),
+            List.of(object),
             null),
         false);
   }

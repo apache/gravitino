@@ -131,6 +131,22 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void metadataEditResolvesDecomposedArticleName() throws IOException {
+    createAndInsertMakeLake("lake");
+    var original = article(31, "café");
+    STORE.insert(original, false);
+    var edited =
+        STORE.editMetadata(
+            NameIdentifier.of("lake", "cafe\u0301"),
+            state -> state.article().toBuilder().withTitle("Updated").build(),
+            (before, after) -> {},
+            missing -> missing);
+    assertEquals(original.id(), edited.article().id());
+    assertEquals(2L, edited.article().revision());
+    assertEquals("Updated", STORE.get(original.nameIdentifier()).title());
+  }
+
+  @TestTemplate
   void testSupplementaryCharactersInArticleBody() throws IOException {
     createAndInsertMakeLake("lake");
     var markdown = ArticleBody.of(ArticleBody.Format.MARKDOWN, "a😀b");

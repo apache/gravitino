@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.builder.annotation.ProviderContext;
@@ -27,8 +28,22 @@ public final class KnowledgeBaseArticleLookupSQL {
   private KnowledgeBaseArticleLookupSQL() {}
 
   /** Returns the query for one Article or all Articles in a metalake. */
-  public static String joined(@Param("name") @Nullable String name, ProviderContext context) {
-    return lookup(name == null ? "" : "AND a.article_name=#{name}", context);
+  public static String joined(
+      @Param("name") @Nullable String name,
+      @Param("domains") @Nullable List<Long> domains,
+      ProviderContext context) {
+    String filter = name == null ? "" : "AND a.article_name=#{name}";
+    if (domains != null) {
+      filter +=
+          """
+           AND EXISTS (SELECT 1 FROM domain_member_rel scope
+             WHERE scope.metalake_id=a.metalake_id AND scope.member_id=a.article_id
+               AND scope.member_type='KNOWLEDGE_BASE_ARTICLE' AND scope.deleted_at=0
+               AND scope.domain_id IN
+               <foreach item="domain" collection="domains" open="(" separator="," close=")">#{domain}</foreach>)
+          """;
+    }
+    return lookup(filter, context);
   }
 
   /** Returns the query for a batch of names in a metalake. */
