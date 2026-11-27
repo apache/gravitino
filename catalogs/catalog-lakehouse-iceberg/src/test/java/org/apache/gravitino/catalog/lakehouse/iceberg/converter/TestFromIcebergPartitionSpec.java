@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg.converter;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -153,12 +152,10 @@ public class TestFromIcebergPartitionSpec extends TestBaseConvert {
             Types.NestedField.required(2, "region", Types.StringType.get()));
     PartitionSpec partitionSpec =
         PartitionSpec.builderFor(schema).alwaysNull("region", "region").identity("id").build();
-    Map<Integer, String> namesWithoutDroppedColumn = new HashMap<>(schema.idToName());
-    namesWithoutDroppedColumn.remove(2);
 
     Transform[] transforms =
         FromIcebergPartitionSpec.fromPartitionSpec(
-            partitionSpec, schema, namesWithoutDroppedColumn);
+            partitionSpec, new Schema(schema.findField("id")));
 
     Assertions.assertArrayEquals(new Transform[] {Transforms.identity("id")}, transforms);
   }
