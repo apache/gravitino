@@ -312,12 +312,14 @@ components:
       description: >
         Optional six-field Quartz cron (`second minute hour day-of-month month day-of-week`).
         When due, PolicyExpand schedules cron maintenance for matching tables.
+        Mutually exclusive with `commitTrigger=true`; set at most one trigger mode.
     commitTrigger:
       type: boolean
       nullable: true
       description: >
         When true, a successful Iceberg REST table update can enqueue commit-triggered
-        maintenance.
+        maintenance. Mutually exclusive with a non-blank `timeTrigger`; set at most one
+        trigger mode.
     minIntervalMs:
       type: integer
       format: int64
@@ -325,7 +327,8 @@ components:
       nullable: true
       description: >
         Optional cooldown in milliseconds after a finished run of this policy on a table.
-        When omitted, the server uses the per-type default.
+        Allowed only when `commitTrigger` is true (On write). When omitted on an On-write
+        policy, the server uses the per-type default. Ignored / rejected with `timeTrigger`.
     jobOptions:
       type: object
       nullable: true
@@ -488,7 +491,16 @@ components:
           nullable: true
           enum: [false, null]
           description: >
-            Must be false, null, or omitted. Orphan file removal rejects commit-triggered runs.
+            Must be false, null, or omitted. Orphan file removal is timeTrigger-only and
+            rejects commit-triggered runs.
+        minIntervalMs:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+          description: >
+            Not applicable for orphan cleanup. `minIntervalMs` requires `commitTrigger=true`,
+            which this policy type rejects.
         olderThanDays:
           type: integer
           format: int64

@@ -36,9 +36,10 @@ import org.apache.gravitino.annotation.Evolving;
  * keys to and from this value object via custom Jackson serdes (same idea as {@code
  * DistributionSerializer}).
  *
- * <p>Shared peer constraints are checked in {@link #of}; type-specific rules (for example rejecting
- * {@code commitTrigger} for orphan cleanup) belong on the concrete content or the server
- * create/alter path.
+ * <p>Shared peer constraints are checked in {@link #of}: {@code timeTrigger} and {@code
+ * commitTrigger=true} are mutually exclusive, and {@code minIntervalMs} is allowed only with {@code
+ * commitTrigger=true}. Type-specific rules (for example rejecting {@code commitTrigger} for orphan
+ * cleanup) belong on the concrete content or the server create/alter path.
  *
  * <p>{@code timeTrigger} cron syntax is <strong>not</strong> validated here. The scheduler
  * registration path (db-scheduler / runtime cron parser) is the source of truth; validating with a
@@ -77,12 +78,14 @@ public final class PolicyExecutionSpec {
    * @param timeTrigger optional cron expression
    * @param commitTrigger optional commit-trigger flag; any non-null value (including {@code false})
    *     is retained
-   * @param minIntervalMs optional cooldown ms
+   * @param minIntervalMs optional cooldown ms; only valid with {@code commitTrigger=true}
    * @param jobOptions optional job options
    * @param updaterOptions optional updater options
    * @return immutable spec, or {@link #EMPTY} when every peer is unset
-   * @throws IllegalArgumentException if {@code minIntervalMs} is negative or an option map has a
-   *     blank key or value
+   * @throws IllegalArgumentException if both a non-blank {@code timeTrigger} and {@code
+   *     commitTrigger=true} are set, if {@code minIntervalMs} is set without {@code
+   *     commitTrigger=true}, if {@code minIntervalMs} is negative, or if an option map has a blank
+   *     key or value
    */
   public static PolicyExecutionSpec of(
       @Nullable String timeTrigger,
@@ -93,8 +96,14 @@ public final class PolicyExecutionSpec {
     String normalizedTimeTrigger = StringUtils.isBlank(timeTrigger) ? null : timeTrigger;
     Map<String, String> normalizedJobOptions = copyOptions(jobOptions);
     Map<String, String> normalizedUpdaterOptions = copyOptions(updaterOptions);
+    boolean onWrite = Boolean.TRUE.equals(commitTrigger);
+    Preconditions.checkArgument(
+        normalizedTimeTrigger == null || !onWrite,
+        "timeTrigger and commitTrigger=true are mutually exclusive; set exactly one trigger mode");
     if (minIntervalMs != null) {
       Preconditions.checkArgument(minIntervalMs >= 0, "minIntervalMs must be >= 0");
+      Preconditions.checkArgument(
+          onWrite, "minIntervalMs is only allowed when commitTrigger is true");
     }
     validateOptionMap(normalizedJobOptions, "jobOptions");
     validateOptionMap(normalizedUpdaterOptions, "updaterOptions");

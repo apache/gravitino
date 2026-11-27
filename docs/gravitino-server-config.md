@@ -684,15 +684,18 @@ server, are documented with those services. See
 
 #### Table maintenance cooldowns
 
-When a table-maintenance policy omits `minIntervalMs`, the server uses these per-type keys, then
-the code defaults below. Policy content always wins when set.
+For On-write (`commitTrigger=true`) policies that omit `minIntervalMs`, the server uses these
+per-type keys, then the code defaults below. Policy content always wins when set. Scheduled
+(`timeTrigger`) runs do not apply this cooldown. Orphan cleanup is schedule-only and does not
+accept `minIntervalMs` on policy content; the orphan key below is unused by the TMS automation
+paths.
 
 | Configuration Item                                     | Description                                     | Default Value   |
 |--------------------------------------------------------|-------------------------------------------------|-----------------|
-| `gravitino.maintenance.compaction.minIntervalMs`       | Cooldown between finished compaction runs       | `3600000` (1h)  |
-| `gravitino.maintenance.manifest-rewrite.minIntervalMs` | Cooldown between finished manifest-rewrite runs | `3600000` (1h)  |
-| `gravitino.maintenance.snapshot-expiry.minIntervalMs`  | Cooldown between finished snapshot-expiry runs  | `3600000` (1h)  |
-| `gravitino.maintenance.orphan-cleanup.minIntervalMs`   | Cooldown between finished orphan-cleanup runs   | `86400000` (1d) |
+| `gravitino.maintenance.compaction.minIntervalMs`       | On-write cooldown between finished compaction runs       | `3600000` (1h)  |
+| `gravitino.maintenance.manifest-rewrite.minIntervalMs` | On-write cooldown between finished manifest-rewrite runs | `3600000` (1h)  |
+| `gravitino.maintenance.snapshot-expiry.minIntervalMs`  | On-write cooldown between finished snapshot-expiry runs  | `3600000` (1h)  |
+| `gravitino.maintenance.orphan-cleanup.minIntervalMs`   | Reserved (orphan cleanup is timeTrigger-only)            | `86400000` (1d) |
 
 ### Key Management
 

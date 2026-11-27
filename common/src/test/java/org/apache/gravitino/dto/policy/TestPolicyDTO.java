@@ -248,7 +248,7 @@ public class TestPolicyDTO {
         PolicyContentDTO.IcebergCompactionContentDTO.builder()
             .withExecutionSpec(
                 PolicyExecutionSpec.of(
-                    "0 0 2 * * ?",
+                    null,
                     true,
                     3_600_000L,
                     ImmutableMap.of("spark.executor.memory", "4g"),
@@ -266,14 +266,16 @@ public class TestPolicyDTO {
             .build();
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO);
-    Assertions.assertTrue(serJson.contains("\"timeTrigger\""));
+    Assertions.assertTrue(serJson.contains("\"commitTrigger\""));
+    Assertions.assertTrue(serJson.contains("\"minIntervalMs\""));
+    Assertions.assertFalse(serJson.contains("\"timeTrigger\""));
     Assertions.assertFalse(serJson.contains("\"executionSpec\""));
     PolicyDTO deserPolicyDTO = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
     Assertions.assertEquals(policyDTO, deserPolicyDTO);
 
     PolicyContentDTO.IcebergCompactionContentDTO content =
         (PolicyContentDTO.IcebergCompactionContentDTO) deserPolicyDTO.content();
-    Assertions.assertEquals("0 0 2 * * ?", content.timeTrigger());
+    Assertions.assertNull(content.timeTrigger());
     Assertions.assertEquals(Boolean.TRUE, content.commitTrigger());
     Assertions.assertEquals(3_600_000L, content.minIntervalMs());
     Assertions.assertEquals("4g", content.jobOptions().get("spark.executor.memory"));

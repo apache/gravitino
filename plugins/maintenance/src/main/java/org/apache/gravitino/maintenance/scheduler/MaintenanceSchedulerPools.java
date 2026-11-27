@@ -112,7 +112,8 @@ public class MaintenanceSchedulerPools implements AutoCloseable {
    *
    * @param dataSource relational JDBC pool shared with the entity store
    * @param config maintenance scheduler settings
-   * @param gravitinoConfig server config for {@code minIntervalMs} fallbacks and jobConf overlay
+   * @param gravitinoConfig server config for On-write {@code minIntervalMs} fallbacks and jobConf
+   *     overlay
    * @param jobManager TMS Spark submit+bind manager
    * @param actionManager occupancy / cooldown gate
    * @param actionMetaService soft-slot claim store used by cron/commit submit pipelines
@@ -143,7 +144,6 @@ public class MaintenanceSchedulerPools implements AutoCloseable {
                 tableEnumerator,
                 new CronJobClient(dataSource, gravitinoConfig),
                 actionManager,
-                gravitinoConfig,
                 config.expandScheduleBatchSize(),
                 policyMetaService));
     EXPAND_PIPELINE.set(() -> pipeline);

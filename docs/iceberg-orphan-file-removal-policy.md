@@ -19,7 +19,8 @@ policy. That list is not an association reject list: associating a policy does n
 `supportedObjectTypes`, and object policy lookup does not filter by it. Consumers decide whether
 the policy type applies to the object they are processing. See
 [Policies](./policies.md) and the OpenAPI description of `supportedObjectTypes`. It accepts time
-triggers only; `commitTrigger=true` is rejected.
+triggers only; `commitTrigger=true` and `minIntervalMs` are rejected (`minIntervalMs` requires
+On write).
 
 ## Policy Content
 

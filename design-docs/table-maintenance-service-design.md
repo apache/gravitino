@@ -174,10 +174,11 @@ framework. Read policy first, then scheduling.
 ### 5.1 Policy
 
 TMS reuses the existing metalake Policy APIs and does **not** add
-`/api/maintenance/table/policies`. Each policy covers **one** maintenance type. The same
-policy may enable both commit and time triggers (`commitTrigger` and `timeTrigger`).
+`/api/maintenance/table/policies`. Each policy covers **one** maintenance type. A policy may
+enable **at most one** trigger mode: a non-blank `timeTrigger` **or** `commitTrigger=true`
+(not both). Create/alter and `PolicyExecutionSpec.of` reject the combination.
 
-#### 5.1.1 Evaluate triggers (`commitTrigger` + `timeTrigger`)
+#### 5.1.1 Evaluate triggers (`commitTrigger` XOR `timeTrigger`)
 
 Triggers are **flat** peers on policy content (same JSON object as `jobOptions` /
 `updaterOptions` / `rewriteOptions` / `minIntervalMs`): `commitTrigger` (boolean) and
@@ -185,12 +186,13 @@ Triggers are **flat** peers on policy content (same JSON object as `jobOptions` 
 `policy_meta` only holds identity and attachment. The `scheduled_*_tasks` tables are runtime
 state for db-scheduler — not where operators set triggers.
 
-TMS has two trigger modes. They never feed each other's queues:
+TMS has two trigger modes. They never feed each other's queues, and a single policy binds to
+only one:
 
-| Wire field      | Runtime path                             | Which types                                     |
-| --------------- | ---------------------------------------- | ----------------------------------------------- |
-| `commitTrigger` | IRC → **commit-job** only (skips expand) | Compaction / manifest-rewrite / snapshot-expiry |
-| `timeTrigger`   | **policy-expand** → cron-job             | All four types                                  |
+| Wire field             | Runtime path                             | Which types                                     |
+| ---------------------- | ---------------------------------------- | ----------------------------------------------- |
+| `commitTrigger=true`   | IRC → **commit-job** only (skips expand) | Compaction / manifest-rewrite / snapshot-expiry |
+| `timeTrigger`          | **policy-expand** → cron-job             | All four types                                  |
 
 **`commitTrigger`** runs after a successful Iceberg commit through IRC. That fits types that
 rewrite or expire data and metadata from the commit stream. **`orphan-cleanup` does not:**
@@ -198,16 +200,18 @@ it scans storage for unreferenced files on a schedule. Running it on every commi
 too heavy. Create/alter rejects `commitTrigger = true` for orphan-cleanup; that type is
 **timeTrigger-only** when automation is enabled.
 
-**`minIntervalMs`** is the cooldown for **that policy's type** after `MAX(finished_at)` on
-`table_maintenance_job` for `(table, policy)`. Server conf and code defaults are
-lower-priority fallbacks.
+**`minIntervalMs`** is the On-write cooldown for **that policy's type** after `MAX(finished_at)`
+on `table_maintenance_job` for `(table, policy)`. It is allowed only with
+`commitTrigger=true`. Server conf and code defaults are lower-priority fallbacks for On-write
+policies that omit it. Scheduled (`timeTrigger`) expand/cron paths ignore this cooldown;
+overlap is blocked by the in-flight check only.
 
 **`timeTrigger` cron:** the string is stored as-is on the policy API. Syntax and time-zone
 rules are owned by the TMS / db-scheduler registration path (not re-validated with a second
 parser in `api`). Examples below use a typical six-field Quartz-style form; align examples
 with the scheduler contract when registration validation is wired.
 
-Example content:
+Example On-write content:
 
 ```json
 {
@@ -218,8 +222,16 @@ Example content:
     "type": "rest"
   },
   "commitTrigger": true,
-  "timeTrigger": "0 0 2 * * ?",
   "minIntervalMs": 3600000
+}
+```
+
+Example scheduled content:
+
+```json
+{
+  "rewriteOptions": { "target-file-size-bytes": "536870912" },
+  "timeTrigger": "0 0 2 * * ?"
 }
 ```
 
@@ -227,7 +239,7 @@ Example content:
 | ---------------- | ---------------------------------------------------------------------- |
 | `commitTrigger`  | IRC upserts commit-job; commit pool submits one chained Job            |
 | `timeTrigger`    | Sets / refreshes next `policy-expand` due time                         |
-| `minIntervalMs`  | Cooldown for this policy's type; highest when set                      |
+| `minIntervalMs`  | On-write cooldown for this policy's type; highest when set             |
 | `jobOptions`     | Non-sensitive Spark / IRC client props (`uri`, `type`, memory, …)      |
 | `updaterOptions` | Non-sensitive Gravitino updater props (`gravitino_uri`, `metalake`, …) |
 
@@ -380,10 +392,11 @@ many cron-jobs due now, then schedules itself for the next 02:00. Expand's due t
 
 Expand writes these one-shot rows **with a schedule-time job snapshot** in `task_data`
 (metalake, table targets, one chain step, merged `jobConf` including auth overlays).
-`minIntervalMs` is gated at expand / schedule so cooled-down tables are not scheduled.
-Most types use one table per job (`table:{table_id};policy:{policy_id}`). Batched
-**snapshot-expiry** may use `batch:{batch_id};policy:{policy_id}` (one snapshot covering several
-same-catalog tables; member table ids live in `task_data`).
+Expand / cron schedule does **not** apply `minIntervalMs` (On-write only); tables already
+in flight are still dropped. Most types use one table per job
+(`table:{table_id};policy:{policy_id}`). Batched **snapshot-expiry** may use
+`batch:{batch_id};policy:{policy_id}` (one snapshot covering several same-catalog tables;
+member table ids live in `task_data`).
 
 When a cron-job is due (cron pool), keep the callback short — consume the snapshot, claim, submit;
 do not sample or rebuild `jobConf` here. For a batch row, **any** in-flight table aborts the whole
@@ -541,24 +554,27 @@ onCommit does not. HTTP / Kafka commit ingress is out of scope.
 
 ### 7.3 Minimum interval
 
-`minIntervalMs` may be set on policy content **peer to `schedule`**. It applies to **that
-policy’s maintenance type**. When omitted, fall back to `gravitino.conf` then the code default.
+`minIntervalMs` may be set on policy content only with `commitTrigger=true` (On write). It
+applies to **that policy’s maintenance type** on the commit-job path. When omitted on an
+On-write policy, fall back to `gravitino.conf` then the code default. Scheduled
+(`timeTrigger`) paths do not use it. Orphan cleanup cannot set `commitTrigger` and therefore
+cannot set `minIntervalMs`.
 
 | Task type          | Code-default `minIntervalMs` | Rationale                                              |
 | ------------------ | ---------------------------- | ------------------------------------------------------ |
-| `compaction`       | `3600000` (1h)               | Often `onCommit`; cooldown after commit storms         |
-| `manifest-rewrite` | `3600000` (1h)               | Same — commit-driven with compaction / snapshot-expiry |
+| `compaction`       | `3600000` (1h)               | On-write cooldown after commit storms                  |
+| `manifest-rewrite` | `3600000` (1h)               | Same — On-write with compaction / snapshot-expiry      |
 | `snapshot-expiry`  | `3600000` (1h)               | Same                                                   |
-| `orphan-cleanup`   | `86400000` (1d)              | Crontab-only                                           |
+| `orphan-cleanup`   | `86400000` (1d)              | Reserved; type is timeTrigger-only                     |
 
-**Resolution** for a given type (first hit wins):
+**Resolution** for On-write types (first hit wins):
 
 1. effective policy content `minIntervalMs` (highest; that type’s policy)
-2. global `gravitino.maintenance.task.<type>.minIntervalMs`
+2. global `gravitino.maintenance.<type>.minIntervalMs` (see server config)
 3. code default
 
-Checked on cron/commit submit. Policy content still owns trigger thresholds (for example MSE); the
-interval only limits how often a type may run after the last finished job.
+Checked on commit-job schedule only. Policy content still owns trigger thresholds (for example
+MSE); the interval only limits how often an On-write type may run after the last finished job.
 
 ### 7.4 Client auth (`gravitino.conf`)
 

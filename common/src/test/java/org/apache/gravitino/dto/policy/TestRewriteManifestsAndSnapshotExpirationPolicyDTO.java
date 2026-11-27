@@ -52,7 +52,7 @@ class TestRewriteManifestsAndSnapshotExpirationPolicyDTO {
             null,
             null,
             null,
-            "0 30 1 * * ?",
+            null,
             true,
             900_000L,
             ImmutableMap.of("spark.executor.memory", "2g"),
@@ -65,8 +65,8 @@ class TestRewriteManifestsAndSnapshotExpirationPolicyDTO {
         "system_iceberg_snapshot_expiration",
         PolicyContents.icebergSnapshotExpiration(
             "0 0 4 * * ?",
-            false,
-            2_700_000L,
+            null,
+            null,
             ImmutableMap.of("spark.driver.memory", "1g"),
             ImmutableMap.of("metalake", "ml")));
   }
@@ -107,7 +107,9 @@ class TestRewriteManifestsAndSnapshotExpirationPolicyDTO {
             .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
             .build();
     String json = JsonUtils.objectMapper().writeValueAsString(dto);
-    Assertions.assertTrue(json.contains("\"timeTrigger\""));
+    Assertions.assertTrue(
+        json.contains("\"timeTrigger\"") || json.contains("\"commitTrigger\""),
+        "expected a flat trigger peer in JSON");
     Assertions.assertFalse(json.contains("\"executionSpec\""));
     PolicyDTO restored = JsonUtils.objectMapper().readValue(json, PolicyDTO.class);
     Assertions.assertEquals(dto, restored);
