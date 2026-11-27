@@ -29,7 +29,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalLong;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.TreeMap;
@@ -157,13 +156,10 @@ public class IcebergIdempotencyManager {
 
     IdempotencyStore idempotencyStore = store.get();
     long expiresAtMs = System.currentTimeMillis() + keyLifetime.toMillis();
-    long claim;
     try {
-      OptionalLong reservation = idempotencyStore.reserve(key, operationBinding, expiresAtMs);
-      if (reservation.isEmpty()) {
+      if (!idempotencyStore.reserve(key, operationBinding, expiresAtMs)) {
         return replay(idempotencyStore, key, operationBinding);
       }
-      claim = reservation.getAsLong();
     } catch (RuntimeException e) {
       LOG.warn(
           "Failed to access idempotency state for key {} before executing the mutation", key, e);
@@ -186,14 +182,21 @@ public class IcebergIdempotencyManager {
       if (status < Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()
           && !NON_FINALIZABLE_STATUSES.contains(status)) {
         release = false;
-        tryFinalize(idempotencyStore, key, claim, response);
+        tryFinalize(idempotencyStore, key, response);
       }
       return response;
     } finally {
       if (release) {
-        // Release only when the action throws or returns a retryable/auth response.
-        // A replacement owner's reservation must remain untouched.
-        idempotencyStore.release(key, claim);
+        // Release only when the action throws or returns a retryable/auth response. Swallow store
+        // failures so they cannot replace the mutation response or the thrown exception.
+        try {
+          idempotencyStore.release(key);
+        } catch (RuntimeException e) {
+          LOG.warn(
+              "Failed to release Idempotency-Key: {}; leaving any reservation until expiry",
+              key,
+              e);
+        }
       }
     }
   }
@@ -280,7 +283,7 @@ public class IcebergIdempotencyManager {
   }
 
   private void tryFinalize(
-      IdempotencyStore idempotencyStore, String idempotencyKey, long claim, Response response) {
+      IdempotencyStore idempotencyStore, String idempotencyKey, Response response) {
     String responseSummary;
     try {
       Object entity = response.getEntity();
@@ -291,16 +294,12 @@ public class IcebergIdempotencyManager {
       } else {
         responseSummary = icebergObjectMapper.writeValueAsString(entity);
       }
-      idempotencyStore.finalizeRecord(idempotencyKey, claim, response.getStatus(), responseSummary);
+      idempotencyStore.finalizeRecord(idempotencyKey, response.getStatus(), responseSummary);
       boolean finalized =
-          idempotencyStore
-              .load(idempotencyKey)
-              .filter(record -> record.isFinalized() && record.claim() == claim)
-              .isPresent();
+          idempotencyStore.load(idempotencyKey).filter(IdempotencyRecord::isFinalized).isPresent();
       if (!finalized) {
         LOG.warn(
-            "Response for Idempotency-Key: {} was not retained under this claim; "
-                + "leaving any reservation until expiry",
+            "Response for Idempotency-Key: {} was not retained; leaving any reservation until expiry",
             idempotencyKey);
       }
     } catch (JsonProcessingException | RuntimeException e) {

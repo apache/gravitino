@@ -24,7 +24,6 @@ import org.apache.gravitino.iceberg.service.idempotency.po.IcebergIdempotencyKey
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -49,33 +48,13 @@ public interface IcebergIdempotencyKeyMapper {
   int insert(@Param("po") IcebergIdempotencyKeyPO po);
 
   /**
-   * Replaces an expired reservation with a new generation.
+   * Replaces an expired reservation with a new one.
    *
    * @param po reservation to persist
    * @return number of affected rows
    */
   @UpdateProvider(type = IcebergIdempotencyKeySQLProviderFactory.class, method = "replaceExpired")
   int replaceExpired(@Param("po") IcebergIdempotencyKeyPO po);
-
-  /**
-   * Advances a counter under a transaction lock or creates it on first use.
-   *
-   * @param stripe counter selected by the key's final byte
-   */
-  @InsertProvider(
-      type = IcebergIdempotencyKeySQLProviderFactory.class,
-      method = "advanceGeneration")
-  void advanceGeneration(@Param("stripe") int stripe);
-
-  /**
-   * Reads the counter advanced by the current transaction.
-   *
-   * @param stripe counter selected by the key's final byte
-   * @return current generation, or null when the stripe has never been used
-   */
-  @Select("SELECT generation FROM iceberg_idempotency_generation_meta WHERE stripe = #{stripe}")
-  @Nullable
-  Long selectGeneration(@Param("stripe") int stripe);
 
   /**
    * Loads a finalized response within its reuse window.
@@ -90,10 +69,9 @@ public interface IcebergIdempotencyKeyMapper {
       @Param("idempotencyKey") String idempotencyKey, @Param("nowMs") long nowMs);
 
   /**
-   * Finalizes a live reservation owned by the given claim.
+   * Finalizes a live unfinalized reservation.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation fencing token
    * @param httpStatus response status
    * @param responseSummary serialized response body, or null for an empty body
    * @param nowMs current time in unix epoch milliseconds
@@ -102,22 +80,20 @@ public interface IcebergIdempotencyKeyMapper {
   @UpdateProvider(type = IcebergIdempotencyKeySQLProviderFactory.class, method = "finalizeRecord")
   int finalizeRecord(
       @Param("idempotencyKey") String idempotencyKey,
-      @Param("claim") long claim,
       @Param("httpStatus") int httpStatus,
       @Param("responseSummary") @Nullable String responseSummary,
       @Param("nowMs") long nowMs);
 
   /**
-   * Deletes only rows matching the statement's ownership or expiry guard.
+   * Deletes an unfinalized reservation.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation fencing token
    * @return number of affected rows
    */
   @DeleteProvider(
       type = IcebergIdempotencyKeySQLProviderFactory.class,
       method = "deleteReservation")
-  int deleteReservation(@Param("idempotencyKey") String idempotencyKey, @Param("claim") long claim);
+  int deleteReservation(@Param("idempotencyKey") String idempotencyKey);
 
   /**
    * Deletes only rows matching the statement's ownership or expiry guard.

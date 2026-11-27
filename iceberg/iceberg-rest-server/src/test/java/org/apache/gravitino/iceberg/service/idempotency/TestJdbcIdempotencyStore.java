@@ -29,7 +29,6 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -134,17 +133,17 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
                 IcebergConstants.ICEBERG_IDEMPOTENCY_CLEANUP_INTERVAL, "PT1H"));
     try (IdempotencyStore configured = IdempotencyStoreFactory.create(config)) {
       Assertions.assertInstanceOf(JdbcIdempotencyStore.class, configured);
-      long generation = configured.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-      configured.finalizeRecord(KEY, generation, 200, "{}");
+      Assertions.assertTrue(configured.reserve(KEY, BINDING, FAR_FUTURE_MS));
+      configured.finalizeRecord(KEY, 200, "{}");
       Assertions.assertEquals(BINDING, peer.load(KEY).orElseThrow().operationBinding());
     }
   }
 
   @TestTemplate
   void testReserveClaimsKeyOnlyOnce() {
-    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isPresent());
-    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
-    Assertions.assertTrue(store.reserve(OTHER_KEY, BINDING, FAR_FUTURE_MS).isPresent());
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS));
+    Assertions.assertFalse(store.reserve(KEY, BINDING, FAR_FUTURE_MS));
+    Assertions.assertTrue(store.reserve(OTHER_KEY, BINDING, FAR_FUTURE_MS));
   }
 
   @TestTemplate
@@ -163,7 +162,7 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
             () -> {
               try {
                 start.await();
-                if (contender.reserve(KEY, BINDING, FAR_FUTURE_MS).isPresent()) {
+                if (contender.reserve(KEY, BINDING, FAR_FUTURE_MS)) {
                   reserved.incrementAndGet();
                 }
               } catch (Exception e) {
@@ -187,10 +186,10 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
 
   @TestTemplate
   void testLoadReturnsEmptyUntilFinalized() {
-    long claim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS));
     Assertions.assertEquals(Optional.empty(), store.load(KEY));
 
-    store.finalizeRecord(KEY, claim, 200, "{\"a\":1}");
+    store.finalizeRecord(KEY, 200, "{\"a\":1}");
 
     IdempotencyRecord record = store.load(KEY).orElseThrow(AssertionError::new);
     Assertions.assertTrue(record.isFinalized());
@@ -203,8 +202,8 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
 
   @TestTemplate
   void testFinalizeWithoutBodyIsReplayable() {
-    long claim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-    store.finalizeRecord(KEY, claim, 204, null);
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS));
+    store.finalizeRecord(KEY, 204, null);
 
     IdempotencyRecord record = store.load(KEY).orElseThrow(AssertionError::new);
     Assertions.assertEquals(204, record.httpStatus().intValue());
@@ -213,70 +212,47 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
 
   @TestTemplate
   void testFinalizeDoesNotResurrectPurgedRecord() {
-    store.finalizeRecord(KEY, 1, 200, "{}");
+    store.finalizeRecord(KEY, 200, "{}");
     Assertions.assertEquals(Optional.empty(), store.load(KEY));
   }
 
   @TestTemplate
   void testReleaseFreesReservationButKeepsFinalizedResponse() {
-    long oldClaim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-    store.release(KEY, oldClaim);
-    long newClaim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS));
+    store.release(KEY);
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS));
 
-    store.finalizeRecord(KEY, newClaim, 201, "{\"b\":2}");
-    store.release(KEY, newClaim);
+    store.finalizeRecord(KEY, 201, "{\"b\":2}");
+    store.release(KEY);
     Assertions.assertTrue(store.load(KEY).isPresent(), "a finalized response survives a release");
   }
 
   @TestTemplate
-  void testStaleFinalizeAfterReReservationIsIgnored() {
-    long oldClaim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-    store.release(KEY, oldClaim);
-    long newClaim = peer.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
+  void testReReserveAfterReleaseReusesFixedClaim() {
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS));
+    store.release(KEY);
+    Assertions.assertTrue(peer.reserve(KEY, BINDING, FAR_FUTURE_MS));
 
-    store.finalizeRecord(KEY, oldClaim, 500, "stale");
-
-    Assertions.assertTrue(peer.load(KEY).isEmpty());
-    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
-    peer.finalizeRecord(KEY, newClaim, 201, "current");
+    peer.finalizeRecord(KEY, 201, "current");
     IdempotencyRecord record = store.load(KEY).orElseThrow();
-    Assertions.assertEquals(newClaim, record.claim());
-    Assertions.assertEquals(201, record.httpStatus());
-    Assertions.assertEquals("current", record.responseSummary());
-  }
-
-  @TestTemplate
-  void testStaleReleaseAfterReReservationIsIgnored() {
-    long oldClaim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-    store.release(KEY, oldClaim);
-    long newClaim = peer.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-
-    store.release(KEY, oldClaim);
-
-    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
-    Assertions.assertTrue(peer.load(KEY).isEmpty());
-    peer.finalizeRecord(KEY, newClaim, 201, "current");
-    IdempotencyRecord record = store.load(KEY).orElseThrow();
-    Assertions.assertEquals(newClaim, record.claim());
     Assertions.assertEquals("current", record.responseSummary());
   }
 
   @TestTemplate
   void testDifferentBindingStillReturnsDuplicateWithoutReplacingOriginal() {
     String otherBinding = "DELETE v1/cat1/namespaces/ns1/tables/t1";
-    long claim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS));
 
-    Assertions.assertTrue(peer.reserve(KEY, otherBinding, FAR_FUTURE_MS).isEmpty());
+    Assertions.assertFalse(peer.reserve(KEY, otherBinding, FAR_FUTURE_MS));
     Assertions.assertTrue(peer.load(KEY).isEmpty());
 
-    store.finalizeRecord(KEY, claim, 201, "original");
+    store.finalizeRecord(KEY, 201, "original");
     IdempotencyRecord original = store.load(KEY).orElseThrow();
-    Assertions.assertEquals(claim, original.claim());
     Assertions.assertEquals(BINDING, original.operationBinding());
     Assertions.assertEquals(201, original.httpStatus());
     Assertions.assertEquals("original", original.responseSummary());
     Assertions.assertEquals(FAR_FUTURE_MS, original.expiresAtMs());
-    Assertions.assertTrue(peer.reserve(KEY, otherBinding, FAR_FUTURE_MS).isEmpty());
+    Assertions.assertFalse(peer.reserve(KEY, otherBinding, FAR_FUTURE_MS));
     Assertions.assertEquals(original, peer.load(KEY).orElseThrow());
   }
 
@@ -288,17 +264,17 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
 
     Assertions.assertEquals(1, store.purgeExpired(now));
 
-    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isPresent());
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS));
     Assertions.assertTrue(
-        store.reserve(OTHER_KEY, BINDING, FAR_FUTURE_MS).isEmpty(),
+        !store.reserve(OTHER_KEY, BINDING, FAR_FUTURE_MS),
         "an unexpired record must survive the purge");
   }
 
   @TestTemplate
   void testPurgeTaskRemovesOnlyExpiredRecords() throws Exception {
     store.reserve(KEY, BINDING, now.get());
-    long claim = store.reserve(OTHER_KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-    store.finalizeRecord(OTHER_KEY, claim, 200, "{}");
+    Assertions.assertTrue(store.reserve(OTHER_KEY, BINDING, FAR_FUTURE_MS));
+    store.finalizeRecord(OTHER_KEY, 200, "{}");
     store.purgeExpiredRecords();
     Assertions.assertEquals(1, rowCount());
     Assertions.assertTrue(store.load(OTHER_KEY).isPresent());
@@ -314,18 +290,17 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
     store.reserve(OTHER_KEY, BINDING, FAR_FUTURE_MS);
 
     Assertions.assertEquals(records, store.purgeExpired(now));
-    Assertions.assertTrue(store.reserve(OTHER_KEY, BINDING, FAR_FUTURE_MS).isEmpty());
+    Assertions.assertFalse(store.reserve(OTHER_KEY, BINDING, FAR_FUTURE_MS));
   }
 
   @TestTemplate
   void testReplaySurvivesStoreRestartAndIsVisibleToPeer() throws Exception {
-    long claim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-    Assertions.assertTrue(peer.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS));
+    Assertions.assertFalse(peer.reserve(KEY, BINDING, FAR_FUTURE_MS));
     Assertions.assertTrue(peer.load(KEY).isEmpty());
     String response = "{\"metadata\":\"" + "x".repeat(100_000) + "\"}";
-    store.finalizeRecord(KEY, claim, 200, response);
+    store.finalizeRecord(KEY, 200, response);
     IdempotencyRecord original = peer.load(KEY).orElseThrow();
-    Assertions.assertEquals(claim, original.claim());
     store.close();
     try (IdempotencyStore restarted =
         IdempotencyStoreFactory.create(
@@ -338,66 +313,55 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testDeletedReservationCannotReuseItsFencingToken() {
-    long oldClaim = store.reserve(KEY, BINDING, now.get()).orElseThrow();
+  void testPurgedKeyCanBeReservedAgainWithFixedClaim() {
+    Assertions.assertTrue(store.reserve(KEY, BINDING, now.get()));
     Assertions.assertEquals(1, peer.purgeExpired(now.get()));
-    long newClaim = peer.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
+    Assertions.assertTrue(peer.reserve(KEY, BINDING, FAR_FUTURE_MS));
 
-    Assertions.assertTrue(newClaim > oldClaim);
-    store.finalizeRecord(KEY, oldClaim, 500, "stale");
-    Assertions.assertTrue(peer.load(KEY).isEmpty());
-    store.release(KEY, oldClaim);
-    peer.finalizeRecord(KEY, newClaim, 201, "current");
+    peer.finalizeRecord(KEY, 201, "current");
     Assertions.assertEquals("current", store.load(KEY).orElseThrow().responseSummary());
   }
 
   @TestTemplate
-  void testExpiredReservationIsReclaimedAndOldOwnerIsFenced() {
-    long oldClaim = store.reserve(KEY, BINDING, now.get() + 1).orElseThrow();
+  void testExpiredReservationIsReclaimedAsNewKey() {
+    Assertions.assertTrue(store.reserve(KEY, BINDING, now.get() + 1));
     now.incrementAndGet();
-    long newClaim = peer.reserve(KEY, "PUT /replacement", FAR_FUTURE_MS).orElseThrow();
-    store.finalizeRecord(KEY, oldClaim, 500, "stale");
-    store.release(KEY, oldClaim);
-    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
-    Assertions.assertTrue(peer.load(KEY).isEmpty());
-    peer.finalizeRecord(KEY, newClaim, 201, "new");
+    Assertions.assertTrue(peer.reserve(KEY, "PUT /replacement", FAR_FUTURE_MS));
+    Assertions.assertFalse(store.reserve(KEY, BINDING, FAR_FUTURE_MS));
+    peer.finalizeRecord(KEY, 201, "new");
     IdempotencyRecord record = store.load(KEY).orElseThrow();
-    Assertions.assertEquals(newClaim, record.claim());
     Assertions.assertEquals("PUT /replacement", record.operationBinding());
     Assertions.assertEquals("new", record.responseSummary());
   }
 
   @TestTemplate
   void testReserveReclaimsKeyThatExpiresBeforeSecondAttempt() {
-    long oldClaim = store.reserve(KEY, BINDING, now.get() + 1).orElseThrow();
+    Assertions.assertTrue(store.reserve(KEY, BINDING, now.get() + 1));
     Mockito.when(clock.millis()).thenReturn(now.get(), now.get() + 1);
 
-    long newClaim = peer.reserve(KEY, "PUT /replacement", FAR_FUTURE_MS).orElseThrow();
-    store.finalizeRecord(KEY, oldClaim, 500, "stale");
-    store.release(KEY, oldClaim);
-    peer.finalizeRecord(KEY, newClaim, 201, "current");
+    Assertions.assertTrue(peer.reserve(KEY, "PUT /replacement", FAR_FUTURE_MS));
+    peer.finalizeRecord(KEY, 201, "current");
     IdempotencyRecord record = store.load(KEY).orElseThrow();
-    Assertions.assertEquals(newClaim, record.claim());
     Assertions.assertEquals("PUT /replacement", record.operationBinding());
     Assertions.assertEquals("current", record.responseSummary());
   }
 
   @TestTemplate
   void testExpiredResponseIsNotLoadedAndCanBeReplacedWithoutPurge() {
-    long oldClaim = store.reserve(KEY, BINDING, now.get() + 1).orElseThrow();
-    store.finalizeRecord(KEY, oldClaim, 200, "old");
+    Assertions.assertTrue(store.reserve(KEY, BINDING, now.get() + 1));
+    store.finalizeRecord(KEY, 200, "old");
     now.incrementAndGet();
     Assertions.assertTrue(peer.load(KEY).isEmpty());
-    long newClaim = peer.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
+    Assertions.assertTrue(peer.reserve(KEY, BINDING, FAR_FUTURE_MS));
     Assertions.assertTrue(peer.load(KEY).isEmpty());
-    peer.finalizeRecord(KEY, newClaim, 204, null);
+    peer.finalizeRecord(KEY, 204, null);
     Assertions.assertNull(store.load(KEY).orElseThrow().responseSummary());
   }
 
   @TestTemplate
   void testFinalizeDoesNotResurrectExpiredReservation() throws Exception {
-    long claim = store.reserve(KEY, BINDING, now.get()).orElseThrow();
-    store.finalizeRecord(KEY, claim, 200, "expired");
+    Assertions.assertTrue(store.reserve(KEY, BINDING, now.get()));
+    store.finalizeRecord(KEY, 200, "expired");
     // Inspect persisted state so a read-time expiry filter cannot hide an incorrect finalization.
     try (SqlSession session =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
@@ -413,17 +377,17 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
     store.reserve(KEY, BINDING, now.get());
     store.reserve(OTHER_KEY, BINDING, now.get() + 1);
     Assertions.assertEquals(1, store.purgeExpired(now.get()));
-    Assertions.assertTrue(peer.reserve(OTHER_KEY, BINDING, FAR_FUTURE_MS).isEmpty());
+    Assertions.assertFalse(peer.reserve(OTHER_KEY, BINDING, FAR_FUTURE_MS));
   }
 
   @TestTemplate
   void testKeyCaseNormalizationOnAllOperations() {
     String upper = KEY.toUpperCase(Locale.ROOT);
-    long oldClaim = store.reserve(upper, BINDING, FAR_FUTURE_MS).orElseThrow();
-    Assertions.assertTrue(peer.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
-    peer.release(upper, oldClaim);
-    long newClaim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-    peer.finalizeRecord(upper, newClaim, 200, "{}");
+    Assertions.assertTrue(store.reserve(upper, BINDING, FAR_FUTURE_MS));
+    Assertions.assertFalse(peer.reserve(KEY, BINDING, FAR_FUTURE_MS));
+    peer.release(upper);
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS));
+    peer.finalizeRecord(upper, 200, "{}");
     Assertions.assertEquals(KEY, store.load(upper).orElseThrow().idempotencyKey());
   }
 
@@ -434,9 +398,9 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> store.reserve(KEY, null, FAR_FUTURE_MS));
     Assertions.assertThrows(IllegalArgumentException.class, () -> store.load("invalid"));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> store.release("invalid", 1));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> store.release("invalid"));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> store.finalizeRecord("invalid", 1, 200, null));
+        IllegalArgumentException.class, () -> store.finalizeRecord("invalid", 200, null));
     Assertions.assertEquals(0, rowCount());
   }
 
@@ -448,7 +412,7 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
     } finally {
       SessionUtils.rollbackTransaction();
     }
-    Assertions.assertTrue(peer.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
+    Assertions.assertFalse(peer.reserve(KEY, BINDING, FAR_FUTURE_MS));
   }
 
   @TestTemplate
@@ -462,21 +426,20 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
     // Jetty accepts request targets longer than MySQL's 64 KiB TEXT limit by default.
     String uri = "/v1/cat1/namespaces/ns%2Fone/tables?tag=" + "x".repeat(70_000) + "%26y";
     String binding = "POST " + uri;
-    long claim = store.reserve(KEY, binding, FAR_FUTURE_MS).orElseThrow();
-    store.finalizeRecord(KEY, claim, 200, "{}");
+    Assertions.assertTrue(store.reserve(KEY, binding, FAR_FUTURE_MS));
+    store.finalizeRecord(KEY, 200, "{}");
     Assertions.assertEquals(binding, peer.load(KEY).orElseThrow().operationBinding());
     try (SqlSession session =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
         var statement = session.getConnection().createStatement();
         var result =
             statement.executeQuery(
-                "SELECT http_method, request_uri, generation FROM iceberg_idempotency_meta")) {
+                "SELECT http_method, request_uri FROM iceberg_idempotency_meta")) {
       Assertions.assertTrue(result.next());
       Assertions.assertEquals("POST", result.getString("http_method"));
       String storedUri = result.getString("request_uri");
       Assertions.assertEquals(uri.length(), storedUri.length());
       Assertions.assertEquals(uri, storedUri);
-      Assertions.assertEquals(claim, result.getLong("generation"));
     }
   }
 
@@ -526,8 +489,8 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
         statement.execute("ALTER TABLE saved_idempotency_keys RENAME TO iceberg_idempotency_meta");
       }
       retrying.initialize(ImmutableMap.of("idempotency-cleanup-interval", "PT1H"));
-      long claim = retrying.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-      retrying.finalizeRecord(KEY, claim, 201, "recovered");
+      Assertions.assertTrue(retrying.reserve(KEY, BINDING, FAR_FUTURE_MS));
+      retrying.finalizeRecord(KEY, 201, "recovered");
       Assertions.assertEquals("recovered", peer.load(KEY).orElseThrow().responseSummary());
       Assertions.assertThrows(
           IllegalStateException.class,
@@ -553,7 +516,6 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
         var statement = session.getConnection().createStatement()) {
       statement.execute("DROP TABLE iceberg_idempotency_meta");
-      statement.execute("DROP TABLE iceberg_idempotency_generation_meta");
       ScriptRunner runner = new ScriptRunner(session.getConnection());
       runner.setLogWriter(null);
       runner.setStopOnError(true);
@@ -563,9 +525,8 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
     try (IdempotencyStore migrated =
         IdempotencyStoreFactory.create(
             new IcebergConfig(ImmutableMap.of("idempotency-store-type", "jdbc")))) {
-      long claim = migrated.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-      migrated.finalizeRecord(KEY, claim, 200, "{}");
-      Assertions.assertEquals(claim, migrated.load(KEY).orElseThrow().claim());
+      Assertions.assertTrue(migrated.reserve(KEY, BINDING, FAR_FUTURE_MS));
+      migrated.finalizeRecord(KEY, 200, "{}");
     }
   }
 
@@ -606,12 +567,10 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
         holderId = result.getLong(1);
       }
       IcebergIdempotencyKeyMapper mapper = holder.getMapper(IcebergIdempotencyKeyMapper.class);
-      long generation = JdbcIdempotencyStore.nextGeneration(mapper, KEY);
       Assertions.assertEquals(
           1,
           mapper.replaceExpired(
-              IcebergIdempotencyKeyPO.reserved(
-                  KEY, BINDING, generation, now.get(), FAR_FUTURE_MS)));
+              IcebergIdempotencyKeyPO.reserved(KEY, BINDING, now.get(), FAR_FUTURE_MS)));
       Future<Integer> purge =
           executor.submit(
               () -> {
@@ -644,7 +603,7 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
       awaitBlockedPurge(purge, holderId);
       holder.commit();
       Assertions.assertEquals(0, purge.get(30, TimeUnit.SECONDS));
-      peer.finalizeRecord(KEY, generation, 201, "renewed");
+      peer.finalizeRecord(KEY, 201, "renewed");
       Assertions.assertEquals("renewed", store.load(KEY).orElseThrow().responseSummary());
     } finally {
       executor.shutdownNow();
@@ -662,18 +621,17 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
         .addInterceptor(new PauseReplacement(duplicateInsert, purged));
     ExecutorService executor = Executors.newSingleThreadExecutor();
     try {
-      Future<OptionalLong> result =
-          executor.submit(() -> store.reserve(KEY, BINDING, FAR_FUTURE_MS));
+      Future<Boolean> result = executor.submit(() -> store.reserve(KEY, BINDING, FAR_FUTURE_MS));
       Assertions.assertTrue(duplicateInsert.await(30, TimeUnit.SECONDS));
       Assertions.assertEquals(1, peer.purgeExpired(now.get()));
-      long peerClaim = peerWins ? peer.reserve(KEY, "PUT /peer", FAR_FUTURE_MS).orElseThrow() : 0;
+      if (peerWins) {
+        Assertions.assertTrue(peer.reserve(KEY, "PUT /peer", FAR_FUTURE_MS));
+      }
       purged.countDown();
-      OptionalLong reservation = result.get(30, TimeUnit.SECONDS);
-      Assertions.assertEquals(!peerWins, reservation.isPresent());
-      long claim = reservation.orElse(peerClaim);
-      peer.finalizeRecord(KEY, claim, 201, "retained");
+      boolean reserved = result.get(30, TimeUnit.SECONDS);
+      Assertions.assertEquals(!peerWins, reserved);
+      peer.finalizeRecord(KEY, 201, "retained");
       IdempotencyRecord record = store.load(KEY).orElseThrow();
-      Assertions.assertEquals(claim, record.claim());
       Assertions.assertEquals(peerWins ? "PUT /peer" : BINDING, record.operationBinding());
       Assertions.assertEquals("retained", record.responseSummary());
     } finally {
@@ -726,7 +684,7 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
     }
   }
 
-  // Pause before locking the counter for replacement, after the duplicate INSERT rolls back.
+  // Pause before replaceExpired locks the row, after the duplicate INSERT rolls back.
   @Intercepts(
       @Signature(
           type = Executor.class,
@@ -746,8 +704,8 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
     public Object intercept(Invocation invocation) throws Throwable {
       if (((MappedStatement) invocation.getArgs()[0])
               .getId()
-              .equals(IcebergIdempotencyKeyMapper.class.getName() + ".advanceGeneration")
-          && attempts.incrementAndGet() == 2) {
+              .equals(IcebergIdempotencyKeyMapper.class.getName() + ".replaceExpired")
+          && attempts.incrementAndGet() == 1) {
         duplicateInsert.countDown();
         Assertions.assertTrue(purged.await(30, TimeUnit.SECONDS));
       }

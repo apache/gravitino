@@ -61,16 +61,6 @@ public class IcebergIdempotencyKeySQLProviderFactory {
   }
 
   /**
-   * Returns the counter advance statement for the configured entity store.
-   *
-   * @param stripe counter selected by the key's final byte
-   * @return SQL statement
-   */
-  public static String advanceGeneration(@Param("stripe") int stripe) {
-    return getProvider().advanceGeneration(stripe);
-  }
-
-  /**
    * Returns the statement for the configured entity-store database.
    *
    * @param idempotencyKey canonical UUIDv7 key
@@ -86,7 +76,6 @@ public class IcebergIdempotencyKeySQLProviderFactory {
    * Returns the statement for the configured entity-store database.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation fencing token
    * @param httpStatus response status
    * @param responseSummary serialized response body, or null for an empty body
    * @param nowMs current time in unix epoch milliseconds
@@ -94,23 +83,20 @@ public class IcebergIdempotencyKeySQLProviderFactory {
    */
   public static String finalizeRecord(
       @Param("idempotencyKey") String idempotencyKey,
-      @Param("claim") long claim,
       @Param("httpStatus") int httpStatus,
       @Param("responseSummary") String responseSummary,
       @Param("nowMs") long nowMs) {
-    return getProvider().finalizeRecord(idempotencyKey, claim, httpStatus, responseSummary, nowMs);
+    return getProvider().finalizeRecord(idempotencyKey, httpStatus, responseSummary, nowMs);
   }
 
   /**
    * Returns the statement for the configured entity-store database.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation fencing token
    * @return SQL statement
    */
-  public static String deleteReservation(
-      @Param("idempotencyKey") String idempotencyKey, @Param("claim") long claim) {
-    return getProvider().deleteReservation(idempotencyKey, claim);
+  public static String deleteReservation(@Param("idempotencyKey") String idempotencyKey) {
+    return getProvider().deleteReservation(idempotencyKey);
   }
 
   /**

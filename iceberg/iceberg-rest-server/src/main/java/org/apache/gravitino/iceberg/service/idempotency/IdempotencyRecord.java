@@ -34,7 +34,6 @@ public final class IdempotencyRecord {
 
   private final String idempotencyKey;
   private final String operationBinding;
-  private final long claim;
   @Nullable private final Integer httpStatus;
   @Nullable private final String responseSummary;
   private final long createdAtMs;
@@ -43,14 +42,12 @@ public final class IdempotencyRecord {
   private IdempotencyRecord(
       String idempotencyKey,
       String operationBinding,
-      long claim,
       @Nullable Integer httpStatus,
       @Nullable String responseSummary,
       long createdAtMs,
       long expiresAtMs) {
     this.idempotencyKey = idempotencyKey;
     this.operationBinding = operationBinding;
-    this.claim = claim;
     this.httpStatus = httpStatus;
     this.responseSummary = responseSummary;
     this.createdAtMs = createdAtMs;
@@ -63,21 +60,16 @@ public final class IdempotencyRecord {
    * @param idempotencyKey the client-provided UUIDv7 key
    * @param operationBinding request identity, for example {@code POST
    *     /v1/cat1/namespaces/ns1/tables}
-   * @param claim the reserving caller's fencing token
    * @param createdAtMs reservation time in unix epoch millis
    * @param expiresAtMs time after which the record may be purged, in unix epoch millis
    * @return a record in the reserved state
    */
   public static IdempotencyRecord reserved(
-      String idempotencyKey,
-      String operationBinding,
-      long claim,
-      long createdAtMs,
-      long expiresAtMs) {
+      String idempotencyKey, String operationBinding, long createdAtMs, long expiresAtMs) {
     Preconditions.checkArgument(idempotencyKey != null, "idempotencyKey should not be null");
     Preconditions.checkArgument(operationBinding != null, "operationBinding should not be null");
     return new IdempotencyRecord(
-        idempotencyKey, operationBinding, claim, null, null, createdAtMs, expiresAtMs);
+        idempotencyKey, operationBinding, null, null, createdAtMs, expiresAtMs);
   }
 
   /**
@@ -89,20 +81,7 @@ public final class IdempotencyRecord {
    */
   public IdempotencyRecord withResponse(int status, @Nullable String summary) {
     return new IdempotencyRecord(
-        idempotencyKey, operationBinding, claim, status, summary, createdAtMs, expiresAtMs);
-  }
-
-  /**
-   * Returns the fencing token of the caller that reserved this record.
-   *
-   * <p>A store accepts a finalize or release only from the caller holding this token, so a caller
-   * whose reservation was already dropped cannot disturb the record of whoever reserved the key
-   * next.
-   *
-   * @return the reserving caller's claim
-   */
-  public long claim() {
-    return claim;
+        idempotencyKey, operationBinding, status, summary, createdAtMs, expiresAtMs);
   }
 
   /**
@@ -183,7 +162,6 @@ public final class IdempotencyRecord {
     IdempotencyRecord that = (IdempotencyRecord) other;
     return createdAtMs == that.createdAtMs
         && expiresAtMs == that.expiresAtMs
-        && claim == that.claim
         && Objects.equals(idempotencyKey, that.idempotencyKey)
         && Objects.equals(operationBinding, that.operationBinding)
         && Objects.equals(httpStatus, that.httpStatus)
@@ -193,13 +171,7 @@ public final class IdempotencyRecord {
   @Override
   public int hashCode() {
     return Objects.hash(
-        idempotencyKey,
-        operationBinding,
-        claim,
-        httpStatus,
-        responseSummary,
-        createdAtMs,
-        expiresAtMs);
+        idempotencyKey, operationBinding, httpStatus, responseSummary, createdAtMs, expiresAtMs);
   }
 
   @Override
