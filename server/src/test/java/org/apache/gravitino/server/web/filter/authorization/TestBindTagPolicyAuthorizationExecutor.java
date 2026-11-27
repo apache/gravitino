@@ -140,9 +140,8 @@ public class TestBindTagPolicyAuthorizationExecutor {
       if (binding) {
         when(access.evaluate(anyMap(), anyMap(), any(), any())).thenReturn(true);
         when(governance.evaluate(anyMap(), anyMap(), any(), any())).thenReturn(false);
-        assertEquals(false, executor.execute(new AuthorizationRequestContext()));
-        when(governance.evaluate(anyMap(), anyMap(), any(), any())).thenReturn(true);
         assertTrue(executor.execute(new AuthorizationRequestContext()));
+        when(governance.evaluate(anyMap(), anyMap(), any(), any())).thenReturn(true);
       }
       when(policy.policyType()).thenReturn(Policy.BuiltInType.CUSTOM);
       assertTrue(executor.execute(new AuthorizationRequestContext()));

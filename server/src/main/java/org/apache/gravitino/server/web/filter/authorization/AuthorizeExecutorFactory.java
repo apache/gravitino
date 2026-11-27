@@ -54,6 +54,8 @@ public class AuthorizeExecutorFactory {
           expression, metadataContext, pathParams, entityType, parameters, args, true);
       case UNBIND_TAG_POLICY -> new BindTagPolicyAuthorizationExecutor(
           expression, metadataContext, pathParams, entityType, parameters, args, false);
+      case CREATE_POLICY -> new CreatePolicyAuthorizationExecutor(
+          expression, metadataContext, pathParams, entityType, parameters, args);
       case ALTER_POLICY -> new AlterPolicyAuthorizationExecutor(
           expression, metadataContext, pathParams, entityType, parameters, args);
       case RUN_JOB -> new RunJobAuthorizationExecutor(

@@ -34,6 +34,8 @@ public @interface AuthorizationRequest {
     BIND_TAG_POLICY,
     UNBIND_TAG_POLICY,
     ALTER_POLICY,
+    /** Creates a policy with type-specific authorization. */
+    CREATE_POLICY,
     RUN_JOB,
     LINEAGE,
     LOAD_TABLE,

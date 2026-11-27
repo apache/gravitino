@@ -6809,7 +6809,7 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
-  void testAccessPolicyBindDenyOverridesCreatePolicy() throws Exception {
+  void testAccessPolicyBindDenyOverridesManageGrants() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     RoleEntity allow =
         mockRoleInStore(
@@ -6820,7 +6820,7 @@ public class TestJcasbinAuthorizer {
                     993L,
                     MetadataObject.Type.METALAKE,
                     METALAKE,
-                    Privilege.Name.CREATE_POLICY,
+                    Privilege.Name.MANAGE_GRANTS,
                     "ALLOW")));
     RoleEntity deny =
         mockRoleInStore(
@@ -6831,12 +6831,12 @@ public class TestJcasbinAuthorizer {
                     994L,
                     MetadataObject.Type.METALAKE,
                     METALAKE,
-                    Privilege.Name.CREATE_POLICY,
+                    Privilege.Name.MANAGE_GRANTS,
                     "DENY")));
     mockDirectUserRoles(allow);
     AuthorizationExpressionEvaluator evaluator =
         new AuthorizationExpressionEvaluator(
-            AuthorizationExpressionConstants.BIND_ACCESS_POLICY_AUTHORIZATION_EXPRESSION,
+            AuthorizationExpressionConstants.ACCESS_POLICY_GRANT_AUTHORIZATION_EXPRESSION,
             jcasbinAuthorizer);
     Map<Entity.EntityType, NameIdentifier> metadata =
         Map.of(Entity.EntityType.METALAKE, NameIdentifier.of(METALAKE));
@@ -6853,7 +6853,7 @@ public class TestJcasbinAuthorizer {
     MetadataObject policy = MetadataObjects.of(null, "policy", MetadataObject.Type.POLICY);
     AuthorizationExpressionEvaluator evaluator =
         new AuthorizationExpressionEvaluator(
-            AuthorizationExpressionConstants.BIND_ACCESS_POLICY_AUTHORIZATION_EXPRESSION,
+            AuthorizationExpressionConstants.ACCESS_POLICY_GRANT_AUTHORIZATION_EXPRESSION,
             jcasbinAuthorizer);
     withMetadataIds(
         Map.of(metalake, Optional.of(915L), tag, Optional.of(916L), policy, Optional.of(917L)),
@@ -6890,16 +6890,16 @@ public class TestJcasbinAuthorizer {
     withMetadataIds(
         Map.of(metalake, Optional.of(918L), policy, Optional.of(919L)),
         () -> {
-          RoleEntity createPolicy =
+          RoleEntity manageGrants =
               mockRoleInStore(
                   920L,
-                  "policyCreator",
+                  "grantManager",
                   ImmutableList.of(
                       buildSecurableObject(
                           920L,
                           MetadataObject.Type.METALAKE,
                           METALAKE,
-                          Privilege.Name.CREATE_POLICY,
+                          Privilege.Name.MANAGE_GRANTS,
                           "ALLOW")));
           Map<Entity.EntityType, NameIdentifier> metadata =
               Map.of(
@@ -6910,10 +6910,10 @@ public class TestJcasbinAuthorizer {
                   "METALAKE::OWNER || POLICY::OWNER", jcasbinAuthorizer);
           AuthorizationExpressionEvaluator widen =
               new AuthorizationExpressionEvaluator(
-                  AuthorizationExpressionConstants.BIND_ACCESS_POLICY_AUTHORIZATION_EXPRESSION,
+                  AuthorizationExpressionConstants.ACCESS_POLICY_GRANT_AUTHORIZATION_EXPRESSION,
                   jcasbinAuthorizer);
           GravitinoCache<Long, Optional<OwnerInfo>> owners = getOwnerRelCache(jcasbinAuthorizer);
-          mockDirectUserRoles(createPolicy);
+          mockDirectUserRoles(manageGrants);
           assertFalse(edit.evaluate(metadata, new AuthorizationRequestContext()));
           assertTrue(widen.evaluate(metadata, new AuthorizationRequestContext()));
           owners.put(919L, Optional.of(new OwnerInfo(USER_ID, "USER")));

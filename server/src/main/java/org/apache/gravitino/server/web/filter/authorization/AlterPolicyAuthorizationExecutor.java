@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.server.web.filter.authorization;
 
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.BIND_ACCESS_POLICY_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.ACCESS_POLICY_GRANT_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.web.filter.ParameterUtil.extractFromParameters;
 
 import java.lang.reflect.Parameter;
@@ -48,7 +48,7 @@ public class AlterPolicyAuthorizationExecutor extends CommonAuthorizerExecutor {
   private final Parameter[] parameters;
   private final Object[] args;
   AuthorizationExpressionEvaluator accessPolicyEvaluator =
-      new AuthorizationExpressionEvaluator(BIND_ACCESS_POLICY_AUTHORIZATION_EXPRESSION);
+      new AuthorizationExpressionEvaluator(ACCESS_POLICY_GRANT_AUTHORIZATION_EXPRESSION);
   boolean authorizationDisabled;
 
   /**
@@ -167,7 +167,7 @@ public class AlterPolicyAuthorizationExecutor extends CommonAuthorizerExecutor {
       PolicyEditAuthorization.requireUnbound();
       return true;
     }
-    context.setOriginalAuthorizationExpression(BIND_ACCESS_POLICY_AUTHORIZATION_EXPRESSION);
+    context.setOriginalAuthorizationExpression(ACCESS_POLICY_GRANT_AUTHORIZATION_EXPRESSION);
     return accessPolicyEvaluator.evaluate(metadataContext, pathParams, context, entityType);
   }
 

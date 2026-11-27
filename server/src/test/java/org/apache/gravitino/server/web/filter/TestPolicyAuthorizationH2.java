@@ -67,6 +67,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.dto.policy.PolicyAssociationSelectorDTO;
+import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
 import org.apache.gravitino.dto.requests.PolicyTagAddRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
@@ -287,6 +288,7 @@ public class TestPolicyAuthorizationH2 extends TestJDBCBackend {
         policyName,
         Policy.BuiltInType.ICEBERG_COMPACTION,
         PolicyContents.icebergDataCompaction());
+    putRole(store, metalake, "reader", List.of());
     PolicyEntity replacement =
         newPolicy(metalake, policyName, Policy.BuiltInType.ACCESS_CONTROL, selectContent());
     UserPrincipal principal = new UserPrincipal("tester");
@@ -335,6 +337,7 @@ public class TestPolicyAuthorizationH2 extends TestJDBCBackend {
         policyName,
         Policy.BuiltInType.ICEBERG_COMPACTION,
         PolicyContents.icebergDataCompaction());
+    putRole(store, metalake, "reader", List.of());
     PolicyEntity replacement =
         newPolicy(metalake, policyName, Policy.BuiltInType.ACCESS_CONTROL, selectContent());
     UserPrincipal principal = new UserPrincipal("tester");
@@ -644,7 +647,9 @@ public class TestPolicyAuthorizationH2 extends TestJDBCBackend {
             "role",
             List.of(
                 SecurableObjects.ofTag("visible", List.of(Privileges.ApplyTag.allow())),
-                SecurableObjects.ofMetalake(metalake, List.of(Privileges.CreatePolicy.allow())),
+                SecurableObjects.ofMetalake(
+                    metalake,
+                    List.of(Privileges.CreatePolicy.allow(), Privileges.ManageGrants.allow())),
                 SecurableObjects.ofCatalog(
                     "catalog",
                     List.of(Privileges.ManageGrants.allow(), Privileges.UseCatalog.allow()))));
@@ -669,7 +674,25 @@ public class TestPolicyAuthorizationH2 extends TestJDBCBackend {
             metalake,
             "createPolicy",
             List.of(
+                SecurableObjects.ofMetalake(
+                    metalake,
+                    List.of(Privileges.CreatePolicy.allow(), Privileges.ManageGrants.allow()))));
+    long createOnlyId =
+        putRole(
+            store,
+            metalake,
+            "createOnly",
+            List.of(
                 SecurableObjects.ofMetalake(metalake, List.of(Privileges.CreatePolicy.allow()))));
+    long grantsOnlyId =
+        putRole(
+            store,
+            metalake,
+            "grantsOnly",
+            List.of(
+                SecurableObjects.ofMetalake(metalake, List.of(Privileges.ManageGrants.allow()))));
+    putUser(store, metalake, "createOnly", List.of(createOnlyId), List.of("createOnly"));
+    putUser(store, metalake, "grantsOnly", List.of(grantsOnlyId), List.of("grantsOnly"));
     long tagSideId =
         putRole(
             store,
@@ -678,6 +701,24 @@ public class TestPolicyAuthorizationH2 extends TestJDBCBackend {
             List.of(
                 SecurableObjects.ofTag("fresh", List.of(Privileges.ApplyTag.allow())),
                 SecurableObjects.ofCatalog("catalog", List.of(Privileges.UseCatalog.allow()))));
+    long viewFreshId =
+        putRole(
+            store,
+            metalake,
+            "viewFresh",
+            List.of(SecurableObjects.ofTag("fresh", List.of(Privileges.ViewTag.allow()))));
+    long denyViewFreshId =
+        putRole(
+            store,
+            metalake,
+            "denyViewFresh",
+            List.of(SecurableObjects.ofTag("fresh", List.of(Privileges.ViewTag.deny()))));
+    long viewPolicyId =
+        putRole(
+            store,
+            metalake,
+            "viewPolicy",
+            List.of(SecurableObjects.ofPolicy("policy", List.of(Privileges.ViewPolicy.allow()))));
     long policySideId =
         putRole(
             store,
@@ -690,6 +731,36 @@ public class TestPolicyAuthorizationH2 extends TestJDBCBackend {
             metalake,
             "policyDeny",
             List.of(SecurableObjects.ofPolicy("policy", List.of(Privileges.ApplyPolicy.deny()))));
+    putUser(
+        store,
+        metalake,
+        "createOnlyBoth",
+        List.of(createOnlyId, tagSideId, policySideId),
+        List.of("createOnly", "tagSide", "policySide"));
+    putUser(
+        store,
+        metalake,
+        "viewBinder",
+        List.of(viewFreshId, policySideId, grantsOnlyId),
+        List.of("viewFresh", "policySide", "grantsOnly"));
+    putUser(
+        store,
+        metalake,
+        "viewNoGrants",
+        List.of(viewFreshId, policySideId),
+        List.of("viewFresh", "policySide"));
+    putUser(
+        store,
+        metalake,
+        "viewNoPolicy",
+        List.of(viewFreshId, grantsOnlyId, viewPolicyId),
+        List.of("viewFresh", "grantsOnly", "viewPolicy"));
+    putUser(
+        store,
+        metalake,
+        "viewDenied",
+        List.of(viewFreshId, denyViewFreshId, policySideId, grantsOnlyId),
+        List.of("viewFresh", "denyViewFresh", "policySide", "grantsOnly"));
     putUser(store, metalake, "creator", List.of(creatorRoleId), List.of("createPolicy"));
     putUser(
         store,
@@ -775,6 +846,67 @@ public class TestPolicyAuthorizationH2 extends TestJDBCBackend {
       GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
       providers.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
       when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      PolicyOperations creationOps = withHttpRequest(new PolicyOperations(policies));
+      Method createMethod =
+          PolicyOperations.class.getMethod("createPolicy", String.class, PolicyCreateRequest.class);
+      PolicyCreateRequest createAccess =
+          new PolicyCreateRequest(
+              "new_access",
+              Policy.BuiltInType.ACCESS_CONTROL.policyType(),
+              null,
+              true,
+              DTOConverters.toDTO(selectContent()));
+      MethodInvocation createAccessInvocation =
+          invocation(
+              createMethod,
+              new Object[] {metalake, createAccess},
+              ignored -> creationOps.createPolicy(metalake, createAccess));
+      for (String user : List.of("createOnly", "grantsOnly")) {
+        current.set(new UserPrincipal(user));
+        assertEquals(403, intercept(createMethod, createAccessInvocation).getStatus(), user);
+        assertFalse(
+            store.exists(
+                NameIdentifierUtil.ofPolicy(metalake, "new_access"), Entity.EntityType.POLICY));
+      }
+      current.set(new UserPrincipal("creator"));
+      assertEquals(200, intercept(createMethod, createAccessInvocation).getStatus());
+      assertTrue(
+          store.exists(
+              NameIdentifierUtil.ofPolicy(metalake, "new_access"), Entity.EntityType.POLICY));
+      PolicyCreateRequest ownerAccess =
+          new PolicyCreateRequest(
+              "owner_access",
+              Policy.BuiltInType.ACCESS_CONTROL.policyType(),
+              null,
+              true,
+              DTOConverters.toDTO(selectContent()));
+      current.set(new UserPrincipal("metalakeOwner"));
+      assertEquals(
+          200,
+          intercept(
+                  createMethod,
+                  invocation(
+                      createMethod,
+                      new Object[] {metalake, ownerAccess},
+                      ignored -> creationOps.createPolicy(metalake, ownerAccess)))
+              .getStatus());
+      PolicyCreateRequest createGovernance =
+          new PolicyCreateRequest(
+              "new_governance",
+              Policy.BuiltInType.ICEBERG_COMPACTION.policyType(),
+              null,
+              true,
+              DTOConverters.toDTO(PolicyContents.icebergDataCompaction()));
+      current.set(new UserPrincipal("createOnly"));
+      assertEquals(
+          200,
+          intercept(
+                  createMethod,
+                  invocation(
+                      createMethod,
+                      new Object[] {metalake, createGovernance},
+                      ignored -> creationOps.createPolicy(metalake, createGovernance)))
+              .getStatus());
       TagOperations legacy = withHttpRequest(new TagOperations(tags));
       MetadataObjectTagOperations operations =
           withHttpRequest(new MetadataObjectTagOperations(tags));
@@ -826,6 +958,23 @@ public class TestPolicyAuthorizationH2 extends TestJDBCBackend {
         assertEquals(403, intercept(bindMethod, bindInvocation).getStatus(), user);
         assertFalse(bindingNames(policies, metalake, "policy").contains("fresh"));
       }
+      for (String user : List.of("viewNoGrants", "viewNoPolicy", "viewDenied", "createOnlyBoth")) {
+        current.set(new UserPrincipal(user));
+        assertEquals(403, intercept(bindMethod, bindInvocation).getStatus(), user);
+        assertFalse(bindingNames(policies, metalake, "policy").contains("fresh"));
+      }
+      current.set(new UserPrincipal("viewBinder"));
+      assertEquals(200, intercept(bindMethod, bindInvocation).getStatus());
+      assertTrue(bindingNames(policies, metalake, "policy").contains("fresh"));
+      Method viewUnbindMethod = removePolicyFromTagMethod();
+      MethodInvocation viewUnbind =
+          invocation(
+              viewUnbindMethod,
+              new Object[] {metalake, "fresh", "policy"},
+              ignored -> legacy.removePolicyFromTag(metalake, "fresh", "policy"));
+      assertEquals(403, intercept(viewUnbindMethod, viewUnbind).getStatus());
+      current.set(new UserPrincipal("metalakeOwner"));
+      assertEquals(204, intercept(viewUnbindMethod, viewUnbind).getStatus());
       current.set(new UserPrincipal("creatorBoth"));
       assertEquals(200, intercept(bindMethod, bindInvocation).getStatus());
       assertTrue(bindingNames(policies, metalake, "policy").contains("fresh"));
@@ -1005,6 +1154,7 @@ public class TestPolicyAuthorizationH2 extends TestJDBCBackend {
     RelationalEntityStore store = newStore();
     PolicyManager policies = new PolicyManager(RandomIdGenerator.INSTANCE, store);
     TagManager tags = new TagManager(RandomIdGenerator.INSTANCE, store);
+    putRole(store, metalake, "reader", List.of());
     UserPrincipal principal = new UserPrincipal("tester");
     try (EnvOverride overrides = new EnvOverride();
         MockedSecurity security = new MockedSecurity(principal)) {
@@ -1087,6 +1237,10 @@ public class TestPolicyAuthorizationH2 extends TestJDBCBackend {
       Policy.BuiltInType type,
       PolicyContent content)
       throws IOException {
+    if (type == Policy.BuiltInType.ACCESS_CONTROL
+        && !store.exists(NameIdentifierUtil.ofRole(metalake, "reader"), Entity.EntityType.ROLE)) {
+      putRole(store, metalake, "reader", List.of());
+    }
     PolicyEntity policy = newPolicy(metalake, name, type, content);
     store.put(policy, false);
     return policy;

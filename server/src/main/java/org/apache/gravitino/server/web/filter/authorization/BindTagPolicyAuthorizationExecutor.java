@@ -99,9 +99,6 @@ public class BindTagPolicyAuthorizationExecutor extends CommonAuthorizerExecutor
     }
     PolicyEditAuthorization.record(checked);
     if (binding && checked.policyType() == Policy.BuiltInType.ACCESS_CONTROL) {
-      if (!super.execute(context)) {
-        return false;
-      }
       context.setOriginalAuthorizationExpression(BIND_ACCESS_POLICY_AUTHORIZATION_EXPRESSION);
       return accessPolicyEvaluator.evaluate(metadataContext, pathParams, context, entityType);
     }
