@@ -99,7 +99,7 @@ class TestOrphanFileRemovalPolicyDTO {
             true,
             "0 0 3 * * ?",
             null,
-            1_800_000L,
+            null,
             ImmutableMap.of("spark.executor.cores", "2"),
             ImmutableMap.of("metalake", "ml"));
     PolicyDTO dto =

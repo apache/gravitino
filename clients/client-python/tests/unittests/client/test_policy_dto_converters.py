@@ -69,7 +69,7 @@ class TestPolicyDTOConverters(unittest.TestCase):
                 rewrite_strategy="sort",
                 sort_order="id",
                 rewrite_options={"a": "b"},
-                time_trigger="0 0 * * *",
+                commit_trigger=True,
                 min_interval_ms=5,
             ),
             PolicyContents.iceberg_orphan_file_removal(

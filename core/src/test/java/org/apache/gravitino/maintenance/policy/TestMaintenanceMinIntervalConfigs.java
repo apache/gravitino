@@ -42,9 +42,6 @@ public class TestMaintenanceMinIntervalConfigs {
     Assertions.assertEquals(
         MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS,
         config.get(MaintenanceMinIntervalConfigs.SNAPSHOT_EXPIRY_MIN_INTERVAL_MS));
-    Assertions.assertEquals(
-        MaintenanceMinIntervalConfigs.DEFAULT_ORPHAN_CLEANUP_MIN_INTERVAL_MS,
-        config.get(MaintenanceMinIntervalConfigs.ORPHAN_CLEANUP_MIN_INTERVAL_MS));
   }
 
   @Test
@@ -61,10 +58,24 @@ public class TestMaintenanceMinIntervalConfigs {
         MaintenanceMinIntervalConfigs.SNAPSHOT_EXPIRY_MIN_INTERVAL_MS_KEY,
         MaintenanceMinIntervalConfigs.forBuiltInType(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION)
             .getKey());
-    Assertions.assertEquals(
-        MaintenanceMinIntervalConfigs.ORPHAN_CLEANUP_MIN_INTERVAL_MS_KEY,
-        MaintenanceMinIntervalConfigs.forBuiltInType(Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL)
-            .getKey());
+  }
+
+  @Test
+  void testOrphanCleanupHasNoMinIntervalConfig() {
+    Assertions.assertNull(
+        MaintenancePolicyDefinitions.require(Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL)
+            .minIntervalMs());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            MaintenanceMinIntervalConfigs.forBuiltInType(
+                Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL));
+    Config config = new Config(false) {};
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            MaintenanceMinIntervalConfigs.resolve(
+                config, Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL, null));
   }
 
   @Test
@@ -82,9 +93,9 @@ public class TestMaintenanceMinIntervalConfigs {
 
     Config defaultsOnly = new Config(false) {};
     Assertions.assertEquals(
-        MaintenanceMinIntervalConfigs.DEFAULT_ORPHAN_CLEANUP_MIN_INTERVAL_MS,
+        MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS,
         MaintenanceMinIntervalConfigs.resolve(
-            defaultsOnly, Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL, null));
+            defaultsOnly, Policy.BuiltInType.ICEBERG_COMPACTION, null));
   }
 
   @Test

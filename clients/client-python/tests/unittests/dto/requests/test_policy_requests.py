@@ -105,6 +105,41 @@ class TestPolicyCreateRequest(unittest.TestCase):
         self.assertTrue(request.enabled)
         self.assertTrue(json.loads(request.to_json())["enabled"])
 
+    def test_rejects_exclusive_trigger_peers(self) -> None:
+        both = PolicyCreateRequest.from_json(
+            json.dumps(
+                {
+                    "name": "p",
+                    "policyType": "system_iceberg_compaction",
+                    "enabled": True,
+                    "content": {
+                        "timeTrigger": "0 0 2 * * ?",
+                        "commitTrigger": True,
+                    },
+                }
+            )
+        )
+        with self.assertRaises(IllegalArgumentException) as both_ctx:
+            both.validate()
+        self.assertIn("mutually exclusive", str(both_ctx.exception))
+
+        min_without_commit = PolicyCreateRequest.from_json(
+            json.dumps(
+                {
+                    "name": "p",
+                    "policyType": "system_iceberg_compaction",
+                    "enabled": True,
+                    "content": {
+                        "timeTrigger": "0 0 2 * * ?",
+                        "minIntervalMs": 1000,
+                    },
+                }
+            )
+        )
+        with self.assertRaises(IllegalArgumentException) as min_ctx:
+            min_without_commit.validate()
+        self.assertIn("minIntervalMs", str(min_ctx.exception))
+
     def test_validation_failures(self) -> None:
         with self.assertRaises(IllegalArgumentException):
             PolicyCreateRequest(
@@ -187,6 +222,41 @@ class TestPolicyUpdateRequest(unittest.TestCase):
             PolicyUpdateRequest.UpdatePolicyContentRequest(
                 "system_row_filter", None
             ).validate()
+
+    def test_update_content_rejects_exclusive_trigger_peers(self) -> None:
+        both = PolicyUpdateRequest.UpdatePolicyContentRequest.from_json(
+            json.dumps(
+                {
+                    "@type": "updateContent",
+                    "policyType": "system_iceberg_compaction",
+                    "newContent": {
+                        "timeTrigger": "0 0 2 * * ?",
+                        "commitTrigger": True,
+                    },
+                }
+            )
+        )
+        with self.assertRaises(IllegalArgumentException) as both_ctx:
+            both.validate()
+        self.assertIn("mutually exclusive", str(both_ctx.exception))
+
+        min_without_commit = (
+            PolicyUpdateRequest.UpdatePolicyContentRequest.from_json(
+                json.dumps(
+                    {
+                        "@type": "updateContent",
+                        "policyType": "system_iceberg_compaction",
+                        "newContent": {
+                            "timeTrigger": "0 0 2 * * ?",
+                            "minIntervalMs": 1000,
+                        },
+                    }
+                )
+            )
+        )
+        with self.assertRaises(IllegalArgumentException) as min_ctx:
+            min_without_commit.validate()
+        self.assertIn("minIntervalMs", str(min_ctx.exception))
 
     def test_update_content_json_round_trip_decodes_content(self) -> None:
         for policy_type, payload, content_type in _CONTENT_ROUND_TRIP_CASES:

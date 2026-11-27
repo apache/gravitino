@@ -70,7 +70,7 @@ import org.slf4j.LoggerFactory;
  * <p>Flow: {@code policy → tags → tagged objects}. Catalog/schema tags expand to tables (including
  * hierarchical child schemas). A table is kept only when {@link NearestMaintenancePolicyResolver}
  * picks this policy and {@link ShouldSkipTable} allows schedule. Stops after {@code limit} accepted
- * tables (skipped cooldown / in-flight tables do not count).
+ * tables (skipped in-flight / already-queued tables do not count).
  *
  * <p>Catalog/schema expansion prefers live {@code listSchemas}/{@code listTables}, then imports
  * only missing entities with {@code loadSchema}/{@code loadTable}. On list failure, falls back to
@@ -81,8 +81,9 @@ public final class NearestPolicyTableEnumerator {
   /**
    * Skip check used while scanning for schedulable tables.
    *
-   * <p>Production expand skips when the action cannot start or a pending {@code cron-job} already
-   * covers the table.
+   * <p>Production expand skips when the soft slot is occupied or a pending {@code cron-job} already
+   * covers the table. Expand does not apply {@code minIntervalMs} ({@code commitTrigger} path
+   * only).
    */
   @FunctionalInterface
   interface ShouldSkipTable {
@@ -90,11 +91,9 @@ public final class NearestPolicyTableEnumerator {
     /**
      * @param tableId table entity id
      * @param policyId policy entity id
-     * @param minIntervalMs resolved cooldown for the policy type
-     * @param nowMs current epoch millis
      * @return true when expand must not schedule a cron-job for this pair
      */
-    boolean shouldSkip(long tableId, long policyId, long minIntervalMs, long nowMs);
+    boolean shouldSkip(long tableId, long policyId);
   }
 
   private static final Logger LOG = LoggerFactory.getLogger(NearestPolicyTableEnumerator.class);
@@ -159,20 +158,18 @@ public final class NearestPolicyTableEnumerator {
   }
 
   /**
-   * Lists up to {@code limit} tables that are nearest-policy winners and can start (not occupied /
-   * cooling) and are not already covered by a queued cron-job.
+   * Lists up to {@code limit} tables that are nearest-policy winners, not occupied, and not already
+   * covered by a queued cron-job.
    *
    * @param policy loaded policy
    * @param limit maximum schedulable candidates to return
-   * @param minIntervalMs resolved cooldown for {@link MaintenanceActionManager#canStart}
-   * @param actionManager occupancy / cooldown checks
+   * @param actionManager occupancy checks (no cooldown on the expand path)
    * @param cronJobClient pending cron-job coverage
    * @return distinct schedulable candidates, size at most {@code limit}
    */
   public List<TableCandidate> listTableIds(
       PolicyEntity policy,
       int limit,
-      long minIntervalMs,
       MaintenanceActionManager actionManager,
       CronJobClient cronJobClient) {
     Preconditions.checkNotNull(actionManager);
@@ -180,10 +177,9 @@ public final class NearestPolicyTableEnumerator {
     return listTableIds(
         policy,
         limit,
-        (tableId, policyId, intervalMs, nowMs) ->
-            !actionManager.canStart(tableId, policyId, intervalMs, nowMs)
-                || cronJobClient.isTableAlreadyQueued(tableId, policyId),
-        minIntervalMs);
+        (tableId, policyId) ->
+            actionManager.isOccupied(tableId, policyId)
+                || cronJobClient.isTableAlreadyQueued(tableId, policyId));
   }
 
   /**
@@ -191,12 +187,10 @@ public final class NearestPolicyTableEnumerator {
    *
    * @param policy loaded policy
    * @param limit maximum schedulable candidates to return
-   * @param shouldSkip skip occupied / cooling / already-queued tables while scanning
-   * @param minIntervalMs resolved cooldown for {@link ShouldSkipTable#shouldSkip}
+   * @param shouldSkip skip occupied / already-queued tables while scanning
    * @return distinct schedulable candidates, size at most {@code limit}
    */
-  List<TableCandidate> listTableIds(
-      PolicyEntity policy, int limit, ShouldSkipTable shouldSkip, long minIntervalMs) {
+  List<TableCandidate> listTableIds(PolicyEntity policy, int limit, ShouldSkipTable shouldSkip) {
     if (limit <= 0) {
       return List.of();
     }
@@ -212,8 +206,6 @@ public final class NearestPolicyTableEnumerator {
             policy,
             nearestResolverSupplier.get(),
             shouldSkip,
-            minIntervalMs,
-            System.currentTimeMillis(),
             new LinkedHashSet<>(),
             new LinkedHashMap<>(),
             limit);
@@ -549,12 +541,11 @@ public final class NearestPolicyTableEnumerator {
     if (winnerId.isEmpty() || winnerId.get().longValue() != scan.policy.id()) {
       return;
     }
-    if (scan.shouldSkip.shouldSkip(tableId, scan.policy.id(), scan.minIntervalMs, scan.nowMs)) {
+    if (scan.shouldSkip.shouldSkip(tableId, scan.policy.id())) {
       LOG.debug(
-          "Skip cron-job schedule for table {} policy {} (in-flight or within minIntervalMs={})",
+          "Skip cron-job schedule for table {} policy {} (in-flight or already queued)",
           tableId,
-          scan.policy.id(),
-          scan.minIntervalMs);
+          scan.policy.id());
       return;
     }
     String fullName = tableObject.fullName();
@@ -578,8 +569,6 @@ public final class NearestPolicyTableEnumerator {
     private final PolicyEntity policy;
     private final NearestMaintenancePolicyResolver nearestResolver;
     private final ShouldSkipTable shouldSkip;
-    private final long minIntervalMs;
-    private final long nowMs;
     private final Set<Long> visitedTableIds;
     private final Map<Long, TableCandidate> acceptedByTableId;
     private final int limit;
@@ -589,8 +578,6 @@ public final class NearestPolicyTableEnumerator {
         PolicyEntity policy,
         NearestMaintenancePolicyResolver nearestResolver,
         ShouldSkipTable shouldSkip,
-        long minIntervalMs,
-        long nowMs,
         Set<Long> visitedTableIds,
         Map<Long, TableCandidate> acceptedByTableId,
         int limit) {
@@ -598,8 +585,6 @@ public final class NearestPolicyTableEnumerator {
       this.policy = policy;
       this.nearestResolver = nearestResolver;
       this.shouldSkip = shouldSkip;
-      this.minIntervalMs = minIntervalMs;
-      this.nowMs = nowMs;
       this.visitedTableIds = visitedTableIds;
       this.acceptedByTableId = acceptedByTableId;
       this.limit = limit;

@@ -166,7 +166,7 @@ public class PolicyContents {
    * @param rewriteOptions rewrite options forwarded as job.options.*
    * @param timeTrigger optional cron expression
    * @param commitTrigger optional commit-trigger flag
-   * @param minIntervalMs optional cooldown ms
+   * @param minIntervalMs optional cooldown ms (only with {@code commitTrigger=true})
    * @param jobOptions optional job options
    * @param updaterOptions optional updater options
    * @return iceberg compaction policy content
@@ -229,7 +229,7 @@ public class PolicyContents {
    * @param dryRun whether to list candidates without deleting them
    * @param timeTrigger optional cron expression
    * @param commitTrigger optional commit-trigger flag (must not be {@code true})
-   * @param minIntervalMs optional cooldown ms
+   * @param minIntervalMs optional cooldown ms (only with {@code commitTrigger=true})
    * @param jobOptions optional job options
    * @param updaterOptions optional updater options
    * @return orphan cleanup policy content
@@ -304,7 +304,7 @@ public class PolicyContents {
    * @param useCaching caching option, or null for the Iceberg default
    * @param timeTrigger optional cron expression
    * @param commitTrigger optional commit-trigger flag
-   * @param minIntervalMs optional cooldown ms
+   * @param minIntervalMs optional cooldown ms (only with {@code commitTrigger=true})
    * @param jobOptions optional job options
    * @param updaterOptions optional updater options
    * @return manifest rewrite policy
@@ -357,7 +357,7 @@ public class PolicyContents {
    *
    * @param timeTrigger optional cron expression
    * @param commitTrigger optional commit-trigger flag
-   * @param minIntervalMs optional cooldown ms
+   * @param minIntervalMs optional cooldown ms (only with {@code commitTrigger=true})
    * @param jobOptions optional job options
    * @param updaterOptions optional updater options
    * @return snapshot-expiration policy content
@@ -381,7 +381,7 @@ public class PolicyContents {
    * @param streamResults whether to stream intermediate delete results, or null for the default
    * @param timeTrigger optional cron expression
    * @param commitTrigger optional commit-trigger flag
-   * @param minIntervalMs optional cooldown ms
+   * @param minIntervalMs optional cooldown ms (only with {@code commitTrigger=true})
    * @param jobOptions optional job options
    * @param updaterOptions optional updater options
    * @return snapshot-expiration policy content

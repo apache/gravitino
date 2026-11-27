@@ -44,7 +44,7 @@ public class TestPolicyExecutionSpec {
   void toStringOmitsOptionValues() {
     PolicyExecutionSpec spec =
         PolicyExecutionSpec.of(
-            "0 0 2 * * ?",
+            null,
             true,
             1000L,
             ImmutableMap.of("password", "secret"),
@@ -58,18 +58,35 @@ public class TestPolicyExecutionSpec {
   }
 
   @Test
-  void ofAcceptsScalarTriggers() {
+  void ofAcceptsTimeTriggerAlone() {
     PolicyExecutionSpec spec =
         Assertions.assertDoesNotThrow(
             () ->
                 PolicyExecutionSpec.of(
                     "0 0 2 * * ?",
+                    null,
+                    null,
+                    ImmutableMap.of("uri", "http://irc"),
+                    ImmutableMap.of("metalake", "ml")));
+    Assertions.assertEquals("0 0 2 * * ?", spec.timeTrigger());
+    Assertions.assertNull(spec.commitTrigger());
+    Assertions.assertNull(spec.minIntervalMs());
+  }
+
+  @Test
+  void ofAcceptsCommitTriggerWithMinInterval() {
+    PolicyExecutionSpec spec =
+        Assertions.assertDoesNotThrow(
+            () ->
+                PolicyExecutionSpec.of(
+                    null,
                     true,
                     100L,
                     ImmutableMap.of("uri", "http://irc"),
                     ImmutableMap.of("metalake", "ml")));
-    Assertions.assertEquals("0 0 2 * * ?", spec.timeTrigger());
+    Assertions.assertNull(spec.timeTrigger());
     Assertions.assertEquals(Boolean.TRUE, spec.commitTrigger());
+    Assertions.assertEquals(100L, spec.minIntervalMs());
   }
 
   @Test
@@ -78,6 +95,34 @@ public class TestPolicyExecutionSpec {
         () ->
             PolicyExecutionSpec.of(
                 null, true, null, Collections.emptyMap(), Collections.emptyMap()));
+  }
+
+  @Test
+  void ofRejectsTimeTriggerWithCommitTriggerTrue() {
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PolicyExecutionSpec.of("0 0 2 * * ?", true, null, null, null));
+    Assertions.assertTrue(ex.getMessage().contains("mutually exclusive"));
+  }
+
+  @Test
+  void ofRejectsMinIntervalWithoutCommitTrigger() {
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PolicyExecutionSpec.of("0 0 2 * * ?", null, 1000L, null, null));
+    Assertions.assertTrue(ex.getMessage().contains("minIntervalMs"));
+    Assertions.assertTrue(ex.getMessage().contains("commitTrigger"));
+  }
+
+  @Test
+  void ofRejectsMinIntervalWithCommitTriggerFalse() {
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PolicyExecutionSpec.of(null, false, 1000L, null, null));
+    Assertions.assertTrue(ex.getMessage().contains("minIntervalMs"));
   }
 
   @Test
@@ -101,7 +146,7 @@ public class TestPolicyExecutionSpec {
     IllegalArgumentException ex =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> PolicyExecutionSpec.of(null, null, -1L, null, null));
+            () -> PolicyExecutionSpec.of(null, true, -1L, null, null));
     Assertions.assertTrue(ex.getMessage().contains("minIntervalMs"));
   }
 

@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.policy;
 
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.policy.Policy;
 
@@ -26,17 +27,19 @@ import org.apache.gravitino.policy.Policy;
  * Per-type maintenance metadata keyed by {@link Policy.BuiltInType}.
  *
  * <p>{@link Policy.BuiltInType} is the single policy/activity identity (not a db-scheduler task
- * kind). Server defaults such as {@code minIntervalMs} are looked up from {@link
- * MaintenancePolicyDefinitions} rather than parallel switches or a second activity enum.
+ * kind). Server defaults for {@code minIntervalMs} ({@code commitTrigger=true} policies) are looked
+ * up from {@link MaintenancePolicyDefinitions} rather than parallel switches or a second activity
+ * enum. Types that cannot use {@code commitTrigger} (orphan cleanup) have a null cooldown entry.
  */
 public final class MaintenancePolicyDefinition {
 
   private final Policy.BuiltInType builtInType;
-  private final ConfigEntry<Long> minIntervalMs;
+  @Nullable private final ConfigEntry<Long> minIntervalMs;
 
-  MaintenancePolicyDefinition(Policy.BuiltInType builtInType, ConfigEntry<Long> minIntervalMs) {
+  MaintenancePolicyDefinition(
+      Policy.BuiltInType builtInType, @Nullable ConfigEntry<Long> minIntervalMs) {
     this.builtInType = Preconditions.checkNotNull(builtInType, "builtInType cannot be null");
-    this.minIntervalMs = Preconditions.checkNotNull(minIntervalMs, "minIntervalMs cannot be null");
+    this.minIntervalMs = minIntervalMs;
   }
 
   /**
@@ -47,16 +50,20 @@ public final class MaintenancePolicyDefinition {
   }
 
   /**
-   * @return server config entry for cooldown when policy content omits {@code minIntervalMs}
+   * @return server config entry for cooldown when a {@code commitTrigger=true} policy omits {@code
+   *     minIntervalMs}, or {@code null} when this type has no cooldown config
    */
+  @Nullable
   public ConfigEntry<Long> minIntervalMs() {
     return minIntervalMs;
   }
 
   /**
-   * @return {@code gravitino.conf} key for this type's cooldown
+   * @return {@code gravitino.conf} key for this type's {@code minIntervalMs} default
+   * @throws IllegalStateException if this type has no cooldown config
    */
   public String minIntervalMsKey() {
+    Preconditions.checkState(minIntervalMs != null, "No minIntervalMs config for %s", builtInType);
     return minIntervalMs.getKey();
   }
 }

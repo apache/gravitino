@@ -143,8 +143,7 @@ class TestPolicyDTO(unittest.TestCase):
                 "system_iceberg_snapshot_expiration",
                 {
                     "olderThanDays": 9,
-                    "timeTrigger": "0 0 * * *",
-                    "commitTrigger": False,
+                    "commitTrigger": True,
                     "minIntervalMs": 60000,
                     "jobOptions": {"k": "v"},
                 },
@@ -155,16 +154,15 @@ class TestPolicyDTO(unittest.TestCase):
         self.assertEqual(9, content.older_than_days())
         self.assertEqual(1, content.retain_last())
         spec = content.execution_spec()
-        self.assertEqual("0 0 * * *", spec.time_trigger())
-        self.assertEqual(False, spec.commit_trigger())
+        self.assertIsNone(spec.time_trigger())
+        self.assertEqual(True, spec.commit_trigger())
         self.assertEqual(60000, spec.min_interval_ms())
         self.assertEqual({"k": "v"}, spec.job_options())
         domain = content.to_domain_content()
         self.assertEqual(
             PolicyContents.iceberg_snapshot_expiration(
                 older_than_days=9,
-                time_trigger="0 0 * * *",
-                commit_trigger=False,
+                commit_trigger=True,
                 min_interval_ms=60000,
                 job_options={"k": "v"},
             ),

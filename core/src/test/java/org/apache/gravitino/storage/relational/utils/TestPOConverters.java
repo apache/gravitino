@@ -1109,7 +1109,7 @@ public class TestPOConverters {
             IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
             IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
             ImmutableMap.of("target-file-size-bytes", "134217728"),
-            "0 0 2 * * ?",
+            null,
             true,
             3_600_000L,
             ImmutableMap.of("spark.executor.memory", "4g"),
@@ -1117,7 +1117,7 @@ public class TestPOConverters {
 
     // Persistence must keep peer keys flat (not nested under executionSpec).
     String storedJson = JsonUtils.anyFieldMapper().writeValueAsString(content);
-    assertTrue(storedJson.contains("\"timeTrigger\""));
+    assertFalse(storedJson.contains("\"timeTrigger\""));
     assertTrue(storedJson.contains("\"commitTrigger\""));
     assertTrue(storedJson.contains("\"minIntervalMs\""));
     assertTrue(storedJson.contains("\"jobOptions\""));
@@ -1137,7 +1137,7 @@ public class TestPOConverters {
 
     IcebergDataCompactionContent loaded = (IcebergDataCompactionContent) convertedPolicy.content();
     PolicyExecutionSpec peers = loaded.executionSpec();
-    assertEquals("0 0 2 * * ?", peers.timeTrigger());
+    assertNull(peers.timeTrigger());
     assertEquals(Boolean.TRUE, peers.commitTrigger());
     assertEquals(3_600_000L, peers.minIntervalMs());
     assertEquals("4g", peers.jobOptions().get("spark.executor.memory"));
@@ -1155,10 +1155,10 @@ public class TestPOConverters {
             true,
             "0 0 3 * * ?",
             null,
-            1_800_000L,
+            null,
             ImmutableMap.of("spark.executor.cores", "2"),
             ImmutableMap.of("metalake", "ml"));
-    assertFlatExecutionPeersPersisted(content);
+    assertFlatExecutionPeersPersisted(content, /*expectMinInterval=*/ false);
 
     PolicyEntity converted =
         POConverters.fromPolicyPO(
@@ -1181,12 +1181,12 @@ public class TestPOConverters {
             null,
             null,
             null,
-            "0 30 1 * * ?",
+            null,
             true,
             900_000L,
             ImmutableMap.of("spark.executor.memory", "2g"),
             ImmutableMap.of("queue", "tms"));
-    assertFlatExecutionPeersPersisted(content);
+    assertFlatExecutionPeersPersisted(content, /*expectMinInterval=*/ true);
 
     PolicyEntity converted =
         POConverters.fromPolicyPO(
@@ -1231,11 +1231,11 @@ public class TestPOConverters {
             5L,
             true,
             "0 0 4 * * ?",
-            false,
-            2_700_000L,
+            null,
+            null,
             ImmutableMap.of("spark.driver.memory", "1g"),
             ImmutableMap.of("metalake", "ml"));
-    assertFlatExecutionPeersPersisted(content);
+    assertFlatExecutionPeersPersisted(content, /*expectMinInterval=*/ false);
 
     PolicyEntity converted =
         POConverters.fromPolicyPO(
@@ -1250,14 +1250,16 @@ public class TestPOConverters {
     assertEquals(content, converted.content());
   }
 
-  private static void assertFlatExecutionPeersPersisted(PolicyContent content)
-      throws JsonProcessingException {
+  private static void assertFlatExecutionPeersPersisted(
+      PolicyContent content, boolean expectMinInterval) throws JsonProcessingException {
     String storedJson = JsonUtils.anyFieldMapper().writeValueAsString(content);
-    assertTrue(storedJson.contains("\"timeTrigger\""));
-    assertTrue(storedJson.contains("\"minIntervalMs\""));
     assertTrue(storedJson.contains("\"jobOptions\""));
     assertTrue(storedJson.contains("\"updaterOptions\""));
     assertFalse(storedJson.contains("\"executionSpec\""));
+    if (expectMinInterval) {
+      assertTrue(storedJson.contains("\"minIntervalMs\""));
+      assertTrue(storedJson.contains("\"commitTrigger\""));
+    }
   }
 
   @Test

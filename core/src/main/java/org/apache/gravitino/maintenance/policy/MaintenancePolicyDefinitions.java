@@ -56,10 +56,8 @@ public final class MaintenancePolicyDefinitions {
         map,
         Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION,
         MaintenanceMinIntervalConfigs.SNAPSHOT_EXPIRY_MIN_INTERVAL_MS);
-    register(
-        map,
-        Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL,
-        MaintenanceMinIntervalConfigs.ORPHAN_CLEANUP_MIN_INTERVAL_MS);
+    // Orphan cleanup is timeTrigger-only and has no minIntervalMs config.
+    register(map, Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL, null);
     BY_TYPE = ImmutableMap.copyOf(map);
   }
 
@@ -125,7 +123,7 @@ public final class MaintenancePolicyDefinitions {
   private static void register(
       EnumMap<Policy.BuiltInType, MaintenancePolicyDefinition> map,
       Policy.BuiltInType builtInType,
-      ConfigEntry<Long> minIntervalMs) {
+      @Nullable ConfigEntry<Long> minIntervalMs) {
     map.put(builtInType, new MaintenancePolicyDefinition(builtInType, minIntervalMs));
   }
 }

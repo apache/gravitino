@@ -27,6 +27,8 @@ import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.requests.PolicyCreateRequest;
+import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.PolicyExecutionSpec;
@@ -248,7 +250,7 @@ public class TestPolicyDTO {
         PolicyContentDTO.IcebergCompactionContentDTO.builder()
             .withExecutionSpec(
                 PolicyExecutionSpec.of(
-                    "0 0 2 * * ?",
+                    null,
                     true,
                     3_600_000L,
                     ImmutableMap.of("spark.executor.memory", "4g"),
@@ -266,14 +268,16 @@ public class TestPolicyDTO {
             .build();
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO);
-    Assertions.assertTrue(serJson.contains("\"timeTrigger\""));
+    Assertions.assertTrue(serJson.contains("\"commitTrigger\""));
+    Assertions.assertTrue(serJson.contains("\"minIntervalMs\""));
+    Assertions.assertFalse(serJson.contains("\"timeTrigger\""));
     Assertions.assertFalse(serJson.contains("\"executionSpec\""));
     PolicyDTO deserPolicyDTO = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
     Assertions.assertEquals(policyDTO, deserPolicyDTO);
 
     PolicyContentDTO.IcebergCompactionContentDTO content =
         (PolicyContentDTO.IcebergCompactionContentDTO) deserPolicyDTO.content();
-    Assertions.assertEquals("0 0 2 * * ?", content.timeTrigger());
+    Assertions.assertNull(content.timeTrigger());
     Assertions.assertEquals(Boolean.TRUE, content.commitTrigger());
     Assertions.assertEquals(3_600_000L, content.minIntervalMs());
     Assertions.assertEquals("4g", content.jobOptions().get("spark.executor.memory"));
@@ -320,5 +324,44 @@ public class TestPolicyDTO {
             .withExecutionSpec(PolicyExecutionSpec.of("a a a a a a", null, null, null, null))
             .build();
     Assertions.assertDoesNotThrow(opaqueCron::validate);
+  }
+
+  @Test
+  public void testRejectsExclusiveTriggerPeersOnCreateAndUpdate() throws JsonProcessingException {
+    String bothTriggers =
+        "{\"name\":\"p\",\"policyType\":\"system_iceberg_compaction\",\"enabled\":true,"
+            + "\"content\":{\"timeTrigger\":\"0 0 2 * * ?\",\"commitTrigger\":true}}";
+    PolicyCreateRequest createBoth =
+        JsonUtils.objectMapper().readValue(bothTriggers, PolicyCreateRequest.class);
+    IllegalArgumentException createBothEx =
+        Assertions.assertThrows(IllegalArgumentException.class, createBoth::validate);
+    Assertions.assertTrue(createBothEx.getMessage().contains("mutually exclusive"));
+
+    String minWithoutCommit =
+        "{\"name\":\"p\",\"policyType\":\"system_iceberg_compaction\",\"enabled\":true,"
+            + "\"content\":{\"timeTrigger\":\"0 0 2 * * ?\",\"minIntervalMs\":1000}}";
+    PolicyCreateRequest createMin =
+        JsonUtils.objectMapper().readValue(minWithoutCommit, PolicyCreateRequest.class);
+    IllegalArgumentException createMinEx =
+        Assertions.assertThrows(IllegalArgumentException.class, createMin::validate);
+    Assertions.assertTrue(createMinEx.getMessage().contains("minIntervalMs"));
+
+    String updateBoth =
+        "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_compaction\","
+            + "\"newContent\":{\"timeTrigger\":\"0 0 2 * * ?\",\"commitTrigger\":true}}";
+    PolicyUpdateRequest update =
+        JsonUtils.objectMapper().readValue(updateBoth, PolicyUpdateRequest.class);
+    IllegalArgumentException updateEx =
+        Assertions.assertThrows(IllegalArgumentException.class, update::validate);
+    Assertions.assertTrue(updateEx.getMessage().contains("mutually exclusive"));
+
+    String updateMinWithoutCommit =
+        "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_compaction\","
+            + "\"newContent\":{\"timeTrigger\":\"0 0 2 * * ?\",\"minIntervalMs\":1000}}";
+    PolicyUpdateRequest updateMin =
+        JsonUtils.objectMapper().readValue(updateMinWithoutCommit, PolicyUpdateRequest.class);
+    IllegalArgumentException updateMinEx =
+        Assertions.assertThrows(IllegalArgumentException.class, updateMin::validate);
+    Assertions.assertTrue(updateMinEx.getMessage().contains("minIntervalMs"));
   }
 }

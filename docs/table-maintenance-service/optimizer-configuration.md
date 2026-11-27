@@ -481,15 +481,16 @@ The adapter supplies `table_identifier`, `older_than`, `location`, and `dry_run`
   "content": {
     "olderThanDays": 3,
     "dryRun": true,
-    "timeTrigger": "0 0 3 * * ?",
-    "minIntervalMs": 86400000
+    "timeTrigger": "0 0 3 * * ?"
   }
 }
 ```
 
 Optional TMS peer fields on content (`timeTrigger`, `commitTrigger`, `minIntervalMs`, `jobOptions`,
-`updaterOptions`) are shared with other maintenance policy types. `commitTrigger` is not allowed for
-orphan cleanup. See [Iceberg compaction policy](../iceberg-compaction-policy.md),
+`updaterOptions`) are shared with other maintenance policy types. A policy may set at most one of
+`timeTrigger` or `commitTrigger=true`. `minIntervalMs` is allowed only with `commitTrigger=true`.
+Orphan cleanup is timeTrigger-only (`commitTrigger=true` and therefore `minIntervalMs` are
+rejected). See [Iceberg compaction policy](../iceberg-compaction-policy.md),
 [Iceberg snapshot expiration policy](../iceberg-snapshot-expiration-policy.md), and
 [Iceberg orphan file removal policy](../iceberg-orphan-file-removal-policy.md) for peer-field
 semantics. `olderThanDays` defaults to 3 (1–36500). The adapter always emits `older_than` as an

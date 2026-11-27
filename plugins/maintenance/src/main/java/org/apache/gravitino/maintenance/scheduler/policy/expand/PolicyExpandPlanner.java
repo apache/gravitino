@@ -22,15 +22,12 @@ import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.model.TableCandidate;
-import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.policy.MaintenancePolicyDefinitions;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
 import org.apache.gravitino.maintenance.scheduler.policy.NearestPolicyTableEnumerator;
 import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +46,6 @@ public final class PolicyExpandPlanner {
   private final NearestPolicyTableEnumerator tableEnumerator;
   private final CronJobClient cronJobClient;
   private final MaintenanceActionManager actionManager;
-  private final Config config;
   private final int scheduleBatchSize;
   private final PolicyMetaService policyMetaService;
 
@@ -57,7 +53,6 @@ public final class PolicyExpandPlanner {
    * @param tableEnumerator lists attached table ids
    * @param cronJobClient writes cron-job rows
    * @param actionManager decides whether a maintenance action can start
-   * @param config gravitino server config for per-type minInterval fallbacks
    * @param scheduleBatchSize max cron-jobs per expand pick
    * @param policyMetaService policy lookup
    */
@@ -65,13 +60,11 @@ public final class PolicyExpandPlanner {
       NearestPolicyTableEnumerator tableEnumerator,
       CronJobClient cronJobClient,
       MaintenanceActionManager actionManager,
-      Config config,
       int scheduleBatchSize,
       PolicyMetaService policyMetaService) {
     this.tableEnumerator = Preconditions.checkNotNull(tableEnumerator);
     this.cronJobClient = Preconditions.checkNotNull(cronJobClient);
     this.actionManager = Preconditions.checkNotNull(actionManager);
-    this.config = Preconditions.checkNotNull(config);
     this.scheduleBatchSize = scheduleBatchSize;
     this.policyMetaService = Preconditions.checkNotNull(policyMetaService);
   }
@@ -115,24 +108,16 @@ public final class PolicyExpandPlanner {
       return Optional.empty();
     }
 
-    Long contentMinInterval = null;
-    if (policy.content() instanceof ExecutablePolicyContent) {
-      contentMinInterval =
-          ((ExecutablePolicyContent) policy.content()).executionSpec().minIntervalMs();
-    }
-    long minIntervalMs =
-        MaintenanceMinIntervalConfigs.resolve(config, policy.policyType(), contentMinInterval);
+    // Expand / cron has no minIntervalMs; overlap is blocked by in-flight / already-queued only.
     List<TableCandidate> toSchedule =
-        tableEnumerator.listTableIds(
-            policy, scheduleBatchSize, minIntervalMs, actionManager, cronJobClient);
+        tableEnumerator.listTableIds(policy, scheduleBatchSize, actionManager, cronJobClient);
     int scheduled = cronJobClient.scheduleNow(policy, toSchedule, scheduleBatchSize);
     LOG.info(
-        "Expanded policy {}: scheduled {} cron-job rows for {} tables (type={}, minIntervalMs={}); next expand due {}",
+        "Expanded policy {}: scheduled {} cron-job rows for {} tables (type={}); next expand due {}",
         policyId,
         scheduled,
         toSchedule.size(),
         policy.policyType(),
-        minIntervalMs,
         nextDue);
     return Optional.of(nextDue);
   }
