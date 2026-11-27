@@ -58,6 +58,11 @@ public interface UserMetaMapper {
   UserPO selectUserMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name);
 
+  /** Returns an active user by ID, or null if it does not exist. */
+  @Nullable
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "selectUserMetaById")
+  UserPO selectUserMetaById(@Param("userId") Long userId);
+
   /** Returns and locks an active user by ID for the current transaction. */
   @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "selectUserMetaByIdForUpdate")
   UserPO selectUserMetaByIdForUpdate(@Param("userId") Long userId);
