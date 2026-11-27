@@ -22,13 +22,10 @@ import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.TreeMap;
-import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.ArrayUtils;
@@ -43,14 +40,12 @@ import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.SupportsPartitionSpecs;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.iceberg.DistributionMode;
-import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -58,7 +53,7 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 /** Represents an Apache Iceberg Table entity in the Iceberg table. */
 @ToString
 @Getter
-public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
+public class IcebergTable extends BaseTable {
 
   /**
    * A reserved property to specify the location of the table. The files of the table should be
@@ -83,37 +78,7 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
 
   private String location;
 
-  /**
-   * All Iceberg partition specs keyed by {@code spec-id}. Populated from metadata in {@link
-   * #fromIcebergTable}, or from the current {@code partitioning} (spec {@code 0}) in {@link
-   * Builder#internalBuild()}.
-   */
-  @Getter(AccessLevel.NONE)
-  private Map<Integer, Transform[]> icebergPartitionSpecs = ImmutableMap.of();
-
-  /** Iceberg default partition spec ID for this table metadata. */
-  @Getter(AccessLevel.NONE)
-  private int icebergDefaultSpecId;
-
   private IcebergTable() {}
-
-  /** {@inheritDoc} */
-  @Override
-  public SupportsPartitionSpecs supportsPartitionSpecs() {
-    return this;
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public int defaultPartitionSpecId() {
-    return icebergDefaultSpecId;
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public Map<Integer, Transform[]> partitionSpecs() {
-    return copyPartitionSpecs(icebergPartitionSpecs);
-  }
 
   public static Map<String, String> rebuildCreateProperties(Map<String, String> createProperties) {
     // Gravitino owns the default Iceberg table format version: when it is not explicitly set, stamp
@@ -216,46 +181,32 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
     Map<String, String> properties = new HashMap<>(table.properties());
     properties.putAll(IcebergTablePropertiesUtil.buildReservedProperties(table));
     Schema schema = table.schema();
-    // Historical specs may still reference source IDs dropped from the current schema.
+    // The current default may still reference source IDs that only older schemas retain.
     Map<Integer, String> idToName = FromIcebergPartitionSpec.idToNameAcrossSchemas(table);
     Transform[] partitionSpec =
         FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema, idToName);
     SortOrder[] sortOrder = FromIcebergSortOrder.fromSortOrder(table.sortOrder());
     IcebergColumn[] icebergColumns =
         schema.columns().stream().map(ConvertUtil::fromNestedField).toArray(IcebergColumn[]::new);
-    Map<Integer, Transform[]> allSpecs = new TreeMap<>();
-    for (PartitionSpec spec : table.specsById().values()) {
-      allSpecs.put(
-          spec.specId(),
-          copyTransforms(FromIcebergPartitionSpec.fromPartitionSpec(spec, schema, idToName)));
-    }
-    Preconditions.checkState(
-        allSpecs.containsKey(table.defaultSpecId()),
-        "Iceberg default partition spec id %s is missing from specs %s",
-        table.defaultSpecId(),
-        allSpecs.keySet());
-    IcebergTable icebergTable =
-        IcebergTable.builder()
-            .withComment(table.property(IcebergTablePropertiesMetadata.COMMENT, null))
-            .withLocation(table.location())
-            .withProperties(properties)
-            .withColumns(icebergColumns)
-            .withName(tableName)
-            .withAuditInfo(auditInfo != null ? auditInfo : AuditInfo.EMPTY)
-            .withPartitioning(partitionSpec)
-            .withSortOrders(sortOrder)
-            .withDistribution(getDistribution(properties))
-            .build();
-    icebergTable.icebergPartitionSpecs = ImmutableMap.copyOf(allSpecs);
-    icebergTable.icebergDefaultSpecId = table.defaultSpecId();
-    return icebergTable;
+    return IcebergTable.builder()
+        .withComment(table.property(IcebergTablePropertiesMetadata.COMMENT, null))
+        .withLocation(table.location())
+        .withProperties(properties)
+        .withColumns(icebergColumns)
+        .withName(tableName)
+        .withAuditInfo(auditInfo != null ? auditInfo : AuditInfo.EMPTY)
+        .withPartitioning(partitionSpec)
+        .withSortOrders(sortOrder)
+        .withDistribution(getDistribution(properties))
+        .build();
   }
 
   /**
    * Keeps the columns from the create request.
    *
    * <p>{@link #fromIcebergTable} converts Iceberg metadata, which rewrites types such as timestamp
-   * precision. Create must return the caller's columns. Partition specs stay on this table.
+   * precision. Create must return the caller's columns. Reserved properties such as {@code
+   * partition-specs} still come from the reloaded metadata.
    *
    * @param columns columns supplied by the caller
    * @return this table
@@ -304,16 +255,10 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
       }
       Transform[] normalizedPartitioning =
           partitioning != null ? partitioning : Transforms.EMPTY_TRANSFORM;
-      // Copy so a caller who mutates the array passed to the builder cannot change partitioning()
-      // without changing partitionSpecs().
+      // Copy so a caller who mutates the array passed to the builder cannot change partitioning().
       icebergTable.partitioning = copyTransforms(normalizedPartitioning);
       icebergTable.distribution = distribution;
       icebergTable.sortOrders = sortOrders;
-      // Iceberg always retains at least spec 0 (unpartitioned has empty fields). Hydrate a
-      // matching default until fromIcebergTable replaces this with full metadata.
-      icebergTable.icebergPartitionSpecs =
-          ImmutableMap.of(0, copyTransforms(normalizedPartitioning));
-      icebergTable.icebergDefaultSpecId = 0;
       if (null != comment) {
         icebergTable.properties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);
       }
@@ -334,15 +279,6 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
       return Transforms.EMPTY_TRANSFORM;
     }
     return Arrays.copyOf(transforms, transforms.length);
-  }
-
-  private static Map<Integer, Transform[]> copyPartitionSpecs(
-      Map<Integer, Transform[]> partitionSpecs) {
-    Map<Integer, Transform[]> copied = new TreeMap<>();
-    for (Map.Entry<Integer, Transform[]> entry : partitionSpecs.entrySet()) {
-      copied.put(entry.getKey(), copyTransforms(entry.getValue()));
-    }
-    return ImmutableMap.copyOf(copied);
   }
 
   private static Distribution getDistribution(Map<String, String> properties) {

@@ -29,7 +29,6 @@ import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.SupportsPartitionSpecs;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -146,21 +145,6 @@ public final class EntityCombinedTable implements Table {
   @Override
   public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
     return table.supportPartitions();
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * <p>A loaded table is the connector snapshot stored as a {@link
-   * org.apache.gravitino.dto.rel.TableDTO}. That snapshot keeps {@link #partitioning()} and {@link
-   * #properties()}, including the Iceberg {@code partition-specs} property, and does not implement
-   * this capability. {@code loadTable().supportsPartitionSpecs()} throws. Server code reads
-   * historical specs through {@link PartitionSpecDispatcher}, the same way it reads partitions
-   * through {@link PartitionDispatcher}.
-   */
-  @Override
-  public SupportsPartitionSpecs supportsPartitionSpecs() {
-    return table.supportsPartitionSpecs();
   }
 
   @Override

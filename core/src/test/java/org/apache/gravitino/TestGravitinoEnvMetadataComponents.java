@@ -46,8 +46,6 @@ import org.apache.gravitino.catalog.ModelNormalizeDispatcher;
 import org.apache.gravitino.catalog.ModelOperationDispatcher;
 import org.apache.gravitino.catalog.PartitionNormalizeDispatcher;
 import org.apache.gravitino.catalog.PartitionOperationDispatcher;
-import org.apache.gravitino.catalog.PartitionSpecNormalizeDispatcher;
-import org.apache.gravitino.catalog.PartitionSpecOperationDispatcher;
 import org.apache.gravitino.catalog.SchemaNormalizeDispatcher;
 import org.apache.gravitino.catalog.SchemaOperationDispatcher;
 import org.apache.gravitino.catalog.SemanticModelNormalizeDispatcher;
@@ -121,7 +119,6 @@ class TestGravitinoEnvMetadataComponents {
     GravitinoEnv env = GravitinoEnv.getInstance();
 
     assertThrows(IllegalArgumentException.class, env::internalPartitionDispatcher);
-    assertThrows(IllegalArgumentException.class, env::internalPartitionSpecDispatcher);
     assertThrows(IllegalArgumentException.class, env::internalStatisticDispatcher);
   }
 
@@ -147,7 +144,6 @@ class TestGravitinoEnvMetadataComponents {
       assertNotNull(env.internalSchemaDispatcher());
       assertNotNull(env.internalTableDispatcher());
       assertNotNull(env.internalPartitionDispatcher());
-      assertNotNull(env.internalPartitionSpecDispatcher());
       assertNotNull(env.internalTopicDispatcher());
       assertNotNull(env.internalModelDispatcher());
       assertNotNull(env.internalFunctionDispatcher());
@@ -178,7 +174,6 @@ class TestGravitinoEnvMetadataComponents {
       assertNull(env.schemaDispatcher());
       assertNull(env.tableDispatcher());
       assertNull(env.partitionDispatcher());
-      assertNull(env.partitionSpecDispatcher());
       assertNull(env.topicDispatcher());
       assertNull(env.modelDispatcher());
       assertNull(env.functionDispatcher());
@@ -321,11 +316,6 @@ class TestGravitinoEnvMetadataComponents {
       assertSame(
           env.internalPartitionDispatcher(),
           FieldUtils.readField(env.partitionDispatcher(), "dispatcher", true));
-      assertDispatcherChain(
-          env.partitionSpecDispatcher(),
-          PartitionSpecNormalizeDispatcher.class,
-          PartitionSpecOperationDispatcher.class);
-      assertSame(env.internalPartitionSpecDispatcher(), env.partitionSpecDispatcher());
       assertDispatcherChain(
           env.statisticDispatcher(), StatisticEventDispatcher.class, StatisticManager.class);
       assertSame(

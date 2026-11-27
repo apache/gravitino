@@ -155,19 +155,6 @@ public interface Table extends Auditable {
   }
 
   /**
-   * Returns partition-spec listing when the table retains historical specs.
-   *
-   * <p>{@link #partitioning()} only reflects the current default spec. Use this capability to list
-   * every registered {@code spec-id} after partition evolution.
-   *
-   * @return The partition-spec support for the table.
-   * @throws UnsupportedOperationException If the table does not expose partition specs.
-   */
-  default SupportsPartitionSpecs supportsPartitionSpecs() {
-    throw new UnsupportedOperationException("Table does not support partition specs.");
-  }
-
-  /**
    * @return The {@link SupportsTags} if the table supports tag operations.
    * @throws UnsupportedOperationException If the table does not support tag operations.
    */

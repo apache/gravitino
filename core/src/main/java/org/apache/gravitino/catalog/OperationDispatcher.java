@@ -45,7 +45,6 @@ import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersionChange;
-import org.apache.gravitino.rel.SupportsPartitionSpecs;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
@@ -211,37 +210,6 @@ public abstract class OperationDispatcher {
       return catalogManager.doWithCatalogWrapper(
           catalogIdent,
           wrapper -> wrapper.detachConnectorResult(wrapper.doWithPartitionOps(tableIdent, fn)));
-    } catch (Exception exception) {
-      if (ex.isInstance(exception)) {
-        throw ex.cast(exception);
-      }
-      if (RuntimeException.class.isAssignableFrom(exception.getClass())) {
-        throw (RuntimeException) exception;
-      }
-      throw new RuntimeException(exception);
-    }
-  }
-
-  /**
-   * Runs {@code fn} against the table's {@link SupportsPartitionSpecs} inside the catalog class
-   * loader.
-   *
-   * @param tableIdent The table identifier.
-   * @param fn The function to apply.
-   * @param ex The exception type to rethrow when thrown by the function.
-   * @param <R> The return type.
-   * @param <E> The exception type.
-   * @return The function result.
-   * @throws E when the function throws an instance of {@code ex}
-   */
-  protected <R, E extends Throwable> R doWithPartitionSpecs(
-      NameIdentifier tableIdent, ThrowableFunction<SupportsPartitionSpecs, R> fn, Class<E> ex)
-      throws E {
-    try {
-      NameIdentifier catalogIdent = getCatalogIdentifier(tableIdent);
-      return catalogManager.doWithCatalogWrapper(
-          catalogIdent,
-          wrapper -> wrapper.detachConnectorResult(wrapper.doWithPartitionSpecOps(tableIdent, fn)));
     } catch (Exception exception) {
       if (ex.isInstance(exception)) {
         throw ex.cast(exception);

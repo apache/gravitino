@@ -218,7 +218,7 @@ public class TestIcebergTable {
         Types.TimestampType.withTimeZone(), createdTimestamp.columns()[0].dataType());
     Assertions.assertEquals(
         Types.TimestampType.withoutTimeZone(), createdTimestamp.columns()[1].dataType());
-    Assertions.assertEquals(0, createdTimestamp.supportsPartitionSpecs().defaultPartitionSpecId());
+    Assertions.assertEquals("0", createdTimestamp.properties().get("default-spec-id"));
     Table loadedTimestamp = icebergCatalogOperations.loadTable(timestampIdentifier);
     Assertions.assertEquals(
         Types.TimestampType.withTimeZone(6), loadedTimestamp.columns()[0].dataType());
@@ -228,10 +228,9 @@ public class TestIcebergTable {
     Assertions.assertEquals(ICEBERG_COMMENT, table.comment());
     Assertions.assertEquals("val1", table.properties().get("key1"));
     Assertions.assertEquals("val2", table.properties().get("key2"));
-    Assertions.assertEquals(0, table.supportsPartitionSpecs().defaultPartitionSpecId());
-    Assertions.assertEquals(1, table.supportsPartitionSpecs().partitionSpecs().size());
-    Assertions.assertArrayEquals(
-        Transforms.EMPTY_TRANSFORM, table.supportsPartitionSpecs().partitionSpecs().get(0));
+    Assertions.assertEquals("0", table.properties().get("default-spec-id"));
+    Assertions.assertArrayEquals(Transforms.EMPTY_TRANSFORM, table.partitioning());
+    Assertions.assertNotNull(table.properties().get("partition-specs"));
 
     Table loadedTable = icebergCatalogOperations.loadTable(tableIdentifier);
 
@@ -308,10 +307,8 @@ public class TestIcebergTable {
     Assertions.assertEquals("val1", table.properties().get("key1"));
     Assertions.assertEquals("val2", table.properties().get("key2"));
     Assertions.assertArrayEquals(partitions, table.partitioning());
-    Assertions.assertEquals(0, table.supportsPartitionSpecs().defaultPartitionSpecId());
-    Assertions.assertEquals(1, table.supportsPartitionSpecs().partitionSpecs().size());
-    Assertions.assertArrayEquals(
-        partitions, table.supportsPartitionSpecs().partitionSpecs().get(0));
+    Assertions.assertEquals("0", table.properties().get("default-spec-id"));
+    Assertions.assertNotNull(table.properties().get("partition-specs"));
 
     Table loadedTable = icebergCatalogOperations.loadTable(tableIdentifier);
 

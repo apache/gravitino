@@ -168,7 +168,6 @@ class TestOperationDispatcherSnapshots {
             TopicDispatcher.class,
             ModelDispatcher.class,
             PartitionDispatcher.class,
-            PartitionSpecDispatcher.class,
             FunctionDispatcher.class);
 
     List<String> escaping = new ArrayList<>();
