@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -64,11 +65,12 @@ public class TestRequestContextFilter {
     AtomicReference<Boolean> sawOpenSession = new AtomicReference<>(false);
 
     try (MockedStatic<SqlSessions> sessions = mockStatic(SqlSessions.class)) {
-      sessions.when(SqlSessions::rollbackIfSessionStillOpen).thenAnswer(invocation -> null);
+      sessions.when(SqlSessions::hasActiveSession).thenReturn(true, true, false);
+      sessions.when(SqlSessions::rollbackAndCloseSqlSession).thenAnswer(invocation -> null);
       FilterChain chain =
           (request, response) -> sawOpenSession.set(RequestContext.getRemoteAddress() != null);
       filter.doFilter(req, resp, chain);
-      sessions.verify(SqlSessions::rollbackIfSessionStillOpen);
+      sessions.verify(SqlSessions::rollbackAndCloseSqlSession, times(1));
     }
 
     Assertions.assertEquals(Boolean.TRUE, sawOpenSession.get());

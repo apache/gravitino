@@ -40,9 +40,8 @@ public final class SqlSessions {
   private static final ThreadLocal<AtomicInteger> sessionCount =
       ThreadLocal.withInitial(() -> new AtomicInteger(0));
 
-  // Run after the outermost session commits, rolls back, or closes. An inner close only
-  // decrements the count and must not run these.
-  private static final CopyOnWriteArrayList<Runnable> OUTERMOST_SESSION_CLOSED_LISTENERS =
+  // Run after the session is actually closed. An inner close only decrements the count.
+  private static final CopyOnWriteArrayList<Runnable> CLOSED_LISTENERS =
       new CopyOnWriteArrayList<>();
 
   private SqlSessions() {}
@@ -99,42 +98,25 @@ public final class SqlSessions {
   }
 
   /**
-   * Registers work that must run only when this thread's outermost SQL session has finished.
+   * Registers work that runs when this thread's SQL session is actually closed.
    *
    * <p>The listener runs after the commit, rollback, or close, including when the session count was
-   * already wrong and had to be reset. It does not run for an inner close that only decrements the
-   * count. Listeners must not throw; a failure is logged and the remaining listeners still run.
+   * already wrong and had to be reset. An inner close only decrements the count and does not run
+   * it. Listeners must not throw; a failure is logged and the remaining listeners still run.
    *
-   * @param listener work to run on the thread that closed the outermost session
+   * @param listener work to run on the thread that closed the session
    */
-  public static void addOutermostSessionClosedListener(Runnable listener) {
-    OUTERMOST_SESSION_CLOSED_LISTENERS.addIfAbsent(listener);
+  public static void addClosedListener(Runnable listener) {
+    CLOSED_LISTENERS.addIfAbsent(listener);
   }
 
   /**
-   * Removes a listener registered with {@link #addOutermostSessionClosedListener}.
+   * Removes a listener registered with {@link #addClosedListener}.
    *
    * @param listener the listener to remove
    */
-  public static void removeOutermostSessionClosedListener(Runnable listener) {
-    OUTERMOST_SESSION_CLOSED_LISTENERS.remove(listener);
-  }
-
-  /**
-   * Rolls back and closes every SQL session reference still open on this thread.
-   *
-   * <p>A finished request must not leave its transaction, or cache blocks held until that
-   * transaction ends, on a pooled thread. Each call drops one reference. The real rollback and
-   * close happen when the count reaches zero.
-   */
-  public static void rollbackIfSessionStillOpen() {
-    if (sessions.get() == null) {
-      return;
-    }
-    LOG.warn("Rolling back an SQL session that was still open after the caller finished");
-    while (sessions.get() != null) {
-      rollbackAndCloseSqlSession();
-    }
+  public static void removeClosedListener(Runnable listener) {
+    CLOSED_LISTENERS.remove(listener);
   }
 
   /**
@@ -202,7 +184,7 @@ public final class SqlSessions {
           // Ensure ThreadLocal is always cleaned up
           sessions.remove();
           sessionCount.remove();
-          notifyOutermostSessionClosed();
+          notifyClosed();
         }
       }
     } else if (count < 0) {
@@ -219,14 +201,14 @@ public final class SqlSessions {
         } finally {
           sessions.remove();
           sessionCount.remove();
-          notifyOutermostSessionClosed();
+          notifyClosed();
         }
       }
     }
   }
 
-  private static void notifyOutermostSessionClosed() {
-    for (Runnable listener : OUTERMOST_SESSION_CLOSED_LISTENERS) {
+  private static void notifyClosed() {
+    for (Runnable listener : CLOSED_LISTENERS) {
       try {
         listener.run();
       } catch (RuntimeException | Error e) {

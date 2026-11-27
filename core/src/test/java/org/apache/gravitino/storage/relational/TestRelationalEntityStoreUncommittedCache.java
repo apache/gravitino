@@ -326,7 +326,9 @@ public class TestRelationalEntityStoreUncommittedCache {
     SessionUtils.beginTransaction();
     store.put(policy(ident), false);
     Assertions.assertTrue(writeBlocked(ident));
-    SqlSessions.rollbackIfSessionStillOpen();
+    while (SqlSessions.hasActiveSession()) {
+      SqlSessions.rollbackAndCloseSqlSession();
+    }
     Assertions.assertFalse(SessionUtils.isInTransaction());
     Assertions.assertFalse(writeBlocked(ident));
     assertInvisible(ident);

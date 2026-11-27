@@ -162,7 +162,7 @@ public class RelationalEntityStore
     RelationalEntityStore store = new RelationalEntityStore();
     store.backend = backend;
     store.cache = new NoOpsCache(config);
-    SqlSessions.addOutermostSessionClosedListener(store.sessionClosedListener);
+    SqlSessions.addClosedListener(store.sessionClosedListener);
     EntityIdService.initialize(new RelationalEntityStoreIdResolver());
     return store;
   }
@@ -208,7 +208,7 @@ public class RelationalEntityStore
 
     this.entityChangeLogPoller.start();
     this.entityChangeLogCleaner.start();
-    SqlSessions.addOutermostSessionClosedListener(sessionClosedListener);
+    SqlSessions.addClosedListener(sessionClosedListener);
   }
 
   /**
@@ -579,7 +579,7 @@ public class RelationalEntityStore
 
   @Override
   public void close() throws IOException {
-    SqlSessions.removeOutermostSessionClosedListener(sessionClosedListener);
+    SqlSessions.removeClosedListener(sessionClosedListener);
     DeferredPendingWrite pending;
     while ((pending = deferredWrites.poll()) != null) {
       releasePendingWrite(pending.ident, pending.entityType);

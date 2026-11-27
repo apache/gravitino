@@ -148,7 +148,12 @@ public class RequestContextFilter implements Filter {
       chain.doFilter(request, response);
     } finally {
       try {
-        SqlSessions.rollbackIfSessionStillOpen();
+        if (SqlSessions.hasActiveSession()) {
+          LOG.warn("Rolling back an SQL session that was still open after the request finished");
+          while (SqlSessions.hasActiveSession()) {
+            SqlSessions.rollbackAndCloseSqlSession();
+          }
+        }
       } catch (RuntimeException | Error e) {
         LOG.warn("Failed to roll back an SQL session left open by the request", e);
       } finally {
