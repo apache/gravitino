@@ -22,7 +22,10 @@ package org.apache.gravitino.storage.relational.session;
 import com.google.common.annotations.VisibleForTesting;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.TransactionIsolationLevel;
 import org.slf4j.Logger;
@@ -38,6 +41,13 @@ public final class SqlSessions {
   private static final ThreadLocal<SqlSession> sessions = new ThreadLocal<>();
   private static final ThreadLocal<AtomicInteger> sessionCount =
       ThreadLocal.withInitial(() -> new AtomicInteger(0));
+
+  // Run after the session is actually closed. An inner close only decrements the count.
+  private static final CopyOnWriteArrayList<Runnable> CLOSED_LISTENERS =
+      new CopyOnWriteArrayList<>();
+
+  // A failure already caught after the session closed. The server installs its health check here.
+  private static volatile Consumer<Throwable> closeFailureRecorder = failure -> {};
 
   private SqlSessions() {}
 
@@ -90,6 +100,58 @@ public final class SqlSessions {
   /** Close the SqlSession object and remove it from the thread local storage. */
   public static void closeSqlSession() {
     handleSessionClose(false /* commit */, false /* rollback */);
+  }
+
+  /**
+   * Registers a process-wide listener that runs on the closing thread whenever any thread closes
+   * its outermost SQL session. It stays registered until removed with {@link
+   * #removeClosedListener}.
+   *
+   * <p>The listener runs after the commit, rollback, or close, including when the session count was
+   * already wrong and had to be reset. An inner close only decrements the count and does not run
+   * it. Opening another SQL session in the listener can recursively notify the same listener when
+   * that session closes. Listeners must avoid SQL work and must not throw. A listener failure is
+   * logged and the remaining listeners still run.
+   *
+   * @param listener work to run on the thread that closed the session
+   */
+  public static void addClosedListener(Runnable listener) {
+    CLOSED_LISTENERS.addIfAbsent(listener);
+  }
+
+  /**
+   * Removes a listener registered with {@link #addClosedListener}.
+   *
+   * @param listener the listener to remove
+   */
+  public static void removeClosedListener(Runnable listener) {
+    CLOSED_LISTENERS.remove(listener);
+  }
+
+  /**
+   * Installs the recorder for a failure already caught after the SQL session closed. The server
+   * points this at its health check. A null recorder drops the failure.
+   *
+   * @param recorder the recorder, or null to drop the failure
+   */
+  public static void setCloseFailureRecorder(@Nullable Consumer<Throwable> recorder) {
+    closeFailureRecorder = recorder == null ? failure -> {} : recorder;
+  }
+
+  /**
+   * Passes a failure caught after the session closed to the recorder installed by {@link
+   * #setCloseFailureRecorder}. A recorder that throws is ignored, so a successful commit stays
+   * successful.
+   *
+   * @param failure the consumed failure, or null
+   */
+  public static void recordCloseFailure(@Nullable Throwable failure) {
+    try {
+      closeFailureRecorder.accept(failure);
+    } catch (RuntimeException | Error ignored) {
+      // The caller already consumed this failure. Recording it must not replace a successful
+      // commit.
+    }
   }
 
   /**
@@ -157,6 +219,7 @@ public final class SqlSessions {
           // Ensure ThreadLocal is always cleaned up
           sessions.remove();
           sessionCount.remove();
+          notifyClosed();
         }
       }
     } else if (count < 0) {
@@ -164,8 +227,29 @@ public final class SqlSessions {
       // Reset the count and remove the session to avoid further issues.
       LOG.warn(
           "Session count is negative: {}. Resetting session count and removing session.", count);
-      sessions.remove();
-      sessionCount.remove();
+      try {
+        // Do not let close() turn auto-commit back on and commit the unbalanced work.
+        sqlSession.rollback(true);
+      } finally {
+        try {
+          sqlSession.close();
+        } finally {
+          sessions.remove();
+          sessionCount.remove();
+          notifyClosed();
+        }
+      }
+    }
+  }
+
+  private static void notifyClosed() {
+    for (Runnable listener : CLOSED_LISTENERS) {
+      try {
+        listener.run();
+      } catch (RuntimeException | Error e) {
+        recordCloseFailure(e);
+        LOG.warn("Failed to finish work deferred until the outermost SQL session closed", e);
+      }
     }
   }
 }

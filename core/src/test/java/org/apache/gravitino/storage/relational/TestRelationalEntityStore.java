@@ -26,6 +26,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -65,6 +67,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.AdditionalAnswers;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
@@ -97,6 +100,24 @@ public class TestRelationalEntityStore {
       throws IllegalAccessException {
     AtomicInteger count = cacheBlocks().get("w\0" + type.name() + "\0" + ident);
     return count != null && count.get() > 0;
+  }
+
+  @Test
+  void testReadOnlyCloseLooksUpOnlyTheClosingThread() throws Exception {
+    Thread writer = new Thread();
+    EntityCacheKey key = EntityCacheKey.of(NameIdentifier.of("lake"), Entity.EntityType.METALAKE);
+    Map<Thread, List<EntityCacheKey>> writes = new ConcurrentHashMap<>();
+    writes.put(writer, List.of(key));
+    ConcurrentMap<?, ?> pending =
+        Mockito.mock(ConcurrentMap.class, AdditionalAnswers.delegatesTo(writes));
+    FieldUtils.writeField(store, "deferredWrites", pending, true);
+    Runnable listener = (Runnable) FieldUtils.readField(store, "sessionClosedListener", true);
+
+    listener.run();
+
+    Mockito.verify(pending).remove(Thread.currentThread());
+    Mockito.verifyNoMoreInteractions(pending);
+    Assertions.assertEquals(List.of(key), writes.get(writer));
   }
 
   @Test

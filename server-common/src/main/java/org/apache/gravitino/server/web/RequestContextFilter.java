@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -40,7 +41,10 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.audit.AuditLogRedactor;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.utils.RequestContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A servlet filter that captures the client remote address and (raw, unredacted) query parameters
@@ -74,6 +78,10 @@ import org.apache.gravitino.utils.RequestContext;
  * audit line written for it, by attaching an arbitrarily large query string.
  *
  * <p>The stored values are always cleared in a {@code finally} block to prevent thread-pool leaks.
+ *
+ * <p>An SQL session still open after the request returns is rolled back and closed on this thread.
+ * A nested dispatch shares its caller's session. Only the outermost dispatch on the thread performs
+ * cleanup, and a forward into this filter preserves a session opened by its caller.
  */
 public class RequestContextFilter implements Filter {
 
@@ -85,6 +93,11 @@ public class RequestContextFilter implements Filter {
 
   /** Appended to a value that was cut short at {@link #MAX_VALUE_LENGTH}. */
   static final String TRUNCATED_SUFFIX = "...(truncated)";
+
+  private static final Logger LOG = LoggerFactory.getLogger(RequestContextFilter.class);
+
+  // Different URL mappings can have different filter instances on the same dispatch stack.
+  private static final ThreadLocal<Boolean> IN_FILTER = new ThreadLocal<>();
 
   private final Optional<EventBus> eventBus;
   private final ClientAddressResolver clientAddressResolver;
@@ -128,6 +141,14 @@ public class RequestContextFilter implements Filter {
   @Override
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
+    boolean outermost = IN_FILTER.get() == null;
+    boolean cleanUpSession =
+        outermost
+            && (request.getDispatcherType() == DispatcherType.REQUEST
+                || !SqlSessions.hasActiveSession());
+    if (outermost) {
+      IN_FILTER.set(true);
+    }
     try {
       if (request instanceof HttpServletRequest) {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
@@ -138,7 +159,22 @@ public class RequestContextFilter implements Filter {
       }
       chain.doFilter(request, response);
     } finally {
-      RequestContext.clear();
+      try {
+        if (cleanUpSession && SqlSessions.hasActiveSession()) {
+          LOG.warn("Rolling back an SQL session that was still open after the request finished");
+          while (SqlSessions.hasActiveSession()) {
+            SqlSessions.rollbackAndCloseSqlSession();
+          }
+        }
+      } catch (RuntimeException | Error e) {
+        ServerHealth.getInstance().recordFailure(e);
+        LOG.warn("Failed to roll back an SQL session left open by the request", e);
+      } finally {
+        if (outermost) {
+          IN_FILTER.remove();
+        }
+        RequestContext.clear();
+      }
     }
   }
 

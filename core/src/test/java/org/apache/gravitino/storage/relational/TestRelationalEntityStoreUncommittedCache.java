@@ -1,0 +1,717 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.storage.relational;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.EntityIdResolver;
+import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.Executable;
+import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.ibatis.session.SqlSession;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
+
+/**
+ * A cacheable write inside an outer SQL transaction must stay invisible to other sessions until
+ * that transaction commits, and must not be cached at all if it rolls back. Update and delete keep
+ * the previous cache entry blocked until the outermost session closes, so a peer cannot refill it
+ * in the gap between the backend call and the outer commit.
+ */
+@CoreBackend.H2
+public class TestRelationalEntityStoreUncommittedCache {
+
+  private static final String METALAKE = "metalake_uncommitted_cache";
+  private static final String USER = "root";
+  private static final String PASSWORD = "123456";
+
+  private static final AuditInfo AUDIT_INFO =
+      AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+  private RelationalEntityStore store;
+  private EntityCache cache;
+  private String dbPath;
+  private Object previousConfig;
+  private Object previousIdGenerator;
+  private EntityIdResolver previousIdResolver;
+  private ExecutorService peer;
+
+  @BeforeEach
+  void setUp() throws Exception {
+    peer =
+        Executors.newSingleThreadExecutor(
+            runnable -> {
+              Thread thread = new Thread(runnable, "uncommitted-cache-peer");
+              thread.setDaemon(true);
+              return thread;
+            });
+    initH2Store();
+    store.put(metalake(METALAKE), false);
+  }
+
+  @AfterEach
+  void tearDown() throws Exception {
+    if (SessionUtils.isInTransaction()) {
+      SessionUtils.rollbackTransaction();
+    }
+    if (peer != null) {
+      peer.shutdownNow();
+      peer.awaitTermination(10, TimeUnit.SECONDS);
+    }
+    if (dbPath != null) {
+      try {
+        store.close();
+      } finally {
+        EntityIdService.initialize(previousIdResolver);
+        FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
+        FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousIdGenerator, true);
+        FileUtils.deleteDirectory(new File(dbPath));
+        dbPath = null;
+      }
+    }
+    store = null;
+    cache = null;
+  }
+
+  @Test
+  void testInsertInsideOpenTransactionIsInvisibleUntilRollback() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "rollback_without_read");
+    SessionUtils.beginTransaction();
+    try {
+      store.put(policy(ident), false);
+      assertInvisible(ident);
+      SessionUtils.rollbackTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+    assertInvisible(ident);
+  }
+
+  @Test
+  void testReadBackInsideOpenTransactionDoesNotPublishToOtherSessions() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "rollback_after_read");
+    SessionUtils.beginTransaction();
+    try {
+      store.put(policy(ident), false);
+      PolicyEntity loaded = store.get(ident, Entity.EntityType.POLICY, PolicyEntity.class);
+      Assertions.assertEquals(ident.name(), loaded.name());
+      List<PolicyEntity> batch =
+          store.batchGet(List.of(ident), Entity.EntityType.POLICY, PolicyEntity.class);
+      Assertions.assertEquals(1, batch.size());
+      Assertions.assertEquals(ident.name(), batch.get(0).name());
+      assertInvisible(ident);
+      SessionUtils.rollbackTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+    assertInvisible(ident);
+  }
+
+  @Test
+  void testCommittedInsertFillsCacheOnTheNextRead() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "commit_then_read");
+    SessionUtils.beginTransaction();
+    try {
+      store.put(policy(ident), false);
+      Assertions.assertFalse(cached(ident));
+      SessionUtils.commitTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+
+    Assertions.assertFalse(cached(ident), "commit itself does not publish the entity");
+    Assertions.assertTrue(peerCanRead(ident));
+    Assertions.assertTrue(cached(ident), "the first read after commit fills the cache");
+  }
+
+  @Test
+  void testStandalonePutStillWarmsTheCache() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "standalone");
+    store.put(policy(ident), false);
+    Assertions.assertTrue(cached(ident));
+    Assertions.assertTrue(peerCanRead(ident));
+  }
+
+  @Test
+  void testNestedOverwriteKeepsTheOldRowOutOfCacheUntilCommit() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "nested_overwrite");
+    PolicyEntity original = policy(ident);
+    store.put(original, false);
+
+    SessionUtils.beginTransaction();
+    try {
+      store.put(withComment(original, "overwritten"), true);
+      Assertions.assertEquals(original.comment(), peerGet(ident).comment());
+      Assertions.assertFalse(cached(ident));
+      SessionUtils.commitTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+
+    Assertions.assertEquals("overwritten", peerGet(ident).comment());
+    Assertions.assertTrue(cached(ident));
+  }
+
+  @Test
+  void testNestedUpdateDoesNotRepublishTheOldRowBeforeCommit() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "nested_update");
+    store.put(policy(ident), false);
+    Assertions.assertTrue(peerCanRead(ident));
+    Assertions.assertTrue(cached(ident));
+
+    SessionUtils.beginTransaction();
+    try {
+      store.update(
+          ident,
+          PolicyEntity.class,
+          Entity.EntityType.POLICY,
+          current -> withComment(current, "changed"));
+      Assertions.assertFalse(cached(ident));
+      Assertions.assertTrue(writeBlocked(ident));
+      PolicyEntity during = peerGet(ident);
+      Assertions.assertEquals("", during.comment());
+      Assertions.assertFalse(cached(ident), "a peer must not cache the pre-commit row");
+
+      SessionUtils.beginTransaction();
+      SessionUtils.commitTransaction();
+      Assertions.assertTrue(writeBlocked(ident), "an inner commit must not release the block");
+      Assertions.assertEquals("", peerGet(ident).comment());
+      Assertions.assertFalse(cached(ident));
+
+      SessionUtils.commitTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+
+    Assertions.assertFalse(cached(ident));
+    Assertions.assertFalse(writeBlocked(ident));
+    Assertions.assertEquals("changed", peerGet(ident).comment());
+    Assertions.assertTrue(cached(ident));
+  }
+
+  @Test
+  void testNestedUpdateRollbackKeepsTheCommittedRow() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "nested_update_rollback");
+    store.put(policy(ident), false);
+    Assertions.assertTrue(peerCanRead(ident));
+
+    SessionUtils.beginTransaction();
+    try {
+      store.update(
+          ident,
+          PolicyEntity.class,
+          Entity.EntityType.POLICY,
+          current -> withComment(current, "rolled-back"));
+      Assertions.assertFalse(cached(ident));
+      SessionUtils.rollbackTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+
+    Assertions.assertEquals("", peerGet(ident).comment());
+    Assertions.assertTrue(cached(ident));
+  }
+
+  @Test
+  void testNestedRenameStaysBlockedUntilTheOuterSessionCloses() throws Exception {
+    NameIdentifier oldIdent = NameIdentifierUtil.ofPolicy(METALAKE, "rename_old");
+    NameIdentifier newIdent = NameIdentifierUtil.ofPolicy(METALAKE, "rename_new");
+    store.put(policy(oldIdent), false);
+    Assertions.assertTrue(peerCanRead(oldIdent));
+
+    SessionUtils.beginTransaction();
+    try {
+      store.update(
+          oldIdent,
+          PolicyEntity.class,
+          Entity.EntityType.POLICY,
+          current -> withName(current, newIdent.name()));
+      Assertions.assertTrue(writeBlocked(oldIdent));
+      Assertions.assertTrue(writeBlocked(newIdent));
+      Assertions.assertEquals("", peerGet(oldIdent).comment());
+      Assertions.assertFalse(cached(oldIdent));
+      Assertions.assertFalse(peerCanRead(newIdent));
+      SessionUtils.rollbackTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+
+    Assertions.assertFalse(writeBlocked(oldIdent));
+    Assertions.assertFalse(writeBlocked(newIdent));
+    Assertions.assertTrue(peerCanRead(oldIdent));
+    Assertions.assertFalse(peerCanRead(newIdent));
+  }
+
+  @ParameterizedTest(name = "commit = {0}")
+  @ValueSource(booleans = {true, false})
+  void testNestedDelete(boolean commit) throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "nested_delete");
+    assertDeleteVisibility(
+        policy(ident),
+        PolicyEntity.class,
+        () -> store.delete(ident, Entity.EntityType.POLICY, false),
+        commit);
+  }
+
+  @ParameterizedTest(name = "commit = {0}")
+  @ValueSource(booleans = {true, false})
+  void testNestedDeleteAndGet(boolean commit) throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "nested_delete_and_get");
+    PolicyEntity original = policy(ident);
+    assertDeleteVisibility(
+        original,
+        PolicyEntity.class,
+        () -> store.deleteAndGet(ident, Entity.EntityType.POLICY, PolicyEntity.class).isPresent(),
+        commit);
+  }
+
+  @ParameterizedTest(name = "commit = {0}")
+  @ValueSource(booleans = {true, false})
+  void testNestedDeleteSchemaAndGet(boolean commit) throws Exception {
+    String catalog = "delete_catalog";
+    store.put(
+        CatalogEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withNamespace(Namespace.of(METALAKE))
+            .withName(catalog)
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(AUDIT_INFO)
+            .build(),
+        false);
+    SchemaEntity schema =
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withNamespace(Namespace.of(METALAKE, catalog))
+            .withName("nested_delete_schema")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    assertDeleteVisibility(
+        schema,
+        SchemaEntity.class,
+        () ->
+            store
+                .deleteSchemaAndGet(
+                    schema.nameIdentifier(),
+                    false,
+                    deleted -> Assertions.assertEquals(schema.id(), deleted.id()))
+                .isPresent(),
+        commit);
+  }
+
+  @Test
+  void testClosingOneWriterReleasesOnlyItsOwnBlocks() throws Exception {
+    NameIdentifier first = NameIdentifierUtil.ofPolicy(METALAKE, "first_writer");
+    // Each policy writer locks its parent metalake until commit.
+    String otherMetalake = METALAKE + "_peer";
+    store.put(metalake(otherMetalake), false);
+    NameIdentifier second = NameIdentifierUtil.ofPolicy(otherMetalake, "second_writer");
+    PolicyEntity original = policy(first);
+    store.put(original, false);
+
+    SessionUtils.beginTransaction();
+    try {
+      store.put(withComment(original, "first overwrite"), true);
+      store.put(withComment(original, "second overwrite"), true);
+      peer.submit(
+              () -> {
+                SessionUtils.beginTransaction();
+                try {
+                  store.put(policy(second), false);
+                  SessionUtils.commitTransaction();
+                } finally {
+                  rollbackIfOpen();
+                }
+                return null;
+              })
+          .get(30, TimeUnit.SECONDS);
+      Assertions.assertTrue(peerCanRead(second));
+      Assertions.assertTrue(cached(second));
+      Assertions.assertEquals(original.comment(), peerGet(first).comment());
+      Assertions.assertFalse(cached(first));
+      SessionUtils.rollbackTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+
+    Assertions.assertEquals(original.comment(), peerGet(first).comment());
+    Assertions.assertTrue(cached(first), "both blocks for the repeated overwrite must be released");
+    Assertions.assertTrue(cached(second));
+  }
+
+  @Test
+  void testStandaloneUpdateReleasesTheBlockWhenItReturns() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "standalone_update");
+    store.put(policy(ident), false);
+    store.update(
+        ident,
+        PolicyEntity.class,
+        Entity.EntityType.POLICY,
+        current -> withComment(current, "now"));
+    Assertions.assertFalse(writeBlocked(ident));
+    Assertions.assertFalse(cached(ident));
+    Assertions.assertEquals("now", peerGet(ident).comment());
+    Assertions.assertTrue(cached(ident));
+  }
+
+  @Test
+  void testRequestEndRollbackDropsAnUncommittedInsert() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "request_end_rollback");
+    SessionUtils.beginTransaction();
+    store.put(policy(ident), false);
+    Assertions.assertTrue(writeBlocked(ident));
+    while (SqlSessions.hasActiveSession()) {
+      SqlSessions.rollbackAndCloseSqlSession();
+    }
+    Assertions.assertFalse(SessionUtils.isInTransaction());
+    Assertions.assertFalse(writeBlocked(ident));
+    assertInvisible(ident);
+  }
+
+  @Test
+  void testReadInsideNewBackingTagCheckDoesNotPublishTheTag() throws Exception {
+    NameIdentifier tagIdent = NameIdentifierUtil.ofTag(METALAKE, "MarketsTag");
+    DomainEntity domain =
+        DomainEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("Markets")
+            .withNamespace(NamespaceUtil.ofDomain(METALAKE))
+            .withComment("")
+            .withStatus(Domain.Status.DRAFT)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(tagIdent.name())
+            .withNamespace(NamespaceUtil.ofTag(METALAKE))
+            .withAllowedValues(new String[0])
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            store.insertDomainWithNewBackingTag(
+                domain,
+                tag,
+                state -> {
+                  try {
+                    store.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
+                    store.batchGet(List.of(tagIdent), Entity.EntityType.TAG, TagEntity.class);
+                  } catch (IOException e) {
+                    throw new IllegalStateException(e);
+                  }
+                  Assertions.assertFalse(cache.contains(tagIdent, Entity.EntityType.TAG));
+                  throw new IllegalArgumentException("rejected");
+                }));
+
+    Assertions.assertFalse(cache.contains(tagIdent, Entity.EntityType.TAG));
+    Assertions.assertFalse(peerCanRead(tagIdent, Entity.EntityType.TAG, TagEntity.class));
+  }
+
+  @Test
+  void testFailedDeferralLeavesTheKeyCacheableOnRetry() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "failed_deferral");
+    PolicyEntity original = policy(ident);
+    Object writes = FieldUtils.readField(store, "deferredWrites", true);
+    ConcurrentMap<?, ?> failing = Mockito.mock(ConcurrentMap.class);
+    OutOfMemoryError failure = new OutOfMemoryError("registering deferred write");
+    Mockito.doThrow(failure).when(failing).compute(Mockito.any(), Mockito.any());
+
+    SessionUtils.beginTransaction();
+    try {
+      FieldUtils.writeField(store, "deferredWrites", failing, true);
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(OutOfMemoryError.class, () -> store.put(original, false)));
+    } finally {
+      FieldUtils.writeField(store, "deferredWrites", writes, true);
+      rollbackIfOpen();
+    }
+
+    Assertions.assertFalse(writeBlocked(ident));
+    assertInvisible(ident);
+    store.put(original, false);
+    Assertions.assertTrue(peerCanRead(ident));
+    Assertions.assertTrue(cached(ident));
+  }
+
+  @Test
+  void testDeferredReleaseOutOfMemoryStillCommits() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "oom_after_commit");
+    AtomicReference<Throwable> recorded = new AtomicReference<>();
+    SqlSessions.setCloseFailureRecorder(recorded::set);
+    EntityCache throwing = Mockito.spy(cache);
+    Mockito.doThrow(new OutOfMemoryError("metaspace"))
+        .when(throwing)
+        .invalidate(Mockito.any(), Mockito.any());
+    try {
+      SessionUtils.beginTransaction();
+      store.put(policy(ident), false);
+      FieldUtils.writeField(store, "cache", throwing, true);
+      SessionUtils.commitTransaction();
+    } finally {
+      FieldUtils.writeField(store, "cache", cache, true);
+      SqlSessions.setCloseFailureRecorder(null);
+      rollbackIfOpen();
+    }
+
+    Assertions.assertInstanceOf(OutOfMemoryError.class, recorded.get());
+    Assertions.assertEquals("metaspace", recorded.get().getMessage());
+    Assertions.assertTrue(peerCanRead(ident));
+  }
+
+  @Test
+  void testDeadOwnerReleasesTheBlockOnTheNextRead() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "dead_owner");
+    store.put(policy(ident), false);
+    Assertions.assertTrue(peerCanRead(ident));
+
+    // Close the actual MyBatis session to return its connection, but deliberately bypass
+    // SqlSessions' thread-local close notification to simulate an abandoned cache block.
+    FutureTask<Void> write =
+        new FutureTask<>(
+            () -> {
+              try (SqlSession session = SqlSessions.getSqlSession()) {
+                store.update(
+                    ident,
+                    PolicyEntity.class,
+                    Entity.EntityType.POLICY,
+                    current -> withComment(current, "committed-without-close"));
+                session.commit();
+              }
+              return null;
+            });
+    Thread owner = new Thread(write, "dead-pending-owner");
+    owner.start();
+    owner.join(TimeUnit.SECONDS.toMillis(30));
+    Assertions.assertFalse(owner.isAlive());
+    write.get();
+    Assertions.assertTrue(writeBlocked(ident), "the dead thread never reached session close");
+
+    Assertions.assertEquals("committed-without-close", peerGet(ident).comment());
+    Assertions.assertFalse(writeBlocked(ident));
+    Assertions.assertTrue(cached(ident));
+  }
+
+  private <E extends Entity & HasIdentifier> void assertDeleteVisibility(
+      E entity, Class<E> entityClass, Executable<Boolean, IOException> delete, boolean commit)
+      throws Exception {
+    NameIdentifier ident = entity.nameIdentifier();
+    Entity.EntityType type = entity.type();
+    store.put(entity, false);
+    Assertions.assertTrue(peerCanRead(ident, type, entityClass));
+    Assertions.assertTrue(cache.contains(ident, type));
+
+    SessionUtils.beginTransaction();
+    try {
+      Assertions.assertTrue(delete.execute());
+      Assertions.assertFalse(cache.contains(ident, type));
+      Assertions.assertTrue(peerCanRead(ident, type, entityClass));
+      Assertions.assertFalse(
+          cache.contains(ident, type), "get must not republish the pre-delete row");
+      if (commit) {
+        SessionUtils.commitTransaction();
+      } else {
+        SessionUtils.rollbackTransaction();
+      }
+    } finally {
+      rollbackIfOpen();
+    }
+
+    Assertions.assertFalse(cache.contains(ident, type));
+    Assertions.assertEquals(!commit, peerCanRead(ident, type, entityClass));
+    Assertions.assertEquals(!commit, cache.contains(ident, type));
+  }
+
+  private void assertInvisible(NameIdentifier ident) throws Exception {
+    Assertions.assertFalse(cached(ident));
+    Assertions.assertFalse(peerExists(ident));
+    Assertions.assertFalse(peerCanRead(ident));
+  }
+
+  private boolean cached(NameIdentifier ident) {
+    return cache.contains(ident, Entity.EntityType.POLICY);
+  }
+
+  private boolean peerExists(NameIdentifier ident) throws Exception {
+    return peer.submit(() -> store.exists(ident, Entity.EntityType.POLICY))
+        .get(30, TimeUnit.SECONDS);
+  }
+
+  private PolicyEntity peerGet(NameIdentifier ident) throws Exception {
+    return peer.submit(() -> store.get(ident, Entity.EntityType.POLICY, PolicyEntity.class))
+        .get(30, TimeUnit.SECONDS);
+  }
+
+  private boolean peerCanRead(NameIdentifier ident) throws Exception {
+    return peerCanRead(ident, Entity.EntityType.POLICY, PolicyEntity.class);
+  }
+
+  private <E extends Entity & HasIdentifier> boolean peerCanRead(
+      NameIdentifier ident, Entity.EntityType type, Class<E> entityClass) throws Exception {
+    return peer.submit(
+            () -> {
+              try {
+                store.get(ident, type, entityClass);
+                return true;
+              } catch (NoSuchEntityException expected) {
+                return false;
+              }
+            })
+        .get(30, TimeUnit.SECONDS);
+  }
+
+  private static void rollbackIfOpen() {
+    if (SessionUtils.isInTransaction()) {
+      SessionUtils.rollbackTransaction();
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private boolean writeBlocked(NameIdentifier ident) throws IllegalAccessException {
+    Map<String, AtomicInteger> blocks =
+        (Map<String, AtomicInteger>) FieldUtils.readField(store, "cacheBlocks", true);
+    AtomicInteger count = blocks.get("w\0" + Entity.EntityType.POLICY.name() + "\0" + ident);
+    return count != null && count.get() > 0;
+  }
+
+  private static PolicyEntity withComment(PolicyEntity current, String comment) {
+    return copy(current, current.name(), comment);
+  }
+
+  private static PolicyEntity withName(PolicyEntity current, String name) {
+    return copy(current, name, current.comment());
+  }
+
+  private static PolicyEntity copy(PolicyEntity current, String name, String comment) {
+    return PolicyEntity.builder()
+        .withId(current.id())
+        .withNamespace(current.namespace())
+        .withName(name)
+        .withPolicyType(current.policyType())
+        .withComment(comment)
+        .withEnabled(current.enabled())
+        .withContent(current.content())
+        .withAuditInfo((AuditInfo) current.auditInfo())
+        .build();
+  }
+
+  private void initH2Store() throws IOException, IllegalAccessException {
+    dbPath = Files.createTempDirectory("gravitino_uncommitted_cache_").toString();
+    String jdbcUrl = String.format("jdbc:h2:file:%s;MODE=MYSQL", new File(dbPath, "db").getPath());
+
+    Config config = new Config(false) {};
+    config.set(Configs.ENTITY_STORE, Configs.RELATIONAL_ENTITY_STORE);
+    config.set(Configs.ENTITY_RELATIONAL_STORE, Configs.DEFAULT_ENTITY_RELATIONAL_STORE);
+    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, jdbcUrl);
+    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, USER);
+    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, PASSWORD);
+    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.h2.Driver");
+    config.set(Configs.CACHE_ENABLED, true);
+
+    previousIdResolver =
+        (EntityIdResolver)
+            FieldUtils.readStaticField(EntityIdService.class, "entityIdResolver", true);
+    previousConfig = FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
+    previousIdGenerator = FieldUtils.readField(GravitinoEnv.getInstance(), "idGenerator", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "idGenerator", RandomIdGenerator.INSTANCE, true);
+
+    store = new RelationalEntityStore();
+    store.initialize(config);
+    cache = (EntityCache) FieldUtils.readField(store, "cache", true);
+  }
+
+  private static BaseMetalake metalake(String name) {
+    return BaseMetalake.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withAuditInfo(AUDIT_INFO)
+        .withComment("")
+        .withProperties(null)
+        .withVersion(SchemaVersion.V_0_1)
+        .build();
+  }
+
+  private static PolicyEntity policy(NameIdentifier ident) {
+    return PolicyEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withNamespace(ident.namespace())
+        .withName(ident.name())
+        .withPolicyType(Policy.BuiltInType.CUSTOM)
+        .withComment("")
+        .withEnabled(true)
+        .withContent(
+            PolicyContents.custom(
+                ImmutableMap.of("field", 1),
+                ImmutableSet.of(MetadataObject.Type.CATALOG, MetadataObject.Type.TABLE),
+                null))
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+}

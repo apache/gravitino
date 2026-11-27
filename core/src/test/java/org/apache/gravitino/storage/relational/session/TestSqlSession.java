@@ -32,6 +32,7 @@ import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -45,6 +46,7 @@ import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Config;
@@ -218,6 +220,27 @@ public class TestSqlSession {
     assertEquals(0, SqlSessions.getSessionCount());
   }
 
+  @Test
+  public void testCloseListenerOutOfMemoryIsRecordedAndCommitSucceeds() {
+    AtomicReference<Throwable> recorded = new AtomicReference<>();
+    SqlSessions.setCloseFailureRecorder(recorded::set);
+    Runnable listener =
+        () -> {
+          throw new OutOfMemoryError("metaspace");
+        };
+    SqlSessions.addClosedListener(listener);
+    try {
+      SessionUtils.beginTransaction();
+      SessionUtils.commitTransaction();
+      assertFalse(SessionUtils.isInTransaction());
+      assertInstanceOf(OutOfMemoryError.class, recorded.get());
+      assertEquals("metaspace", recorded.get().getMessage());
+    } finally {
+      SqlSessions.removeClosedListener(listener);
+      SqlSessions.setCloseFailureRecorder(null);
+    }
+  }
+
   /** An unsuccessful fresh-read acquisition cannot release the caller's existing session. */
   @Test
   public void testFreshReadAcquisitionFailurePreservesOuterSession() {
@@ -258,6 +281,18 @@ public class TestSqlSession {
     assertEquals(1, SqlSessions.getSessionCount());
     SqlSessions.rollbackAndCloseSqlSession();
     assertNull(SqlSessions.getSessions().get());
+    assertEquals(0, SqlSessions.getSessionCount());
+  }
+
+  @Test
+  public void testRepeatedRollbackClosesNestedSessions() {
+    SqlSessions.getSqlSession();
+    SqlSessions.getSqlSession();
+    assertEquals(2, SqlSessions.getSessionCount());
+    while (SqlSessions.hasActiveSession()) {
+      SqlSessions.rollbackAndCloseSqlSession();
+    }
+    assertFalse(SqlSessions.hasActiveSession());
     assertEquals(0, SqlSessions.getSessionCount());
   }
 }
