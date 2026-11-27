@@ -557,15 +557,14 @@ onCommit does not. HTTP / Kafka commit ingress is out of scope.
 `minIntervalMs` may be set on policy content only with `commitTrigger=true` (On write). It
 applies to **that policy’s maintenance type** on the commit-job path. When omitted on an
 On-write policy, fall back to `gravitino.conf` then the code default. Scheduled
-(`timeTrigger`) paths do not use it. Orphan cleanup cannot set `commitTrigger` and therefore
-cannot set `minIntervalMs`.
+(`timeTrigger`) paths do not use it. Orphan cleanup cannot set `commitTrigger` and has **no**
+`minIntervalMs` peer or server cooldown config.
 
-| Task type          | Code-default `minIntervalMs` | Rationale                                              |
-| ------------------ | ---------------------------- | ------------------------------------------------------ |
-| `compaction`       | `3600000` (1h)               | On-write cooldown after commit storms                  |
-| `manifest-rewrite` | `3600000` (1h)               | Same — On-write with compaction / snapshot-expiry      |
-| `snapshot-expiry`  | `3600000` (1h)               | Same                                                   |
-| `orphan-cleanup`   | `86400000` (1d)              | Reserved; type is timeTrigger-only                     |
+| Task type          | Code-default `minIntervalMs` | Rationale                                         |
+| ------------------ | ---------------------------- | ------------------------------------------------- |
+| `compaction`       | `3600000` (1h)               | On-write cooldown after commit storms             |
+| `manifest-rewrite` | `3600000` (1h)               | Same — On-write with compaction / snapshot-expiry |
+| `snapshot-expiry`  | `3600000` (1h)               | Same                                              |
 
 **Resolution** for On-write types (first hit wins):
 

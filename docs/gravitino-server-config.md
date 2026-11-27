@@ -686,16 +686,14 @@ server, are documented with those services. See
 
 For On-write (`commitTrigger=true`) policies that omit `minIntervalMs`, the server uses these
 per-type keys, then the code defaults below. Policy content always wins when set. Scheduled
-(`timeTrigger`) runs do not apply this cooldown. Orphan cleanup is schedule-only and does not
-accept `minIntervalMs` on policy content; the orphan key below is unused by the TMS automation
-paths.
+(`timeTrigger`) runs do not apply this cooldown. Orphan cleanup is timeTrigger-only and has no
+cooldown config.
 
-| Configuration Item                                     | Description                                     | Default Value   |
-|--------------------------------------------------------|-------------------------------------------------|-----------------|
-| `gravitino.maintenance.compaction.minIntervalMs`       | On-write cooldown between finished compaction runs       | `3600000` (1h)  |
-| `gravitino.maintenance.manifest-rewrite.minIntervalMs` | On-write cooldown between finished manifest-rewrite runs | `3600000` (1h)  |
-| `gravitino.maintenance.snapshot-expiry.minIntervalMs`  | On-write cooldown between finished snapshot-expiry runs  | `3600000` (1h)  |
-| `gravitino.maintenance.orphan-cleanup.minIntervalMs`   | Reserved (orphan cleanup is timeTrigger-only)            | `86400000` (1d) |
+| Configuration Item                                     | Description                                              | Default Value  |
+|--------------------------------------------------------|----------------------------------------------------------|----------------|
+| `gravitino.maintenance.compaction.minIntervalMs`       | On-write cooldown between finished compaction runs       | `3600000` (1h) |
+| `gravitino.maintenance.manifest-rewrite.minIntervalMs` | On-write cooldown between finished manifest-rewrite runs | `3600000` (1h) |
+| `gravitino.maintenance.snapshot-expiry.minIntervalMs`  | On-write cooldown between finished snapshot-expiry runs  | `3600000` (1h) |
 
 ### Key Management
 
