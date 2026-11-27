@@ -33,6 +33,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.function.Function;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Column;
@@ -102,6 +103,8 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
       new TagListPlainFormat(context).output((Tag[]) entity);
     } else if (entity instanceof Map) {
       new PropertiesListPlainFormat(context).output((Map<?, ?>) entity);
+    } else if (entity instanceof Function[]) {
+      new FunctionListPlainFormat(context).output((Function[]) entity);
     } else {
       throw new IllegalArgumentException(
           "Unsupported object type: " + (entity == null ? "null" : entity.getClass().getName()));
@@ -641,6 +644,26 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     public String getOutput(Topic[] entity) {
       List<String> topicList = Arrays.stream(entity).map(Topic::name).collect(Collectors.toList());
       return String.join(",", topicList);
+    }
+  }
+
+  /**
+   * Format an array of {@link Function} instances with their names, output format: function name
+   */
+  static final class FunctionListPlainFormat extends PlainFormat<Function[]> {
+
+    /**
+     * Creates a new {@link PlainFormat} with the specified command context.
+     *
+     * @param context The command context.
+     */
+    FunctionListPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    @Override
+    public String getOutput(Function[] entity) {
+      return Arrays.stream(entity).map(Function::name).collect(Collectors.joining(","));
     }
   }
 }
