@@ -28,6 +28,7 @@ import java.io.UncheckedIOException;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -58,6 +59,7 @@ import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.kb.ArticleBody;
@@ -73,6 +75,7 @@ import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.MemberType;
 import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.Membership;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermRelMapper;
 import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.KnowledgeBaseArticlePO;
@@ -135,6 +138,21 @@ public final class KnowledgeBaseArticleMetaService {
      */
     void onChange(
         @Nullable KnowledgeBaseArticleEntity before, @Nullable KnowledgeBaseArticleEntity after);
+
+    /**
+     * Reports an effective change, including whether it wrote new body content. The snapshots
+     * remain metadata-only.
+     *
+     * @param before the previous Article, or null on creation
+     * @param after the resulting Article, or null on deletion
+     * @param bodyChanged whether a new body was persisted
+     */
+    default void onChange(
+        @Nullable KnowledgeBaseArticleEntity before,
+        @Nullable KnowledgeBaseArticleEntity after,
+        boolean bodyChanged) {
+      onChange(before, after);
+    }
   }
 
   /** Stable identity and revision decoded from an editing token by the caller. */
@@ -169,13 +187,27 @@ public final class KnowledgeBaseArticleMetaService {
 
   /** Selects Article candidates matching any visible Domain ID in the caller's snapshot. */
   public List<KnowledgeBaseArticleEntity> listByDomains(Namespace namespace, Set<Long> domains) {
+    return listByDomains(namespace, domains, true);
+  }
+
+  /** Loads list candidates without collecting binding IDs, which are paged in the same snapshot. */
+  public List<KnowledgeBaseArticleEntity> listForPreview(
+      Namespace namespace, @Nullable Set<Long> domains) {
+    return domains == null
+        ? joinedList(namespace, false)
+        : listByDomains(namespace, domains, false);
+  }
+
+  private List<KnowledgeBaseArticleEntity> listByDomains(
+      Namespace namespace, Set<Long> domains, boolean includeBindings) {
     String lake = metalakeName(namespace);
     Map<Long, KnowledgeBaseArticleEntity> matches = new TreeMap<>();
     return SessionUtils.getWithoutCommit(
         KnowledgeBaseArticleMapper.class,
         mapper -> {
           for (List<Long> batch : Lists.partition(List.copyOf(domains), LOOKUP_BATCH_SIZE)) {
-            for (var article : aggregate(namespace, mapper.joined(lake, null, batch))) {
+            for (var article :
+                aggregate(namespace, mapper.joined(lake, null, batch, includeBindings))) {
               matches.put(article.id(), article);
             }
           }
@@ -183,11 +215,21 @@ public final class KnowledgeBaseArticleMetaService {
         });
   }
 
+  /** Reads Article metadata for separately paged binding previews in the caller's snapshot. */
+  public ScopedArticle getForPreview(NameIdentifier ident) {
+    ScopedArticle result =
+        joinedArticle(ident.namespace(), KnowledgeBaseArticle.normalizeName(ident.name()), false);
+    if (result == null) {
+      throw missing(ident);
+    }
+    return result;
+  }
+
   /** Reads the Article and the identity used for its editing token from one snapshot. */
   public ScopedArticle getScoped(NameIdentifier ident) {
     String name = KnowledgeBaseArticle.normalizeName(ident.name());
     if (SqlSessions.hasActiveSession()) {
-      ScopedArticle result = joinedArticle(ident.namespace(), name);
+      ScopedArticle result = joinedArticle(ident.namespace(), name, true);
       if (result == null) {
         throw missing(ident);
       }
@@ -434,7 +476,7 @@ public final class KnowledgeBaseArticleMetaService {
             }
             addBindings(mapper, row, initial.bindings());
             changeMemberships(row, Set.of(), initial.domainIds());
-            hook.onChange(null, initial);
+            hook.onChange(null, initial, true);
             return new ScopedArticle(metalakeId, project.apply(initial));
           });
     } catch (RuntimeException e) {
@@ -542,6 +584,39 @@ public final class KnowledgeBaseArticleMetaService {
       TransactionHook hook,
       UnaryOperator<KnowledgeBaseArticleEntity> project,
       Function<NoSuchEntityException, RuntimeException> onMissingTarget) {
+    return editScoped(ident, requestedDomains, Set.of(), edit, hook, project, onMissingTarget);
+  }
+
+  /** Locks named Term targets before Domain and Article rows for one atomic mixed edit. */
+  public ScopedArticle editScoped(
+      NameIdentifier ident,
+      @Nullable Set<Long> requestedDomains,
+      Set<Binding> requestedTerms,
+      Function<ScopedArticle, KnowledgeBaseArticleEntity> edit,
+      TransactionHook hook,
+      UnaryOperator<KnowledgeBaseArticleEntity> project,
+      Function<NoSuchEntityException, RuntimeException> onMissingTarget) {
+    return editScoped(
+        ident,
+        requestedDomains,
+        requestedTerms,
+        lake -> Set.of(),
+        edit,
+        hook,
+        project,
+        onMissingTarget);
+  }
+
+  /** Fences the planned assets before Terms, Domains and the Article. */
+  public ScopedArticle editScoped(
+      NameIdentifier ident,
+      @Nullable Set<Long> requestedDomains,
+      Set<Binding> requestedTerms,
+      LongFunction<Set<Binding>> lockAssets,
+      Function<ScopedArticle, KnowledgeBaseArticleEntity> edit,
+      TransactionHook hook,
+      UnaryOperator<KnowledgeBaseArticleEntity> project,
+      Function<NoSuchEntityException, RuntimeException> onMissingTarget) {
     return write(
         mapper -> {
           long lake;
@@ -550,6 +625,8 @@ public final class KnowledgeBaseArticleMetaService {
           } catch (NoSuchEntityException missing) {
             throw onMissingTarget.apply(missing);
           }
+          Set<Binding> locked = Sets.union(lockAssets.apply(lake), requestedTerms);
+          lockTermTargets(lake, requestedTerms);
           KnowledgeBaseArticleEntity before;
           KnowledgeBaseArticlePO row;
           if (requestedDomains == null) {
@@ -574,13 +651,32 @@ public final class KnowledgeBaseArticleMetaService {
           }
           KnowledgeBaseArticleEntity after = edit.apply(new ScopedArticle(lake, before));
           Preconditions.checkArgument(
-              before.bindings().equals(after.bindings())
+              locked.containsAll(Sets.symmetricDifference(before.bindings(), after.bindings()))
                   && (requestedDomains == null
                       ? before.domainIds().equals(after.domainIds())
                       : Sets.union(before.domainIds(), requestedDomains)
                           .containsAll(after.domainIds())),
               "Relation changes require endpoint lock planning");
           return new ScopedArticle(lake, project.apply(replace(mapper, row, before, after, hook)));
+        });
+  }
+
+  /** Fences live Term targets in stable ID order in the caller's Article write transaction. */
+  public void lockTermTargets(long lake, Set<Binding> targets) {
+    if (targets.isEmpty()) {
+      return;
+    }
+    SessionUtils.doWithoutCommit(
+        GlossaryTermRelMapper.class,
+        mapper -> {
+          for (Binding target :
+              targets.stream().sorted(Comparator.comparingLong(Binding::targetId)).toList()) {
+            Preconditions.checkArgument(
+                "GLOSSARY_TERM".equals(target.targetType()), "Expected a Term binding");
+            if (mapper.lockTerm(lake, target.targetId()) == null) {
+              throw new NoSuchTermException("Requested Term does not exist");
+            }
+          }
         });
   }
 
@@ -736,7 +832,7 @@ public final class KnowledgeBaseArticleMetaService {
           }
           mapper.deleteBindings(row.getArticleId(), now);
           changeMemberships(row, old.domainIds(), Set.of());
-          hook.onChange(old, null);
+          hook.onChange(old, null, false);
           return Optional.of(old);
         });
   }
@@ -827,21 +923,26 @@ public final class KnowledgeBaseArticleMetaService {
     return id;
   }
 
+  private List<KnowledgeBaseArticleEntity> joinedList(Namespace ns, boolean includeBindings) {
+    String metalake = metalakeName(ns);
+    return SessionUtils.getWithoutCommitFresh(
+        KnowledgeBaseArticleMapper.class,
+        m -> {
+          List<KnowledgeBaseArticlePO> rows = m.joined(metalake, null, null, includeBindings);
+          if (rows.isEmpty()) {
+            throw new NoSuchEntityException(
+                NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "metalake", metalake);
+          }
+          return aggregate(ns, rows);
+        });
+  }
+
   private List<KnowledgeBaseArticleEntity> readAll(Namespace ns) {
     String metalake = metalakeName(ns);
     if (SqlSessions.hasActiveSession()) {
       // A caller's READ_COMMITTED transaction may contain uncommitted writes. A single
       // statement observes them without splitting the row and its bindings across snapshots.
-      return SessionUtils.getWithoutCommitFresh(
-          KnowledgeBaseArticleMapper.class,
-          m -> {
-            List<KnowledgeBaseArticlePO> rows = m.joined(metalake, null, null);
-            if (rows.isEmpty()) {
-              throw new NoSuchEntityException(
-                  NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "metalake", metalake);
-            }
-            return aggregate(ns, rows);
-          });
+      return joinedList(ns, true);
     }
     return SqlSessions.readSnapshot(
         () ->
@@ -928,16 +1029,16 @@ public final class KnowledgeBaseArticleMetaService {
   @Nullable
   private KnowledgeBaseArticleEntity observe(NameIdentifier ident) {
     ScopedArticle current =
-        joinedArticle(ident.namespace(), KnowledgeBaseArticle.normalizeName(ident.name()));
+        joinedArticle(ident.namespace(), KnowledgeBaseArticle.normalizeName(ident.name()), true);
     return current == null ? null : current.article();
   }
 
   @Nullable
-  private ScopedArticle joinedArticle(Namespace namespace, String name) {
+  private ScopedArticle joinedArticle(Namespace namespace, String name, boolean includeBindings) {
     List<KnowledgeBaseArticlePO> rows =
         SessionUtils.getWithoutCommitFresh(
             KnowledgeBaseArticleMapper.class,
-            mapper -> mapper.joined(metalakeName(namespace), name, null));
+            mapper -> mapper.joined(metalakeName(namespace), name, null, includeBindings));
     return rows.isEmpty()
         ? null
         : new ScopedArticle(rows.get(0).getMetalakeId(), aggregate(namespace, rows).get(0));
@@ -1098,7 +1199,7 @@ public final class KnowledgeBaseArticleMetaService {
     }
     addBindings(mapper, next, Sets.difference(after.bindings(), before.bindings()));
     changeMemberships(next, before.domainIds(), after.domainIds());
-    hook.onChange(before, after);
+    hook.onChange(before, after, bodyChanged);
     return after;
   }
 

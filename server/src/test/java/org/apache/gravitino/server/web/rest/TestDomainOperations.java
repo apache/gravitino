@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -33,16 +34,26 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.domain.DefinitionMember;
+import org.apache.gravitino.domain.DefinitionMemberPage;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.domain.DomainDispatcher;
+import org.apache.gravitino.dto.domain.DefinitionMemberDTO;
 import org.apache.gravitino.dto.requests.DomainBackingTagSetRequest;
 import org.apache.gravitino.dto.responses.DomainListResponse;
 import org.apache.gravitino.dto.responses.DomainResponse;
@@ -72,6 +83,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestDomainOperations extends BaseOperationsTest {
@@ -141,6 +153,87 @@ public class TestDomainOperations extends BaseOperationsTest {
     }
     try (Response response = target(ITEM).request().get()) {
       assertDomain(response, Domain.Status.DRAFT);
+    }
+  }
+
+  @Test
+  public void testDefinitionMembers() throws IOException {
+    String path = ITEM + "/definition-members";
+    var members =
+        new DefinitionMemberPage(
+            List.of(
+                new DefinitionMemberDTO(DefinitionMember.Type.GLOSSARY_TERM, "revenue"),
+                new DefinitionMemberDTO(
+                    DefinitionMember.Type.KNOWLEDGE_BASE_ARTICLE, "hidden-draft")),
+            true);
+    when(dispatcher.listDefinitionMembers(eq("test"), eq("Finance"), eq(20), eq(0), any()))
+        .thenAnswer(
+            call -> {
+              call.<Consumer<DomainEntity>>getArgument(4).accept(domain(Domain.Status.PUBLISHED));
+              return members;
+            });
+    when(dispatcher.listDefinitionMembers(eq("test"), eq("Finance"), eq(2), eq(4), any()))
+        .thenReturn(new DefinitionMemberPage(List.of(), false));
+    try (Response response = target(path).request("application/vnd.gravitino.v1+json").get()) {
+      assertEquals(200, response.getStatus());
+      assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
+      assertEquals(
+          JsonUtils.objectMapper()
+              .readTree(
+                  """
+          {"code":0,"members":[{"type":"GLOSSARY_TERM","name":"revenue"},
+          {"type":"KNOWLEDGE_BASE_ARTICLE","name":"hidden-draft"}],"hasMore":true}
+          """),
+          JsonUtils.objectMapper().readTree(response.readEntity(String.class)));
+    }
+    try (Response response =
+        target(path)
+            .queryParam("offset", 4)
+            .queryParam("limit", 2)
+            .request(MediaType.APPLICATION_JSON)
+            .get()) {
+      assertEquals(200, response.getStatus());
+      assertEquals(
+          JsonUtils.objectMapper().readTree("{\"code\":0,\"members\":[],\"hasMore\":false}"),
+          JsonUtils.objectMapper().readTree(response.readEntity(String.class)));
+    }
+  }
+
+  @Test
+  public void testDefinitionMemberErrors() {
+    String path = ITEM + "/definition-members";
+    when(dispatcher.listDefinitionMembers(eq("test"), eq("Finance"), eq(20), eq(0), any()))
+        .thenThrow(new NoSuchDomainException("Missing Domain"));
+    try (Response missing = target(path).request().get();
+        Response invalid = target(path).queryParam("limit", "many").request().get()) {
+      assertError(missing, 404);
+      assertError(invalid, 400);
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"DRAFT,404", "PUBLISHED,403"})
+  public void testDefinitionMembersRequireManageOnTheDomainSnapshot(
+      Domain.Status status, int expectedStatus) {
+    var env = mock(GravitinoEnv.class);
+    var config = mock(Config.class);
+    var authorizer = mock(GravitinoAuthorizer.class);
+    when(env.config()).thenReturn(config);
+    when(config.get(Configs.ENABLE_AUTHORIZATION)).thenReturn(true);
+    when(env.gravitinoAuthorizer()).thenReturn(authorizer);
+    when(authorizer.authorize(any(), any(), any(), eq(Privilege.Name.USE_DOMAIN), any()))
+        .thenReturn(true);
+    when(dispatcher.listDefinitionMembers(eq("test"), eq("Finance"), eq(20), eq(0), any()))
+        .thenAnswer(
+            call -> {
+              try (var environment = mockStatic(GravitinoEnv.class)) {
+                environment.when(GravitinoEnv::getInstance).thenReturn(env);
+                call.<Consumer<DomainEntity>>getArgument(4).accept(domain(status));
+                return new DefinitionMemberPage(List.of(), false);
+              }
+            });
+    try (Response response = target(ITEM + "/definition-members").request().get()) {
+      assertError(response, expectedStatus);
     }
   }
 

@@ -21,6 +21,8 @@ package org.apache.gravitino.storage.relational;
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -28,9 +30,14 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.WriterAppender;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -55,6 +62,11 @@ public class TestRelationalGarbageCollector {
     Config config = mock(Config.class);
     when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
     when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+    for (MetadataObject.Type type : MetadataObject.Type.values()) {
+      doCallRealMethod()
+          .when(orphanedRelationCleanup)
+          .sweepOrphanedRelations(type, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+    }
     when(orphanedRelationCleanup.softDeleteOrphanedRelations(
             MetadataObject.Type.TABLE, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT))
         .thenReturn(2, 0);
@@ -65,6 +77,36 @@ public class TestRelationalGarbageCollector {
       int expectedInvocations = type == MetadataObject.Type.TABLE ? 2 : 1;
       verify(orphanedRelationCleanup, times(expectedInvocations))
           .softDeleteOrphanedRelations(type, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+    }
+  }
+
+  @Test
+  public void testFailedSweepIdentifiesSystemActorAndTargetType() throws IOException {
+    var backend = mock(JDBCBackend.class);
+    var config = new Config(false) {};
+    doThrow(new IllegalStateException("sweep failed"))
+        .when(backend)
+        .sweepOrphanedRelations(MetadataObject.Type.TABLE, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+    var logs = new StringWriter();
+    var appender =
+        WriterAppender.newBuilder()
+            .setName("failedSweep")
+            .setTarget(logs)
+            .setLayout(PatternLayout.newBuilder().withPattern("%m%n%throwable").build())
+            .build();
+    var context = (LoggerContext) LogManager.getContext(false);
+    var logger = context.getLogger(RelationalGarbageCollector.class.getName());
+    appender.start();
+    logger.addAppender(appender);
+    try (var collector = new RelationalGarbageCollector(backend, config)) {
+      collector.collectAndClean();
+      Assertions.assertTrue(
+          logs.toString()
+              .contains("Orphaned relation cleanup failed actor=system targetType=TABLE"));
+      Assertions.assertTrue(logs.toString().contains("sweep failed"));
+    } finally {
+      logger.removeAppender(appender);
+      appender.stop();
     }
   }
 

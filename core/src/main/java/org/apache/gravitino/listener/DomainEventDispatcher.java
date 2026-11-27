@@ -23,6 +23,7 @@ import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
+import org.apache.gravitino.domain.DefinitionMemberPage;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.domain.DomainDispatcher;
@@ -353,6 +354,12 @@ public final class DomainEventDispatcher implements DomainDispatcher {
   }
 
   /** {@inheritDoc} */
+  @Override
+  public DefinitionMemberPage listDefinitionMembers(
+      String metalake, String name, int limit, int offset, Consumer<DomainEntity> authorize) {
+    return dispatcher.listDefinitionMembers(metalake, name, limit, offset, authorize);
+  }
+
   @Override
   public DomainMember[] listMembers(String metalake, String name, DomainMemberFilter filter) {
     String user = PrincipalUtils.getCurrentUserName();

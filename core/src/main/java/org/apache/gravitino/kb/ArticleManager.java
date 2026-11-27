@@ -24,18 +24,25 @@ import com.google.common.base.Suppliers;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 import java.util.function.UnaryOperator;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
@@ -43,7 +50,16 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
+import org.apache.gravitino.listener.ArticleEventDispatcher;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.OperationType;
+import org.apache.gravitino.listener.api.event.article.ArticleEvent;
+import org.apache.gravitino.listener.api.event.article.ArticleListEvent;
+import org.apache.gravitino.listener.api.event.article.ArticleMutationEvent;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper;
+import org.apache.gravitino.storage.relational.po.KnowledgeBaseArticlePO;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.ExpectedRevision;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.MissingArticleScopeException;
@@ -56,6 +72,7 @@ import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /** Manages current Knowledge Base Articles in a metalake. */
 public final class ArticleManager {
@@ -66,6 +83,7 @@ public final class ArticleManager {
   private final IdGenerator ids;
   private final ArticleEdits edits;
   private final TransactionHook policy;
+  private final ArticleEventDispatcher events;
   private final boolean authorizationEnabled;
   private final KnowledgeBaseArticleMetaService articles =
       KnowledgeBaseArticleMetaService.getInstance();
@@ -77,21 +95,47 @@ public final class ArticleManager {
 
   /** Creates the server manager with the configured Article authorization mode. */
   public ArticleManager(IdGenerator ids, int maxBodyBytes, boolean authorizationEnabled) {
-    this(ids, maxBodyBytes, authorizationEnabled, (before, after) -> {});
+    this(ids, maxBodyBytes, authorizationEnabled, (before, after) -> {}, null);
+  }
+
+  /**
+   * Creates the server manager with Article lifecycle notifications.
+   *
+   * @param ids the Article ID generator
+   * @param maxBodyBytes the configured body size limit
+   * @param authorizationEnabled whether to enforce Article authorization
+   * @param eventBus the configured listener bus
+   */
+  public ArticleManager(
+      IdGenerator ids,
+      int maxBodyBytes,
+      boolean authorizationEnabled,
+      @Nullable EventBus eventBus) {
+    this(ids, maxBodyBytes, authorizationEnabled, (before, after) -> {}, eventBus);
   }
 
   /** Creates a manager with a transactional write policy and authorization disabled. */
   public ArticleManager(IdGenerator ids, int maxBodyBytes, TransactionHook policy) {
-    this(ids, maxBodyBytes, false, policy);
+    this(ids, maxBodyBytes, false, policy, null);
   }
 
   /** Creates a manager with the configured authorization mode and transactional write policy. */
   public ArticleManager(
       IdGenerator ids, int maxBodyBytes, boolean authorizationEnabled, TransactionHook policy) {
+    this(ids, maxBodyBytes, authorizationEnabled, policy, null);
+  }
+
+  private ArticleManager(
+      IdGenerator ids,
+      int maxBodyBytes,
+      boolean authorizationEnabled,
+      TransactionHook policy,
+      @Nullable EventBus eventBus) {
     this.authorizationEnabled = authorizationEnabled;
     this.ids = Preconditions.checkNotNull(ids, "ids");
     this.edits = new ArticleEdits(maxBodyBytes);
     this.policy = Preconditions.checkNotNull(policy, "policy");
+    this.events = new ArticleEventDispatcher(eventBus);
   }
 
   /** The Article metadata and its opaque editing token from the same transaction. */
@@ -109,6 +153,13 @@ public final class ArticleManager {
    *     caller-owned transaction. The caller can then retry the transaction.
    */
   public Result createArticle(String metalake, ArticleCreate request) {
+    NameIdentifier requested =
+        request.name() == null ? NameIdentifier.of(metalake) : requested(metalake, request.name());
+    return write(
+        OperationType.CREATE_ARTICLE, requested, hook -> createArticle(metalake, request, hook));
+  }
+
+  private Result createArticle(String metalake, ArticleCreate request, TransactionHook hook) {
     String name = request.name();
     boolean generated = name == null;
     boolean allocateInCallerTransaction = generated && SqlSessions.hasActiveSession();
@@ -126,6 +177,15 @@ public final class ArticleManager {
       name = ArticleEdits.generatedName(request.title(), 0);
     }
     ArticleDomains domains = new ArticleDomains(metalake, authorizationEnabled);
+    ArticleTerms terms = new ArticleTerms(metalake, authorizationEnabled);
+    ArticleAssets assets = new ArticleAssets(metalake, authorizationEnabled);
+    Supplier<ArticleAssets.Plan> assetPlan =
+        Suppliers.memoize(
+            () -> assets.plan(List.of(new ArticleAssets.Edit(true, request.objects()))));
+    Supplier<ArticleTerms.Plan> termPlan =
+        Suppliers.memoize(
+            () ->
+                terms.resolve(terms.lake(), List.of(new ArticleTerms.Edit(true, request.terms()))));
     Supplier<ArticleDomains.Replacement> plan =
         Suppliers.memoize(() -> domains.resolve(List.of(request.domains())));
     Supplier<ArticleBody> body = Suppliers.memoize(() -> edits.storedBody(request.body()));
@@ -140,8 +200,23 @@ public final class ArticleManager {
                   if (authorizationEnabled) {
                     ArticleAccess.forRequest(metalake).requireCreate();
                   }
+                  Set<Binding> bindings = Set.of();
+                  if (!request.objects().isEmpty()) {
+                    bindings = assets.lock(terms.lake(), assetPlan.get());
+                  }
+                  Collection<ArticleTerms.CheckedEdit> checkedTerms = List.of();
+                  if (!request.terms().isEmpty()) {
+                    long lake = terms.lake();
+                    ArticleTerms.Plan resolved = termPlan.get();
+                    articles.lockTermTargets(lake, resolved.targets());
+                    checkedTerms = terms.check(lake, resolved);
+                  }
                   Set<Long> initial = domains.check(plan.get(), Set.of(), true);
-                  return edits.create(metalake, articleId, ident.name(), request, initial, body);
+                  return edits
+                      .create(metalake, articleId, ident.name(), request, initial, body)
+                      .toBuilder()
+                      .withBindings(ArticleTerms.apply(checkedTerms, bindings))
+                      .build();
                 },
                 expectedMetalakeId,
                 (before, created) -> {
@@ -153,10 +228,10 @@ public final class ArticleManager {
                             NameIdentifierUtil.ofUser(metalake, created.auditInfo().creator()),
                             EntityType.USER);
                   }
-                  policy.onChange(before, created);
+                  hook.onChange(before, created, true);
                 },
                 TargetNameConflict::new,
-                domains::visible));
+                article -> visible(article, domains, terms, assets)));
       } catch (TargetNameConflict conflict) {
         if (allocateInCallerTransaction) {
           throw new OptimisticLockException(
@@ -179,23 +254,56 @@ public final class ArticleManager {
 
   /** Reads one Article and its token from a single database snapshot. */
   public Result loadArticle(String metalake, String name) {
-    NameIdentifier ident = ident(metalake, name);
+    return loadArticle(metalake, name, ArticleListFilter.DEFAULT_LIMIT, 0);
+  }
+
+  /**
+   * Loads Article metadata and the requested Term and asset binding previews from the same
+   * snapshot.
+   *
+   * @param metalake the Article's metalake
+   * @param name the Article name
+   * @param limit the maximum number of readable bindings per preview
+   * @param offset the number of readable bindings to skip per preview
+   * @return the Article and its editing token
+   */
+  public Result loadArticle(String metalake, String name, int limit, int offset) {
+    return load(
+        OperationType.LOAD_ARTICLE,
+        requested(metalake, name),
+        () -> loadArticle(metalake, ident(metalake, name), limit, offset));
+  }
+
+  private Result loadArticle(String metalake, NameIdentifier ident, int limit, int offset) {
+    ArticleTerms.checkPage(limit, offset);
+    ArticleTerms terms = new ArticleTerms(metalake, authorizationEnabled);
     ScopedArticle state =
         readArticle(
             ident,
-            () -> articles.getScoped(ident),
+            () -> articles.getForPreview(ident),
             (access, current) ->
                 access.requireRead(ident, current.article().id(), current.article().status()),
-            current ->
-                new ScopedArticle(
-                    current.metalakeId(),
-                    new ArticleDomains(metalake, authorizationEnabled).visible(current.article())));
+            current -> {
+              long lake = current.metalakeId();
+              var article =
+                  new ArticleDomains(metalake, authorizationEnabled).visible(current.article());
+              var withTerms = terms.preview(lake, article, limit, offset);
+              var assets = new ArticleAssets(metalake, authorizationEnabled);
+              return new ScopedArticle(
+                  lake, withOwner(assets.preview(lake, withTerms, limit, offset)));
+            });
     return Result.from(state);
   }
 
   /** Reads the stored body and its token from the same row. */
   public ArticleContent getArticleContent(String metalake, String name) {
-    NameIdentifier ident = ident(metalake, name);
+    return load(
+        OperationType.LOAD_ARTICLE_CONTENT,
+        requested(metalake, name),
+        () -> getArticleContent(ident(metalake, name)));
+  }
+
+  private ArticleContent getArticleContent(NameIdentifier ident) {
     Supplier<StoredContent> fetch = () -> articles.getContent(ident);
     var content =
         authorizationEnabled
@@ -218,11 +326,21 @@ public final class ArticleManager {
 
   /** Lists readable Articles in the requested Domain and its readable direct subdomains. */
   public List<KnowledgeBaseArticleEntity> listArticles(String metalake, @Nullable String domain) {
+    return list(
+        OperationType.LIST_ARTICLES,
+        NameIdentifier.of(metalake),
+        () -> listCurrentArticles(metalake, domain),
+        List::size);
+  }
+
+  private List<KnowledgeBaseArticleEntity> listCurrentArticles(
+      String metalake, @Nullable String domain) {
     Namespace namespace = Namespace.of(metalake);
     return SqlSessions.readSnapshotOrJoin(
         () -> {
+          long lake;
           try {
-            MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+            lake = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
           } catch (NoSuchEntityException missing) {
             throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
           }
@@ -232,13 +350,154 @@ public final class ArticleManager {
           }
           ArticleDomains domains = new ArticleDomains(metalake, authorizationEnabled);
           List<KnowledgeBaseArticleEntity> candidates =
-              domain == null
-                  ? articles.list(namespace)
-                  : articles.listByDomains(namespace, domains.scope(domain));
+              articles.listForPreview(namespace, domain == null ? null : domains.scope(domain));
+          ArticleTerms terms = new ArticleTerms(metalake, authorizationEnabled);
           List<KnowledgeBaseArticleEntity> visible =
               access == null ? candidates : access.visibleArticles(candidates);
-          return visible.stream().map(domains::visible).toList();
+          return visible.stream()
+              .map(domains::visible)
+              .map(article -> terms.preview(lake, article, ArticleListFilter.DEFAULT_LIMIT, 0))
+              .toList();
         });
+  }
+
+  /**
+   * Lists readable Article summaries in title and name order using all supplied filters.
+   *
+   * @param metalake the Article metalake
+   * @param filter the search criteria and requested window
+   * @return the matching page and whether another readable match follows it
+   */
+  public ArticlePage listArticleSummaries(String metalake, ArticleListFilter filter) {
+    return listArticleSummaries(metalake, () -> filter);
+  }
+
+  private ArticlePage listArticleSummaries(String metalake, Supplier<ArticleListFilter> filter) {
+    return list(
+        OperationType.LIST_ARTICLES,
+        NameIdentifier.of(metalake),
+        () -> search(metalake, filter.get()),
+        page -> page.articles().size());
+  }
+
+  private ArticlePage search(String metalake, ArticleListFilter filter) {
+    Preconditions.checkNotNull(filter, "filter");
+    Owner owner = filter.owner();
+    if (owner != null) {
+      Preconditions.checkArgument(owner.type() != null, "Owner type must be set");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(owner.name()), "Owner name must not be blank");
+    }
+    return SqlSessions.readSnapshotOrJoin(
+        () -> new ArticleSearch(metalake, authorizationEnabled).list(filter));
+  }
+
+  /**
+   * Lists live, readable Term bindings in stable ID order.
+   *
+   * @param metalake the Article's metalake
+   * @param name the Article name
+   * @param limit the maximum number of readable Terms to return
+   * @param offset the number of readable Terms to skip
+   * @return the binding page
+   */
+  public TermBindingPage listTermBindings(String metalake, String name, int limit, int offset) {
+    return list(
+        OperationType.LIST_ARTICLE_TERMS,
+        requested(metalake, name),
+        () ->
+            bindingPage(
+                metalake,
+                name,
+                limit,
+                offset,
+                row ->
+                    new ArticleTerms(metalake, authorizationEnabled)
+                        .page(row.getMetalakeId(), row.getArticleId(), limit, offset)),
+        page -> page.terms().size());
+  }
+
+  /** Lists the requested window of live, readable assets in stable binding order. */
+  public AssetBindingPage listAssetBindings(String metalake, String name, int limit, int offset) {
+    return list(
+        OperationType.LIST_ARTICLE_ASSETS,
+        requested(metalake, name),
+        () ->
+            bindingPage(
+                metalake,
+                name,
+                limit,
+                offset,
+                row ->
+                    new ArticleAssets(metalake, authorizationEnabled)
+                        .window(row.getMetalakeId(), row.getArticleId(), limit, offset)
+                        .page()),
+        page -> page.objects().size());
+  }
+
+  private <T> T bindingPage(
+      String metalake,
+      String name,
+      int limit,
+      int offset,
+      Function<KnowledgeBaseArticlePO, T> page) {
+    ArticleTerms.checkPage(limit, offset);
+    NameIdentifier ident = ident(metalake, name);
+    return readArticle(
+        ident,
+        () -> {
+          var row =
+              SessionUtils.getWithoutCommitFresh(
+                  KnowledgeBaseArticleMapper.class, mapper -> mapper.ids(metalake, ident.name()));
+          if (row == null) {
+            throw new NoSuchKnowledgeBaseArticleException("Article %s does not exist", ident);
+          }
+          return row;
+        },
+        (access, row) ->
+            access.requireRead(ident, row.getArticleId(), ArticleStatus.valueOf(row.getStatus())),
+        page);
+  }
+
+  /**
+   * Lists Articles directly bound to a readable Term in title and name order.
+   *
+   * @param metalake the Term's metalake
+   * @param term the Term name
+   * @param includeDeprecated whether to include deprecated Articles alongside published ones
+   * @param limit the maximum number of Articles to return
+   * @param offset the number of matching Articles to skip
+   * @return the Article summary page
+   */
+  public ArticlePage listArticlesForTerm(
+      String metalake, String term, boolean includeDeprecated, int limit, int offset) {
+    return listArticleSummaries(
+        metalake,
+        () ->
+            ArticleListFilter.builder()
+                .withTerm(term)
+                .withIncludeDeprecated(includeDeprecated)
+                .withLimit(limit)
+                .withOffset(offset)
+                .build());
+  }
+
+  /** Lists Article summaries directly bound to a readable asset. */
+  public ArticlePage listArticlesForObject(
+      String metalake,
+      ArticleObjectIdentifier object,
+      boolean includeDeprecated,
+      int limit,
+      int offset) {
+    return listArticleSummaries(
+        metalake,
+        () ->
+            ArticleListFilter.builder()
+                .withObject(object)
+                .withIncludeDeprecated(includeDeprecated)
+                .withLimit(limit)
+                .withOffset(offset)
+                .build());
   }
 
   /** Applies the changes atomically, optionally checking the editing token before any change. */
@@ -247,8 +506,28 @@ public final class ArticleManager {
       String name,
       @Nullable String expectedRevision,
       KnowledgeBaseArticleChange... changes) {
-    NameIdentifier ident = ident(metalake, name);
+    boolean bindingsOnly =
+        changes != null
+            && changes.length > 0
+            && Arrays.stream(changes)
+                .allMatch(
+                    change ->
+                        change instanceof KnowledgeBaseArticleChange.AddTerms
+                            || change instanceof KnowledgeBaseArticleChange.RemoveTerms
+                            || change instanceof KnowledgeBaseArticleChange.AddObjects
+                            || change instanceof KnowledgeBaseArticleChange.RemoveObjects);
+    return write(
+        bindingsOnly ? OperationType.ALTER_ARTICLE_BINDINGS : OperationType.ALTER_ARTICLE,
+        requested(metalake, name),
+        hook -> alterArticle(metalake, ident(metalake, name), expectedRevision, changes, hook));
+  }
 
+  private Result alterArticle(
+      String metalake,
+      NameIdentifier ident,
+      @Nullable String expectedRevision,
+      KnowledgeBaseArticleChange[] changes,
+      TransactionHook hook) {
     Preconditions.checkNotNull(changes, "changes");
     ArticleDomains domains = new ArticleDomains(metalake, authorizationEnabled);
     var replacements =
@@ -257,22 +536,36 @@ public final class ArticleManager {
             .map(KnowledgeBaseArticleChange.UpdateDomains.class::cast)
             .map(change -> List.of(change.getNewDomains()))
             .toList();
+    ArticleTerms terms = new ArticleTerms(metalake, authorizationEnabled);
+    List<ArticleTerms.Edit> termEdits = ArticleTerms.edits(changes);
+    ArticleAssets assets = new ArticleAssets(metalake, authorizationEnabled);
+    var assetEdits = ArticleAssets.edits(changes);
+    ArticleAssets.Plan assetPlan;
+    ArticleTerms.Plan termPlan;
     ArticleDomains.Replacement plan;
     Long originalId;
-    if (replacements.isEmpty()) {
+    if (replacements.isEmpty() && termEdits.isEmpty() && assetEdits.isEmpty()) {
+      assetPlan = null;
+      termPlan = null;
       plan = null;
       originalId = null;
     } else {
-      KnowledgeBaseArticleEntity observed = loadStored(ident, () -> articles.get(ident));
-      requireEdit(metalake, observed);
-      originalId = observed.id();
-      plan = domains.resolve(replacements);
-      domains.check(plan, observed.domainIds(), false);
+      ScopedArticle observed = loadStored(ident, () -> articles.getForPreview(ident));
+      requireEdit(metalake, observed.article());
+      originalId = observed.article().id();
+      assetPlan = assetEdits.isEmpty() ? null : assets.plan(assetEdits);
+      termPlan = termEdits.isEmpty() ? null : terms.resolve(observed.metalakeId(), termEdits);
+      plan = replacements.isEmpty() ? null : domains.resolve(replacements);
+      if (plan != null) {
+        domains.check(plan, observed.article().domainIds(), false);
+      }
     }
     return Result.from(
         articles.editScoped(
             ident,
             plan == null ? null : plan.named().keySet(),
+            termPlan == null ? Set.of() : termPlan.targets(),
+            lake -> assetPlan == null ? Set.of() : assets.lock(lake, assetPlan),
             state -> {
               KnowledgeBaseArticleEntity before = state.article();
               requireEdit(metalake, before);
@@ -283,6 +576,10 @@ public final class ArticleManager {
                   plan == null
                       ? before.domainIds()
                       : domains.check(plan, before.domainIds(), false);
+              var checkedTerms =
+                  termPlan == null
+                      ? List.<ArticleTerms.CheckedEdit>of()
+                      : terms.check(state.metalakeId(), termPlan);
               if (expectedRevision != null
                   && !decode(expectedRevision)
                       .equals(
@@ -290,10 +587,14 @@ public final class ArticleManager {
                               state.metalakeId(), before.id(), before.revision()))) {
                 throw new ArticleRevisionConflictException("Article %s has changed", ident);
               }
-              return edits.apply(before, desired, changes);
+              var after = edits.apply(before, desired, changes);
+              Set<Binding> bindings = ArticleTerms.apply(checkedTerms, before.bindings());
+              return after.toBuilder()
+                  .withBindings(assetPlan == null ? bindings : assetPlan.apply(bindings))
+                  .build();
             },
-            policy,
-            domains::visible,
+            hook,
+            article -> visible(article, domains, terms, assets),
             missing ->
                 new NoSuchKnowledgeBaseArticleException(
                     missing, "Article %s does not exist", ident)));
@@ -301,15 +602,26 @@ public final class ArticleManager {
 
   /** Detaches a member using Domain management authority, including when the Article is hidden. */
   public void detachDomain(String metalake, String name, String domain) {
+    write(
+        OperationType.DETACH_ARTICLE_DOMAIN,
+        requested(metalake, name),
+        hook -> {
+          detachDomain(metalake, ident(metalake, name), domain, hook);
+          return null;
+        });
+  }
+
+  private void detachDomain(
+      String metalake, NameIdentifier ident, String domain, TransactionHook hook) {
     ArticleDomains domains = new ArticleDomains(metalake, authorizationEnabled);
     long id = domains.manage(domain);
     try {
       articles.detachDomain(
-          ident(metalake, name),
+          ident,
           id,
           lake -> domains.lockManaged(lake, id, domain),
           ArticleEdits::modifiedAudit,
-          policy);
+          hook);
     } catch (MissingArticleScopeException missing) {
       throw new NoSuchDomainException(missing, "Domain %s does not exist", domain);
     }
@@ -317,13 +629,20 @@ public final class ArticleManager {
 
   /** Deletes the Article and its relations, returning false when the Article is absent. */
   public boolean deleteArticle(String metalake, String name) {
+    return write(
+        OperationType.DROP_ARTICLE,
+        requested(metalake, name),
+        hook -> deleteArticle(metalake, ident(metalake, name), hook));
+  }
+
+  private boolean deleteArticle(String metalake, NameIdentifier ident, TransactionHook hook) {
     return articles
         .deleteAndGet(
-            ident(metalake, name),
+            ident,
             article ->
                 !authorizationEnabled
                     || ArticleAccess.forRequest(metalake).authorizeMutation(article),
-            policy)
+            hook)
         .isPresent();
   }
 
@@ -336,17 +655,121 @@ public final class ArticleManager {
     }
   }
 
+  private <T> T load(OperationType op, NameIdentifier ident, Supplier<T> read) {
+    return events.execute(op, ident, read, (user, ignored) -> new ArticleEvent(user, ident, op));
+  }
+
+  private <T> T list(
+      OperationType op, NameIdentifier ident, Supplier<T> read, ToIntFunction<T> count) {
+    return events.execute(
+        op,
+        ident,
+        read,
+        (user, result) -> new ArticleListEvent(user, ident, op, count.applyAsInt(result)));
+  }
+
+  private <T> T write(OperationType op, NameIdentifier ident, Function<TransactionHook, T> action) {
+    if (!events.enabled()) {
+      return action.apply(policy);
+    }
+    var hook = new MutationHook(op);
+    return events.execute(
+        op,
+        ident,
+        () -> action.apply(hook),
+        (user, ignored) -> {
+          ArticleMutationEvent event = hook.event;
+          if (event != null && SqlSessions.hasActiveSession()) {
+            // Nested writes belong to their caller's transaction, which can still roll back.
+            SqlSessions.afterCommit(() -> events.success(event));
+            return null;
+          }
+          return event;
+        });
+  }
+
+  /** Captures the effective, locked relation sets before the response projection filters them. */
+  private final class MutationHook implements TransactionHook {
+    private final OperationType operation;
+    @Nullable private ArticleMutationEvent event;
+
+    private MutationHook(OperationType operation) {
+      this.operation = operation;
+    }
+
+    @Override
+    public void beforeChange(
+        KnowledgeBaseArticleEntity before, @Nullable KnowledgeBaseArticleEntity after) {
+      policy.beforeChange(before, after);
+    }
+
+    @Override
+    public void onChange(
+        @Nullable KnowledgeBaseArticleEntity before, @Nullable KnowledgeBaseArticleEntity after) {
+      onChange(before, after, before == null);
+    }
+
+    @Override
+    public void onChange(
+        @Nullable KnowledgeBaseArticleEntity before,
+        @Nullable KnowledgeBaseArticleEntity after,
+        boolean bodyChanged) {
+      policy.onChange(before, after, bodyChanged);
+      var article = after == null ? before : after;
+      String initialOwner =
+          before == null && authorizationEnabled ? article.auditInfo().creator() : null;
+      event =
+          new ArticleMutationEvent(
+              PrincipalUtils.getCurrentUserName(),
+              article.nameIdentifier(),
+              operation,
+              before,
+              after,
+              bodyChanged,
+              initialOwner);
+    }
+  }
+
+  private static KnowledgeBaseArticleEntity visible(
+      KnowledgeBaseArticleEntity article,
+      ArticleDomains domains,
+      ArticleTerms terms,
+      ArticleAssets assets) {
+    var projected = terms.visible(domains.visible(article), ArticleListFilter.DEFAULT_LIMIT, 0);
+    if (article.bindings().stream().anyMatch(b -> !"GLOSSARY_TERM".equals(b.targetType()))) {
+      projected = assets.preview(terms.lake(), projected, ArticleListFilter.DEFAULT_LIMIT, 0);
+    }
+    return withOwner(projected);
+  }
+
+  private static KnowledgeBaseArticleEntity withOwner(KnowledgeBaseArticleEntity article) {
+    var relations =
+        OwnerMetaService.getInstance()
+            .listOwnersByObjectIds(
+                article.namespace().level(0),
+                Map.of(article.id(), article.nameIdentifier()),
+                article.type());
+    if (relations.isEmpty()) {
+      return article;
+    }
+    var owner = relations.get(0).targetEntity();
+    return article.toBuilder()
+        .withOwner(
+            new ArticleSearch.DirectOwner(owner.name(), Owner.Type.valueOf(owner.type().name())))
+        .build();
+  }
+
   private void requireEdit(String metalake, KnowledgeBaseArticleEntity article) {
     if (authorizationEnabled) {
       ArticleAccess.forRequest(metalake).requireEdit(article);
     }
   }
 
-  private <T> T readArticle(
+  private <T, R> R readArticle(
       NameIdentifier ident,
       Supplier<T> fetch,
       BiConsumer<ArticleAccess, T> checkVisibility,
-      UnaryOperator<T> project) {
+      Function<T, R> project) {
     return SqlSessions.readSnapshotOrJoin(
         () -> {
           if (!authorizationEnabled) {
@@ -372,6 +795,13 @@ public final class ArticleManager {
 
   private static NameIdentifier ident(String metalake, String name) {
     return NameIdentifier.of(metalake, KnowledgeBaseArticle.normalizeName(name));
+  }
+
+  private static NameIdentifier requested(String metalake, String name) {
+    // A listener can observe failed validation of an addressable name.
+    return NameIdentifier.of(
+        metalake,
+        Normalizer.normalize(Preconditions.checkNotNull(name, "name"), Normalizer.Form.NFC));
   }
 
   private String nextAvailableName(String metalake, String title, long start) {

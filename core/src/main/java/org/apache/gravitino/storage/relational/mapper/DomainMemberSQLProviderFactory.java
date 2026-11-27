@@ -52,6 +52,11 @@ public class DomainMemberSQLProviderFactory {
     return getProvider().members();
   }
 
+  /** Delegates {@link DomainMemberBaseSQLProvider#liveMembers}. */
+  public static String liveMembers() {
+    return getProvider().liveMembers();
+  }
+
   /** Delegates {@link DomainMemberBaseSQLProvider#add}. */
   public static String add() {
     return getProvider().add();

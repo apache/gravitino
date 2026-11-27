@@ -111,6 +111,8 @@ import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
 import org.apache.gravitino.listener.api.event.TestConnectionEvent;
 import org.apache.gravitino.listener.api.event.TestConnectionFailureEvent;
+import org.apache.gravitino.listener.api.event.article.ArticleEvent;
+import org.apache.gravitino.listener.api.event.article.ArticleFailureEvent;
 import org.apache.gravitino.listener.api.event.domain.DomainEvent;
 import org.apache.gravitino.listener.api.event.domain.DomainFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelEvent;
@@ -341,6 +343,27 @@ public interface AuditLog {
     LIST_FILESET,
 
     LIST_FILESET_FILES,
+
+    /** Lists readable Articles. */
+    LIST_ARTICLES,
+    /** Loads Article metadata. */
+    LOAD_ARTICLE,
+    /** Reads Article content. */
+    LOAD_ARTICLE_CONTENT,
+    /** Lists the Terms bound to an Article. */
+    LIST_ARTICLE_TERMS,
+    /** Lists the assets bound to an Article. */
+    LIST_ARTICLE_ASSETS,
+    /** Creates an Article. */
+    CREATE_ARTICLE,
+    /** Changes an Article. */
+    ALTER_ARTICLE,
+    /** Deletes an Article. */
+    DROP_ARTICLE,
+    /** Changes the bindings of an Article. */
+    ALTER_ARTICLE_BINDINGS,
+    /** Detaches an Article from a Domain. */
+    DETACH_ARTICLE_DOMAIN,
 
     /** Domain operation: ListDomains. */
     LIST_DOMAIN,
@@ -618,7 +641,10 @@ public interface AuditLog {
     UNKNOWN_OPERATION;
 
     public static Operation fromEvent(Event event) {
-      if (event instanceof DomainEvent || event instanceof DomainFailureEvent) {
+      if (event instanceof DomainEvent
+          || event instanceof DomainFailureEvent
+          || event instanceof ArticleEvent
+          || event instanceof ArticleFailureEvent) {
         try {
           return Operation.valueOf(event.operationType().name());
         } catch (IllegalArgumentException e) {
