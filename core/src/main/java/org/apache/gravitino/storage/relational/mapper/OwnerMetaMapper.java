@@ -128,12 +128,14 @@ public interface OwnerMetaMapper {
   @UpdateProvider(
       type = OwnerMetaSQLProviderFactory.class,
       method = "softDeleteOwnerRelByCatalogId")
-  void softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId);
+  void softDeleteOwnerRelByCatalogId(
+      @Param("metalakeId") Long metalakeId, @Param("catalogId") Long catalogId);
 
   @UpdateProvider(
       type = OwnerMetaSQLProviderFactory.class,
       method = "softDeleteOwnerRelBySchemaIds")
-  void softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
+  void softDeleteOwnerRelBySchemaIds(
+      @Param("metalakeId") Long metalakeId, @Param("schemaIds") List<Long> schemaIds);
 
   @UpdateProvider(
       type = OwnerMetaSQLProviderFactory.class,

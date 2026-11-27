@@ -79,14 +79,14 @@ import org.slf4j.LoggerFactory;
  * transaction, including domains and relation targets supplied in a request body.
  */
 @Path("/metalakes/{metalake}/terms")
-@Produces("application/vnd.gravitino.v1+json")
+@Produces({"application/json", TermOperations.V1_JSON})
 public class TermOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TermOperations.class);
   private static final ExceptionHandler COMMON_ERRORS =
       new ExceptionHandlers.BaseExceptionHandler();
   // VersioningFilter prepends the default vendor type to a plain JSON Accept header. Prefer
   // plain JSON when both types are present, while honoring an explicitly versioned request.
-  static final String BINDING_V1_JSON = "application/vnd.gravitino.v1+json;qs=0.9";
+  static final String V1_JSON = "application/vnd.gravitino.v1+json;qs=0.9";
 
   private final GlossaryTermViews views;
   @Context private HttpServletRequest httpRequest;
@@ -122,23 +122,25 @@ public class TermOperations {
           effective.validate();
           GlossaryTerm.Status filter = parseStatus(effective.status);
           return Boolean.parseBoolean(effective.details)
-              ? Utils.ok(
-                  new TermListResponse(
-                      views.listTerms(
-                          metalake,
-                          effective.domain,
-                          effective.nameContains,
-                          filter,
-                          effective.match,
-                          Boolean.parseBoolean(effective.bindings))))
-              : Utils.ok(
-                  new NameListResponse(
-                      views.listTermNames(
-                          metalake,
-                          effective.domain,
-                          effective.nameContains,
-                          filter,
-                          effective.match)));
+              ? Response.ok(
+                      new TermListResponse(
+                          views.listTerms(
+                              metalake,
+                              effective.domain,
+                              effective.nameContains,
+                              filter,
+                              effective.match,
+                              Boolean.parseBoolean(effective.bindings))))
+                  .build()
+              : Response.ok(
+                      new NameListResponse(
+                          views.listTermNames(
+                              metalake,
+                              effective.domain,
+                              effective.nameContains,
+                              filter,
+                              effective.match)))
+                  .build();
         });
   }
 
@@ -164,7 +166,9 @@ public class TermOperations {
         OperationType.GET,
         metalake,
         term,
-        () -> Utils.ok(new TermResponse(views.getTerm(metalake, term, parseStatus(status)))));
+        () ->
+            Response.ok(new TermResponse(views.getTerm(metalake, term, parseStatus(status))))
+                .build());
   }
 
   /**
@@ -190,7 +194,8 @@ public class TermOperations {
         null,
         () -> {
           Preconditions.checkArgument(request != null, "Request body is required");
-          return Utils.ok(new TermResponse(views.createTerm(metalake, request.toSpec())));
+          return Response.ok(new TermResponse(views.createTerm(metalake, request.toSpec())))
+              .build();
         });
   }
 
@@ -220,10 +225,11 @@ public class TermOperations {
         term,
         () -> {
           Preconditions.checkArgument(request != null, "Request body is required");
-          return Utils.ok(
-              new TermResponse(
-                  views.alterTerm(
-                      metalake, term, request.getExpectedRevision(), request.changes())));
+          return Response.ok(
+                  new TermResponse(
+                      views.alterTerm(
+                          metalake, term, request.getExpectedRevision(), request.changes())))
+              .build();
         });
   }
 
@@ -246,7 +252,7 @@ public class TermOperations {
         OperationType.DELETE,
         metalake,
         term,
-        () -> Utils.ok(new DropResponse(views.dropTerm(metalake, term))));
+        () -> Response.ok(new DropResponse(views.dropTerm(metalake, term))).build());
   }
 
   /**
@@ -276,16 +282,16 @@ public class TermOperations {
         term,
         () -> {
           GlossaryManager.Direction walk = parseDirection(direction);
-          return Utils.ok(
-              new TermTreeResponse(
-                  views.getTermHierarchy(metalake, term, walk, parseStatus(status))));
+          return Response.ok(
+                  new TermTreeResponse(
+                      views.getTermHierarchy(metalake, term, walk, parseStatus(status))))
+              .build();
         });
   }
 
   /** Lists all visible objects or metrics bound to the requested term. */
   @GET
   @Path("{term}/objects")
-  @Produces({"application/json", BINDING_V1_JSON})
   @Timed(name = "list-term-bindings." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-term-bindings", absolute = true)
   @AuthorizationExpression(expression = "")
