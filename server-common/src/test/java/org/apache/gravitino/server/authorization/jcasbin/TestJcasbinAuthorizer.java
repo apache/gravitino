@@ -5912,6 +5912,24 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testArticleOwnerChangeInvalidatesLockedIdWithoutResolvingName() throws Exception {
+    long articleId = 601L;
+    NameIdentifier ident = NameIdentifier.of(METALAKE, "guide");
+    Entity.EntityType type = Entity.EntityType.KNOWLEDGE_BASE_ARTICLE;
+    MetadataObject object = NameIdentifierUtil.toMetadataObjectForRead(ident, type);
+    String key = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(METALAKE, object);
+    var names = getMetadataIdCache(jcasbinAuthorizer);
+    var owners = getOwnerRelCache(jcasbinAuthorizer);
+    names.put(key, articleId);
+    owners.put(articleId, Optional.of(new OwnerInfo(USER_ID, "USER")));
+    jcasbinAuthorizer.handleMetadataOwnerChange(METALAKE, USER_ID, ident, type, articleId);
+    assertFalse(names.getIfPresent(key).isPresent());
+    assertFalse(owners.getIfPresent(articleId).isPresent());
+    metadataIdConverterMockedStatic.verify(
+        () -> MetadataIdConverter.getID(object, METALAKE), Mockito.never());
+  }
+
+  @Test
   public void testOwnerChangeBestEffortWhenMetadataIdLookupFails() throws Exception {
     GravitinoCache<String, Long> metadataIdCache = getMetadataIdCache(jcasbinAuthorizer);
     GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache = getOwnerRelCache(jcasbinAuthorizer);
@@ -6289,6 +6307,28 @@ public class TestJcasbinAuthorizer {
         jcasbinAuthorizer.hasMetadataPrivilegePermission(
             METALAKE, "CATALOG", "testCatalog", new AuthorizationRequestContext()),
         "Owner should be able to manage privileges without checking DENY MANAGE_GRANTS");
+  }
+
+  @Test
+  public void testArticleListHonorsCustomOwnership() {
+    var custom =
+        new JcasbinAuthorizer() {
+          @Override
+          public boolean isArticleOwner(
+              Principal principal,
+              String metalake,
+              long articleId,
+              AuthorizationRequestContext context) {
+            return articleId == 2L;
+          }
+        };
+    assertEquals(
+        Set.of(2L),
+        custom.ownedArticleIds(
+            new UserPrincipal("writer"),
+            METALAKE,
+            List.of(1L, 2L),
+            new AuthorizationRequestContext()));
   }
 
   @Test

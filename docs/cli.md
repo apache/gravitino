@@ -822,6 +822,15 @@ CREATE privileges before applying explicit denies. Implement `canAccessGlossaryT
 generic metadata endpoints and `isGlossaryTermOwner` to check current ownership by term ID
 in the caller's transaction. Both checks default to denying access.
 
+For Knowledge Base Articles, implement `canAccessArticle` to check visibility for generic
+metadata endpoints such as Owner GET. Use the caller's read snapshot and deny access to
+both missing and hidden Articles. Implement `isArticleOwner` to check whether the caller
+or one of their groups owns the stable Article ID in that transaction. Both methods
+default to `false`. A provider that grants `CREATE_DEFINITION` but inherits these defaults
+can allow an author to create a draft and then deny them access to it. The optional
+`ownedArticleIds` method batches draft ownership checks when listing Articles. Its results
+must match the single-Article check in the same snapshot.
+
 #### Revoke All Privileges
 
 ```bash
