@@ -112,6 +112,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.model.ModelCatalog;
+import org.apache.gravitino.rel.SupportsPartitionSpecs;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -416,6 +417,29 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             Preconditions.checkArgument(
                 partitionOps != null, "Table does not support partition operations");
             return fn.apply(partitionOps);
+          });
+    }
+
+    /**
+     * Loads the table inside the catalog class loader and applies {@code fn} to its {@link
+     * SupportsPartitionSpecs} capability.
+     *
+     * @param tableIdent The table identifier relative to the catalog.
+     * @param fn The function to apply.
+     * @param <R> The return type.
+     * @return The function result.
+     * @throws Exception if loading the table or applying the function fails
+     * @throws UnsupportedOperationException if the table does not expose partition specs
+     */
+    public <R> R doWithPartitionSpecOps(
+        NameIdentifier tableIdent, ThrowableFunction<SupportsPartitionSpecs, R> fn)
+        throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            Preconditions.checkArgument(
+                asTables() != null, "Catalog does not support table operations");
+            Table table = asTables().loadTable(tableIdent);
+            return fn.apply(table.supportsPartitionSpecs());
           });
     }
 

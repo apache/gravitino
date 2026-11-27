@@ -46,6 +46,9 @@ import org.apache.gravitino.catalog.ModelOperationDispatcher;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.PartitionNormalizeDispatcher;
 import org.apache.gravitino.catalog.PartitionOperationDispatcher;
+import org.apache.gravitino.catalog.PartitionSpecDispatcher;
+import org.apache.gravitino.catalog.PartitionSpecNormalizeDispatcher;
+import org.apache.gravitino.catalog.PartitionSpecOperationDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.SchemaNormalizeDispatcher;
 import org.apache.gravitino.catalog.SchemaOperationDispatcher;
@@ -156,6 +159,9 @@ public class GravitinoEnv {
 
   private PartitionDispatcher partitionDispatcher;
   private PartitionDispatcher internalPartitionDispatcher;
+
+  private PartitionSpecDispatcher partitionSpecDispatcher;
+  private PartitionSpecDispatcher internalPartitionSpecDispatcher;
 
   private FilesetDispatcher filesetDispatcher;
 
@@ -483,6 +489,28 @@ public class GravitinoEnv {
     Preconditions.checkArgument(
         internalPartitionDispatcher != null, "GravitinoEnv is not initialized.");
     return internalPartitionDispatcher;
+  }
+
+  /**
+   * Get the PartitionSpecDispatcher associated with the Gravitino environment.
+   *
+   * @return The PartitionSpecDispatcher instance.
+   */
+  public PartitionSpecDispatcher partitionSpecDispatcher() {
+    return partitionSpecDispatcher;
+  }
+
+  /**
+   * Get the internal PartitionSpecDispatcher associated with the Gravitino environment.
+   *
+   * <p>The internal dispatcher preserves normalization. Partition-spec reads do not emit events.
+   *
+   * @return The internal PartitionSpecDispatcher instance.
+   */
+  public PartitionSpecDispatcher internalPartitionSpecDispatcher() {
+    Preconditions.checkArgument(
+        internalPartitionSpecDispatcher != null, "GravitinoEnv is not initialized.");
+    return internalPartitionSpecDispatcher;
   }
 
   /**
@@ -954,6 +982,7 @@ public class GravitinoEnv {
     SchemaOperationDispatcher schemaOperationDispatcher = initInternalSchemaDispatcher();
     initInternalTableDispatcher();
     initInternalPartitionDispatcher();
+    initInternalPartitionSpecDispatcher();
     TopicOperationDispatcher topicOperationDispatcher = initInternalTopicDispatcher();
     ModelOperationDispatcher modelOperationDispatcher = initInternalModelDispatcher();
     FunctionOperationDispatcher functionOperationDispatcher =
@@ -1011,6 +1040,14 @@ public class GravitinoEnv {
         new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     this.internalPartitionDispatcher =
         new PartitionNormalizeDispatcher(partitionOperationDispatcher, catalogManager);
+  }
+
+  private void initInternalPartitionSpecDispatcher() {
+    PartitionSpecOperationDispatcher partitionSpecOperationDispatcher =
+        new PartitionSpecOperationDispatcher(
+            catalogManager, entityStore, idGenerator, secretManager);
+    this.internalPartitionSpecDispatcher =
+        new PartitionSpecNormalizeDispatcher(partitionSpecOperationDispatcher, catalogManager);
   }
 
   private TopicOperationDispatcher initInternalTopicDispatcher() {
@@ -1149,6 +1186,9 @@ public class GravitinoEnv {
     // TODO: We can install hooks when we need, we only supports ownership post hook,
     //  partition doesn't have ownership, so we don't need it now.
     this.partitionDispatcher = new PartitionEventDispatcher(eventBus, internalPartitionDispatcher);
+
+    // Partition-spec listing is read-only; reuse the normalizing internal dispatcher publicly.
+    this.partitionSpecDispatcher = internalPartitionSpecDispatcher;
 
     TopicHookDispatcher topicHookDispatcher =
         new TopicHookDispatcher(metadataOperations.topicOperationDispatcher);
