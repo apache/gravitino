@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/apache/ossie/ontology/mapping.json",
+  "title": "Apache Ossie Mapping Specification",
+  "description": "JSON Schema for validating a standalone Apache Ossie mapping document: the constructs of one semantic model mapped onto one ontology, as its own document rather than embedded inside the ontology's ontology_mappings.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Mapping specification version"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for this mapping"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of this mapping"
+    },
+    "ontology_ref": {
+      "$ref": "#/$defs/DocumentReference",
+      "description": "Reference to the ontology document this mapping targets"
+    },
+    "semantic_model_ref": {
+      "$ref": "#/$defs/DocumentReference",
+      "description": "Reference to the semantic model document this mapping draws from"
+    },
+    "concept_mappings": {
+      "type": "array",
+      "items": {
+        "$ref": "https://raw.githubusercontent.com/apache/ossie/main/ontology/ontology.json#/$defs/ConceptMapping"
+      },
+      "description": "Maps logical model constructs to some concept and its relationships in the referenced ontology"
+    },
+    "nonportable_extensions": {
+      "$ref": "https://raw.githubusercontent.com/apache/ossie/main/core-spec/ossie-schema.json#/$defs/SemanticModel/properties/nonportable_extensions"
+    }
+  },
+  "required": ["version", "name", "ontology_ref", "semantic_model_ref", "concept_mappings"],
+  "additionalProperties": false,
+  "$defs": {
+    "DocumentReference": {
+      "type": "object",
+      "description": "Reference to another Ossie document by its logical name, with an iri saying where to resolve it from",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Must equal the referenced document's own 'name'; carries this reference's checkable identity regardless of location"
+        },
+        "iri": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where to resolve the referenced document from: a relative reference resolved against the mapping document's own location or base IRI, or an absolute IRI"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    }
+  }
+}
