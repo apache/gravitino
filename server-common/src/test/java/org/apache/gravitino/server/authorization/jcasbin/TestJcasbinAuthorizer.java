@@ -6292,6 +6292,28 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testArticleListHonorsCustomOwnership() {
+    var custom =
+        new JcasbinAuthorizer() {
+          @Override
+          public boolean isArticleOwner(
+              Principal principal,
+              String metalake,
+              long articleId,
+              AuthorizationRequestContext context) {
+            return articleId == 2L;
+          }
+        };
+    assertEquals(
+        Set.of(2L),
+        custom.ownedArticleIds(
+            new UserPrincipal("writer"),
+            METALAKE,
+            List.of(1L, 2L),
+            new AuthorizationRequestContext()));
+  }
+
+  @Test
   public void testHasSetOwnerPermissionAllowsSchemaAndCatalogOwner() throws Exception {
     MetadataObject metalakeObject =
         MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE);

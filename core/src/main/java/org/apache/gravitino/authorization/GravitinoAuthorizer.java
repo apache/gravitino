@@ -20,7 +20,9 @@ package org.apache.gravitino.authorization;
 import java.io.Closeable;
 import java.security.Principal;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -102,7 +104,10 @@ public interface GravitinoAuthorizer extends Closeable {
     return false;
   }
 
-  /** Returns whether the caller may read the Article identified by the metadata object. */
+  /**
+   * Checks Article visibility for generic metadata endpoints in the caller's read snapshot. Missing
+   * and hidden Articles both deny access. The default denies access.
+   */
   default boolean canAccessArticle(
       Principal principal,
       String metalake,
@@ -112,11 +117,32 @@ public interface GravitinoAuthorizer extends Closeable {
   }
 
   /**
-   * Checks the current user or group owner of the stable Article ID in the caller's transaction.
+   * Checks whether the caller or one of their groups owns the stable Article ID in the caller's
+   * transaction. The default denies ownership.
    */
   default boolean isArticleOwner(
       Principal principal, String metalake, long articleId, AuthorizationRequestContext context) {
     return false;
+  }
+
+  /**
+   * Filters Article IDs using the same ownership rules as {@link #isArticleOwner}. Providers may
+   * batch the lookup in the caller's snapshot. The default delegates to the single-ID check.
+   *
+   * @param principal the caller
+   * @param metalake the metalake containing the Articles
+   * @param articleIds stable IDs of candidate Articles
+   * @param context the current request context
+   * @return the candidate IDs owned by the caller or their groups
+   */
+  default Set<Long> ownedArticleIds(
+      Principal principal,
+      String metalake,
+      List<Long> articleIds,
+      AuthorizationRequestContext context) {
+    return articleIds.stream()
+        .filter(id -> isArticleOwner(principal, metalake, id, context))
+        .collect(Collectors.toSet());
   }
 
   boolean deny(

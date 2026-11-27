@@ -436,6 +436,28 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public Set<Long> ownedArticleIds(
+      Principal principal,
+      String metalake,
+      List<Long> articleIds,
+      AuthorizationRequestContext context) {
+    // Subclasses may implement different ownership rules in their single-Article check.
+    if (getClass() != JcasbinAuthorizer.class) {
+      return GravitinoAuthorizer.super.ownedArticleIds(principal, metalake, articleIds, context);
+    }
+    return lookups
+        .currentDefinitionOwners(articleIds, MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE)
+        .entrySet()
+        .stream()
+        .filter(
+            entry ->
+                ownerMatchesUserOrGroups(
+                    Optional.of(entry.getValue()), principal, metalake, context))
+        .map(Map.Entry::getKey)
+        .collect(Collectors.toSet());
+  }
+
+  @Override
   public boolean canAccessGlossaryTerm(
       Principal principal,
       String metalake,

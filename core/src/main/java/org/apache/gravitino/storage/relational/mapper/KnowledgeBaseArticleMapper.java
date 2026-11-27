@@ -73,10 +73,10 @@ public interface KnowledgeBaseArticleMapper {
   @Nullable
   KnowledgeBaseArticlePO content(@Param("metalake") String metalake, @Param("name") String name);
 
-  /** Resolves identity without reading the body. */
+  /** Resolves identity and status without reading Article content or relations. */
   @Select(
       """
-      SELECT a.article_id AS articleId, a.metalake_id AS metalakeId
+      SELECT a.article_id AS articleId, a.metalake_id AS metalakeId, a.status
       FROM kb_article_meta a
       JOIN metalake_meta m ON a.metalake_id=m.metalake_id
       WHERE m.metalake_name=#{metalake} AND m.deleted_at=0 AND a.article_name=#{name} AND

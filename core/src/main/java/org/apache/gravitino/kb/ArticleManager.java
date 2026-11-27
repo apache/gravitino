@@ -212,9 +212,7 @@ public final class ArticleManager {
           if (!access.canView()) {
             return List.of();
           }
-          return articles.list(namespace).stream()
-              .filter(article -> access.canRead(article.id(), article.status()))
-              .toList();
+          return access.visibleArticles(articles.list(namespace));
         });
   }
 
