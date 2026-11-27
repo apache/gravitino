@@ -22,5 +22,6 @@ package org.apache.gravitino.listener.api.event;
 public enum EventSource {
   GRAVITINO_SERVER,
   GRAVITINO_ICEBERG_REST_SERVER,
-  GRAVITINO_LANCE_REST_SERVER
+  GRAVITINO_LANCE_REST_SERVER,
+  GRAVITINO_PAIMON_REST_SERVER
 }

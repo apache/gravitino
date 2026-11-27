@@ -137,6 +137,27 @@ gravitino.lance-rest.host = 0.0.0.0
 # Lance REST service http port
 gravitino.lance-rest.httpPort = 9101
 
+# Paimon REST requires gravitino.authorization.enable to be false.
+# Paimon REST service classpath
+# gravitino.paimon-rest.classpath = paimon-rest-server/libs, paimon-rest-server/conf
+# Paimon REST service host
+# gravitino.paimon-rest.host = 0.0.0.0
+# Paimon REST service http port
+# gravitino.paimon-rest.httpPort = 9002
+# The backend Paimon catalog for the Paimon REST service, one of filesystem, jdbc or hive
+# gravitino.paimon-rest.catalog-backend = filesystem
+# The warehouse directory of the Paimon catalog for the Paimon REST service
+# gravitino.paimon-rest.warehouse = /tmp/paimon-warehouse
+# Bearer tokens: one token per principal (revocable individually, visible in audit logs),
+# or a single shared token via gravitino.paimon-rest.token. Clients send them as
+# 'Authorization: Bearer <token>' (token.provider = bear on the client side).
+# gravitino.paimon-rest.token.<principal> = <token>
+# gravitino.paimon-rest.token = <shared-token>
+# Forward the same catalog-wide static storage keys for every table. The synthetic 2h
+# expiry controls client refresh only. Use long-lived keys, without S3/OSS session tokens.
+# Credential keys use the fs.s3a./fs.oss./... prefixes.
+# gravitino.paimon-rest.data-token.enabled = true
+
 # THE CONFIGURATION FOR Lance namespace backend
 # The backend Lance namespace for Lance REST service, it's recommended to use Gravitino
 gravitino.lance-rest.namespace-backend = gravitino

@@ -985,10 +985,29 @@ subprojects {
       }
     }
   }
+  val bundledJarConfiguration = when (project.path) {
+    ":clients:cli" -> "runtimeClasspath"
+    ":paimon:paimon-common" -> "bundledPaimonFormat"
+    else -> null
+  }
+  if (bundledJarConfiguration != null) {
+    val bundledClasspath = provider { configurations.getByName(bundledJarConfiguration) }
+    configureBundledLegalFiles(bundledClasspath.map { listOf(it) }, bundledClasspath.map<FileCollection> { it })
+  }
   if (project.path == ":clients:cli") {
-    configureBundledLegalFiles(provider { listOf(configurations.runtimeClasspath.get()) }, provider { configurations.runtimeClasspath.get() })
     tasks.named<Jar>("jar") {
       from(provider { configurations.runtimeClasspath.get().map { zipTree(it) } }) {
+        exclude { GenerateJarLegalFiles.isLegalResource(it.relativePath.pathString) }
+      }
+    }
+  }
+  if (project.path == ":paimon:paimon-common") {
+    // Include the format classes in both the main source-set output and the published jar.
+    // The upstream jar bundles an unrelocated Zstd JNI copy, which would shadow our runtime dependency.
+    tasks.named<ProcessResources>("processResources") {
+      from(provider { configurations.getByName("bundledPaimonFormat").map { zipTree(it) } }) {
+        exclude("com/github/luben/zstd/**", "**/libzstd-jni-*", "META-INF/maven/com.github.luben/zstd-jni/**")
+        exclude("META-INF/MANIFEST.MF")
         exclude { GenerateJarLegalFiles.isLegalResource(it.relativePath.pathString) }
       }
     }
@@ -1007,7 +1026,7 @@ subprojects {
     }
     val legalFiles = when {
       name == "javadocJar" -> javadocLegalFiles
-      name == "jar" && project.path == ":clients:cli" -> bundledLegalFiles
+      name == "jar" && bundledJarConfiguration != null -> bundledLegalFiles
       else -> mavenLegalFiles
     }
     dependsOn(legalFiles)
@@ -1290,6 +1309,7 @@ tasks {
         ":iceberg:iceberg-rest-server:copyLibAndConfigs",
         ":iceberg:iceberg-rest-server-experiment:copyLibAndConfigs",
         ":lance:lance-rest-server:copyLibAndConfigs",
+        ":paimon:paimon-rest-server:copyLibAndConfigs",
         ":maintenance:optimizer:copyLibAndConfigs",
         ":plugins:idp-basic:copyLibAndConfigs",
         ":plugins:maintenance:copyLibAndConfigs",
@@ -1472,6 +1492,62 @@ tasks {
     }
   }
 
+  val compilePaimonRESTServer by registering(Sync::class) {
+    dependsOn(":paimon:paimon-rest-server:copyLibAndConfigsToStandalonePackage")
+    group = "gravitino distribution"
+    from(project(":paimon:paimon-rest-server").layout.buildDirectory.dir("standalone"))
+    from(projectDir.dir("conf")) {
+      include(
+        "gravitino-paimon-rest-server.conf.template",
+        "gravitino-paimon-rest-log4j2.properties.template",
+        "gravitino-env.sh.template"
+      )
+      rename { it.removeSuffix(".template") }
+      eachFile {
+        if (name == "gravitino-env.sh") {
+          filter { line -> line.replace("GRAVITINO_VERSION_PLACEHOLDER", "$version") }
+        }
+      }
+      into("conf")
+    }
+    from(projectDir.dir("bin")) {
+      include("common.sh.template", "gravitino-paimon-rest-server.sh.template")
+      rename { it.removeSuffix(".template") }
+      fileMode = 0b111101101
+      into("bin")
+    }
+    from(projectDir.dir("licenses")) { into("licenses") }
+    from(listOf("LICENSE.bin", "NOTICE.bin")) { rename { it.removeSuffix(".bin") } }
+    from("paimon/paimon-rest-server/README.md")
+    into(outputDir.dir("gravitino-paimon-rest-server"))
+  }
+
+  val assemblePaimonRESTServer by registering(Tar::class) {
+    group = "gravitino distribution"
+    finalizedBy("checksumPaimonRESTServerDistribution")
+    into("${rootProject.name}-paimon-rest-server-$version-bin")
+    from(compilePaimonRESTServer)
+    compression = Compression.GZIP
+    archiveFileName.set("${rootProject.name}-paimon-rest-server-$version-bin.tar.gz")
+    destinationDirectory.set(outputDir)
+  }
+
+  register("checksumPaimonRESTServerDistribution") {
+    group = "gravitino distribution"
+    dependsOn(assemblePaimonRESTServer)
+    val archiveFile = assemblePaimonRESTServer.flatMap { it.archiveFile }
+    val checksumFile = archiveFile.map { archive ->
+      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
+    }
+    inputs.file(archiveFile)
+    outputs.file(checksumFile)
+    doLast {
+      checksumFile.get().writeText(
+        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+      )
+    }
+  }
+
   val compileTrinoConnector by registering {
     dependsOn("trino-connector:trino-connector-482-483:copyLibs")
     group = "gravitino distribution"
@@ -1487,7 +1563,8 @@ tasks {
       ":trino-connector:trino-connector-481:assembleTrinoConnector",
       ":trino-connector:trino-connector-482-483:assembleTrinoConnector",
       "assembleIcebergRESTServer",
-      "assembleLanceRESTServer"
+      "assembleLanceRESTServer",
+      assemblePaimonRESTServer
     )
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
@@ -1581,7 +1658,7 @@ tasks {
 
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution, "checksumIcebergRESTServerDistribution", "checksumLanceRESTServerDistribution")
+    dependsOn(assembleDistribution, "checksumIcebergRESTServerDistribution", "checksumLanceRESTServerDistribution", "checksumPaimonRESTServerDistribution")
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
@@ -1610,6 +1687,7 @@ tasks {
         !it.name.startsWith("flink") &&
         !it.name.startsWith("iceberg") &&
         !it.name.startsWith("lance") &&
+        !it.name.startsWith("paimon") &&
         !it.name.startsWith("optimizer") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("hive-metastore") &&
@@ -1657,6 +1735,7 @@ tasks {
         !it.name.startsWith("flink") &&
         !it.name.startsWith("iceberg") &&
         !it.name.startsWith("lance") &&
+        !it.name.startsWith("paimon") &&
         !it.name.startsWith("integration-test") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("trino-connector") &&
@@ -1675,9 +1754,13 @@ tasks {
         it.name != "mcp-server"
       ) {
         dependsOn("${it.name}:build")
+        if (it.tasks.names.contains("testJar")) {
+          // build/libs also contains the test jar, so the copy needs the explicit edge.
+          dependsOn("${it.name}:testJar")
+        }
         from("${it.name}/build/libs") {
           include("*.jar")
-          exclude("*-jcstress.jar", "*-jmh.jar", "error_prone_annotations-*.jar")
+          exclude("*-tests.jar", "*-jcstress.jar", "*-jmh.jar", "error_prone_annotations-*.jar")
         }
         into("distribution/package/libs")
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)

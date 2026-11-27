@@ -211,7 +211,11 @@
    Ethlo Time ITU
    Apache Hive
    Apache Paimon
-   FastDoubleParser (older Jackson copy shaded in paimon-format 1.2.0)
+   Hilbert Curve (shaded in paimon-common 2.1.0)
+   Guava Mini (shaded in paimon-common 2.1.0)
+   Zero Allocation Hashing (shaded in paimon-common 2.1.0)
+   fastutil (shaded in paimon-common 2.1.0)
+   FastDoubleParser (older Jackson copy shaded in paimon-format 1.2.0 and 2.1.0)
    Apache DataSketches Java
    Apache DataSketches Memory
    Apache Iceberg
@@ -588,3 +592,11 @@ For the BSD license of the ANTLR 3 runtime, see licenses/antlr3.txt.
 For the JDOM license, see licenses/jdom.txt.
 
 For the MIT No Attribution license of Reactive Streams, see licenses/reactive-streams.txt.
+
+   This product includes JTS Topology Suite 1.20.0, shaded in paimon-format 2.1.0
+   and bundled in Gravitino paimon-common, under the Eclipse Distribution
+   License 1.0. See licenses/jts-edl.txt for its license and the OSGeo BSD
+   license covering GeoTools contributions.
+
+   Third-party license texts for Paimon REST runtime bundles, including nested
+   code generation libraries, are reproduced in licenses/paimon-rest-thirdparty.txt.

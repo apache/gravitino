@@ -1,0 +1,114 @@
+#!/bin/bash
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+set -e
+
+usage() {
+  echo "Usage: $0 [--config <conf-dir>] {start|run|stop|status}"
+}
+
+if [[ "${1:-}" == "--config" ]]; then
+  if [[ ! -d "${2:-}" ]]; then
+    usage >&2
+    exit 1
+  fi
+  export GRAVITINO_CONF_DIR="$(cd "$2" && pwd)"
+  shift 2
+fi
+
+bin="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "${bin}/common.sh"
+check_java_version
+
+server=org.apache.gravitino.paimon.server.GravitinoPaimonRESTServer
+pid_file="${GRAVITINO_PID_DIR:-${GRAVITINO_LOG_DIR}}/gravitino-paimon-rest-server.pid"
+output="${GRAVITINO_LOG_DIR}/gravitino-paimon-rest-server.out"
+
+if [[ -d "${GRAVITINO_HOME}/paimon-rest-server/libs" ]]; then
+  addJarInDir "${GRAVITINO_HOME}/paimon-rest-server/libs"
+  addDirToClasspath "${GRAVITINO_HOME}/paimon-rest-server/conf"
+else
+  addJarInDir "${GRAVITINO_HOME}/libs"
+fi
+
+read -r -a java_opts <<< "${JAVA_OPTS:-} ${GRAVITINO_MEM} ${GRAVITINO_DEBUG_OPTS:-}"
+command=(
+  "${JAVA_RUNNER}" "${java_opts[@]}"
+  "-Dfile.encoding=UTF-8"
+  "-Dlog4j2.configurationFile=${GRAVITINO_CONF_DIR}/gravitino-paimon-rest-log4j2.properties"
+  "-Dgravitino.paimon-rest-server.log.path=${GRAVITINO_LOG_DIR}"
+  "-Dgravitino.paimon-rest-server.name=gravitino-paimon-rest-server"
+  -cp "${GRAVITINO_CLASSPATH}" "${server}"
+)
+
+running() {
+  [[ -r "${pid_file}" ]] || return 1
+  local pid command_line
+  read -r pid < "${pid_file}"
+  [[ "${pid}" =~ ^[0-9]+$ ]] && kill -0 "${pid}" 2>/dev/null || return 1
+  command_line="$(ps -p "${pid}" -o command=)"
+  [[ "${command_line}" == *"${server}"* && "${command_line}" == *"${GRAVITINO_HOME}"* ]]
+}
+
+case "${1:-}" in
+  run)
+    mkdir -p "${GRAVITINO_LOG_DIR}"
+    exec "${command[@]}"
+    ;;
+  start)
+    if running; then
+      echo "Gravitino Paimon REST server is already running (PID $(cat "${pid_file}"))"
+      exit 0
+    fi
+    mkdir -p "${GRAVITINO_LOG_DIR}" "$(dirname "${pid_file}")"
+    rotate_out_file "${output}"
+    nohup "${command[@]}" >> "${output}" 2>&1 &
+    pid=$!
+    printf '%s\n' "${pid}" > "${pid_file}"
+    echo "Started Gravitino Paimon REST server (PID ${pid})"
+    ;;
+  stop)
+    if running; then
+      pid="$(cat "${pid_file}")"
+      kill "${pid}"
+      for (( attempt = 0; attempt < 30; attempt++ )); do
+        running || break
+        sleep 1
+      done
+      if running; then
+        echo "Gravitino Paimon REST server is still stopping (PID ${pid})" >&2
+        exit 1
+      fi
+    fi
+    rm -f "${pid_file}"
+    ;;
+  status)
+    if running; then
+      echo "Gravitino Paimon REST server is running (PID $(cat "${pid_file}"))"
+    else
+      echo "Gravitino Paimon REST server is stopped"
+      exit 1
+    fi
+    ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac
