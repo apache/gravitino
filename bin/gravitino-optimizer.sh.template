@@ -76,57 +76,21 @@ if [[ "$JVM_VERSION" -eq 17 ]]; then
   JAVA_OPTS+=" --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED"
 fi
 
-# Reuse shared runtime jars from root libs/ (not the whole tree — skip server/plugins).
-# optimizer/libs should only keep the 4 CLI-owned jars; everything else comes from here.
-add_jars_by_prefix() {
-  local dir=$1
-  shift
-  local prefix jar
-  [[ -d "${dir}" ]] || return 0
-  for prefix in "$@"; do
-    for jar in "${dir}/${prefix}"*.jar; do
-      [[ -f "${jar}" ]] || continue
-      GRAVITINO_CLASSPATH="${jar}:${GRAVITINO_CLASSPATH}"
-    done
-  done
-}
+# Exact shared jar names from packaging (optimizer/conf/shared-libs), resolved from
+# root libs/. optimizer/libs keeps the four CLI jars plus any jar not in root libs.
+SHARED_LIBS_LIST="${GRAVITINO_HOME}/optimizer/conf/shared-libs"
+if [[ -f "${SHARED_LIBS_LIST}" ]]; then
+  while IFS= read -r jar_name || [[ -n "${jar_name}" ]]; do
+    [[ -z "${jar_name}" || "${jar_name}" =~ ^[[:space:]]*# ]] && continue
+    jar_path="${GRAVITINO_HOME}/libs/${jar_name}"
+    if [[ ! -f "${jar_path}" ]]; then
+      echo "ERROR: required shared jar not found: ${jar_path}" >&2
+      exit 1
+    fi
+    GRAVITINO_CLASSPATH="${jar_path}:${GRAVITINO_CLASSPATH}"
+  done < "${SHARED_LIBS_LIST}"
+fi
 
-add_jars_by_prefix "${GRAVITINO_HOME}/libs" \
-  commons-collections4- \
-  commons-dbcp2- \
-  commons-io- \
-  commons-lang3- \
-  commons-logging- \
-  commons-pool2- \
-  failureaccess- \
-  gravitino-api- \
-  gravitino-catalog-common- \
-  gravitino-client-java- \
-  gravitino-common- \
-  gravitino-core- \
-  guava- \
-  h2- \
-  httpclient5- \
-  httpcore5- \
-  j2objc-annotations- \
-  jackson-annotations- \
-  jackson-core- \
-  jackson-databind- \
-  jackson-datatype-jdk8- \
-  jackson-datatype-jsr310- \
-  jakarta.transaction-api- \
-  jakarta.validation-api- \
-  jspecify- \
-  listenablefuture- \
-  log4j-1.2-api- \
-  log4j-api- \
-  log4j-core- \
-  log4j-layout-template-json- \
-  log4j-slf4j2-impl- \
-  qlexpress4- \
-  slf4j-api-
-
-# All jars under optimizer/libs (the four CLI jars, plus any extension jars).
 if [ -d "${GRAVITINO_HOME}/optimizer/libs" ]; then
   addJarInDir "${GRAVITINO_HOME}/optimizer/libs"
   addDirToClasspath "${GRAVITINO_HOME}/optimizer/conf"
