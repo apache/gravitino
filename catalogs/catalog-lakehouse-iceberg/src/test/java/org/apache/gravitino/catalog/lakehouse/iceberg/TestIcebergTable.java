@@ -56,6 +56,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.DistributionMode;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.junit.jupiter.api.AfterEach;
@@ -199,6 +200,8 @@ public class TestIcebergTable {
             new Transform[0],
             Distributions.NONE,
             sortOrders);
+    Assertions.assertEquals(PrincipalUtils.getCurrentUserName(), table.auditInfo().creator());
+    Assertions.assertNotNull(table.auditInfo().createTime());
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(ICEBERG_COMMENT, table.comment());
     Assertions.assertEquals("val1", table.properties().get("key1"));

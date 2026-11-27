@@ -74,7 +74,12 @@ class TestIcebergTablePropertiesUtil {
     Assertions.assertEquals(1, specs.partitionSpecs().size());
     Assertions.assertArrayEquals(built.partitioning(), specs.partitionSpecs().get(0));
     Assertions.assertNotSame(built.partitioning(), specs.partitionSpecs().get(0));
+    Assertions.assertNotSame(partitioning, built.partitioning());
     Assertions.assertNotSame(partitioning, specs.partitionSpecs().get(0));
+    partitioning[0] = Transforms.identity("mutated");
+    Assertions.assertArrayEquals(new Transform[] {Transforms.identity("id")}, built.partitioning());
+    Assertions.assertArrayEquals(
+        new Transform[] {Transforms.identity("id")}, specs.partitionSpecs().get(0));
   }
 
   @Test

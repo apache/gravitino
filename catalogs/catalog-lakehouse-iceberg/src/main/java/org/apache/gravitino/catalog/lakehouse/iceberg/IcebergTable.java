@@ -195,6 +195,23 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
    * @return A new IcebergTable instance.
    */
   public static IcebergTable fromIcebergTable(TableMetadata table, String tableName) {
+    return fromIcebergTable(table, tableName, AuditInfo.EMPTY);
+  }
+
+  /**
+   * Creates an {@link IcebergTable} from Iceberg metadata and keeps the supplied audit.
+   *
+   * <p>Iceberg metadata has no Gravitino creator or create time. {@link
+   * org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogOperations#createTable} passes the
+   * audit it recorded before the backend call. Load paths pass {@link AuditInfo#EMPTY}.
+   *
+   * @param table The inner Table representing the IcebergTable.
+   * @param tableName The name of Table.
+   * @param auditInfo Audit recorded by the caller. Null is stored as {@link AuditInfo#EMPTY}.
+   * @return A new IcebergTable instance.
+   */
+  public static IcebergTable fromIcebergTable(
+      TableMetadata table, String tableName, AuditInfo auditInfo) {
     Map<String, String> properties = new HashMap<>(table.properties());
     properties.putAll(IcebergTablePropertiesUtil.buildReservedProperties(table));
     Schema schema = table.schema();
@@ -219,7 +236,7 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
             .withProperties(properties)
             .withColumns(icebergColumns)
             .withName(tableName)
-            .withAuditInfo(AuditInfo.EMPTY)
+            .withAuditInfo(auditInfo != null ? auditInfo : AuditInfo.EMPTY)
             .withPartitioning(partitionSpec)
             .withSortOrders(sortOrder)
             .withDistribution(getDistribution(properties))
@@ -268,7 +285,9 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
       }
       Transform[] normalizedPartitioning =
           partitioning != null ? partitioning : Transforms.EMPTY_TRANSFORM;
-      icebergTable.partitioning = normalizedPartitioning;
+      // Copy so a caller who mutates the array passed to the builder cannot change partitioning()
+      // without changing partitionSpecs().
+      icebergTable.partitioning = copyTransforms(normalizedPartitioning);
       icebergTable.distribution = distribution;
       icebergTable.sortOrders = sortOrders;
       // Iceberg always retains at least spec 0 (unpartitioned has empty fields). Hydrate a

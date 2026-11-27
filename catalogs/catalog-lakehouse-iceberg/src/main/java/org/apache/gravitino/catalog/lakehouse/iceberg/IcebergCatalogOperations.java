@@ -627,7 +627,10 @@ public class IcebergCatalogOperations
       loadTableResponse.validate();
 
       LOG.info("Created Iceberg table {}", tableIdent.name());
-      return IcebergTable.fromIcebergTable(loadTableResponse.tableMetadata(), tableIdent.name());
+      // Reload metadata so historical specs are present, and keep the creator recorded above.
+      // fromIcebergTable cannot read that audit from Iceberg metadata.
+      return IcebergTable.fromIcebergTable(
+          loadTableResponse.tableMetadata(), tableIdent.name(), createdTable.auditInfo());
     } catch (AlreadyExistsException e) {
       throw new TableAlreadyExistsException(e, "Table already exists: %s", tableIdent.name());
     } catch (ValidationException | BadRequestException e) {
