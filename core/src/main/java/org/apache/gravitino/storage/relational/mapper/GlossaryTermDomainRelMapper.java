@@ -52,4 +52,20 @@ public interface GlossaryTermDomainRelMapper {
   @SelectProvider(type = GlossaryTermDomainRelSQLProviderFactory.class, method = "listTermIds")
   List<Long> listTermIds(
       @Param("metalakeId") long metalakeId, @Param("domainIds") Collection<Long> domainIds);
+
+  /**
+   * Counts at most the remaining membership budget and one overflow row before hydrating roots.
+   *
+   * @param metalakeId the metalake ID
+   * @param termIds the root term IDs
+   * @param limit the maximum count to return
+   * @return number of live membership candidates up to the limit
+   */
+  @SelectProvider(
+      type = GlossaryTermDomainRelSQLProviderFactory.class,
+      method = "countLiveMemberships")
+  int countLiveMemberships(
+      @Param("metalakeId") long metalakeId,
+      @Param("termIds") Collection<Long> termIds,
+      @Param("limit") int limit);
 }
