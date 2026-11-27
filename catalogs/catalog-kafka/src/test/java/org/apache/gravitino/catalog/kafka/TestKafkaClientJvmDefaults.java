@@ -34,14 +34,15 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.CatalogInfo;
+import org.apache.gravitino.integration.test.util.JwksMockServerHelper;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -133,27 +134,73 @@ public class TestKafkaClientJvmDefaults {
   }
 
   @Test
-  public void testInitializeReadsConfiguredTokenEndpoint() throws IOException {
-    String tokenUrl = writeToken().toUri().toString();
-    // Kafka 3.9.2 builds the file path from the raw URL path, so it cannot read a file whose path
-    // needs percent-encoding, such as a path with a space. Skip instead of passing without a read.
-    Assumptions.assumeFalse(
-        tokenUrl.contains("%"), "Kafka cannot read a file token endpoint with an encoded path");
-    System.setProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY, tokenUrl);
+  public void testInitializeDoesNotCallUnlistedHttpTokenEndpointByDefault() throws Exception {
+    try (JwksMockServerHelper idp = JwksMockServerHelper.create("kafka-test-key")) {
+      AtomicInteger tokenRequests = countTokenRequests(idp);
+      String tokenUrl = idp.baseUri() + "/token";
 
-    for (String handler : HANDLERS) {
-      // The client reads and validates the token while it is created, so success means the
-      // allowed endpoint was read.
-      Assertions.assertDoesNotThrow(
-          () -> initialize(oauthBearerConfig(handler, tokenUrl)),
-          handler + " must read the configured token endpoint");
+      for (String handler : HANDLERS) {
+        Throwable thrown =
+            Assertions.assertThrows(
+                RuntimeException.class, () -> initialize(oauthBearerConfig(handler, tokenUrl)));
+
+        Assertions.assertTrue(
+            messages(thrown).contains("is not allowed"),
+            handler + " must reject the token endpoint by default, got: " + messages(thrown));
+      }
+      Assertions.assertEquals(0, tokenRequests.get(), "No token request may reach the endpoint");
     }
   }
 
-  /**
-   * Writes an unsigned JWT that Kafka's login validator accepts: it needs {@code sub} and {@code
-   * exp}.
-   */
+  @Test
+  public void testInitializeReadsConfiguredTokenEndpoint() throws Exception {
+    try (JwksMockServerHelper idp = JwksMockServerHelper.create("kafka-test-key")) {
+      AtomicInteger tokenRequests = countTokenRequests(idp);
+      String tokenUrl = idp.baseUri() + "/token";
+      System.setProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY, tokenUrl);
+
+      for (String handler : HANDLERS) {
+        int before = tokenRequests.get();
+        // The client fetches and validates the token while it is created, so success means that
+        // the allowed endpoint was called. The mock server does not depend on java.io.tmpdir.
+        Assertions.assertDoesNotThrow(
+            () -> initialize(oauthBearerConfig(handler, tokenUrl)),
+            handler + " must read the configured token endpoint");
+        Assertions.assertTrue(
+            tokenRequests.get() > before, handler + " must call the configured token endpoint");
+      }
+    }
+  }
+
+  @Test
+  public void testInitializeReadsTokenEndpointFromCommaSeparatedList() throws Exception {
+    try (JwksMockServerHelper idp = JwksMockServerHelper.create("kafka-test-key")) {
+      AtomicInteger tokenRequests = countTokenRequests(idp);
+      String tokenUrl = idp.baseUri() + "/token";
+      System.setProperty(
+          OAUTHBEARER_ALLOWED_URLS_PROPERTY, "https://other.example.com/token," + tokenUrl);
+
+      Assertions.assertDoesNotThrow(() -> initialize(oauthBearerConfig(HANDLER, tokenUrl)));
+      Assertions.assertTrue(tokenRequests.get() > 0, "The listed endpoint must be called");
+    }
+  }
+
+  /** Makes the mock token endpoint return a valid signed JWT and count the requests it gets. */
+  private static AtomicInteger countTokenRequests(JwksMockServerHelper idp) {
+    AtomicInteger requests = new AtomicInteger();
+    idp.setTokenSupplier(
+        () -> {
+          requests.incrementAndGet();
+          try {
+            return idp.mintToken("gravitino-test", "kafka", Instant.now().plusSeconds(3600));
+          } catch (Exception e) {
+            throw new IllegalStateException(e);
+          }
+        });
+    return requests;
+  }
+
+  /** Writes an unsigned JWT in the form that Kafka's login validator accepts. */
   private Path writeToken() throws IOException {
     Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
     long expiresAt = Instant.now().plusSeconds(3600).getEpochSecond();
@@ -182,7 +229,8 @@ public class TestKafkaClientJvmDefaults {
         .put("gravitino.bypass.sasl.login.callback.handler.class", handler)
         .put(
             "gravitino.bypass.sasl.jaas.config",
-            "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;")
+            "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required"
+                + " clientId=\"test-client\" clientSecret=\"test-secret\";")
         .put("gravitino.bypass.sasl.oauthbearer.token.endpoint.url", tokenUrl)
         .build();
   }

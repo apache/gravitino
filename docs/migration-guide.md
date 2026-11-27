@@ -142,6 +142,11 @@ and shutdown steps in [Upgrade Gravitino](./how-to-upgrade.md) before applying t
   after the upgrade until the token endpoint URL is added to the list. Set it in `JAVA_OPTS`, for
   example in `conf/gravitino-env.sh`:
   `JAVA_OPTS+=" -Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp.example.com/oauth2/token"`.
+  All Kafka catalogs share this one property, so when several catalogs use different token
+  endpoints, list them together in one comma-separated value, for example
+  `-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp-a.example.com/oauth2/token,https://idp-b.example.com/oauth2/token`.
+  A repeated `-D` for the same property keeps only the last one. `JAVA_OPTS` also reaches other
+  launchers that source the same `gravitino-env.sh`, such as `gravitino-optimizer.sh`.
   `JAVA_TOOL_OPTIONS` and `JDK_JAVA_OPTIONS` also work, but local jobs that the server starts read
   them too. Catalogs whose login handler creates the token itself, such as the AWS MSK IAM handler,
   need no change.

@@ -61,17 +61,26 @@ class needs its token endpoint URL in the list, for example
 handlers that create the token themselves, such as the AWS MSK IAM handler, do not read the token
 endpoint and work with the empty list.
 
-To set the property for the server only, add it to `JAVA_OPTS`, for example in
-`conf/gravitino-env.sh`:
+To keep the allow list out of the Java jobs that the server starts, add it to `JAVA_OPTS`, for
+example in `conf/gravitino-env.sh`:
 
 ```shell
 JAVA_OPTS+=" -Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp.example.com/oauth2/token"
 ```
 
-`JAVA_TOOL_OPTIONS` and `JDK_JAVA_OPTIONS` also work, but every Java process that the server starts,
-such as a local job, reads them too. That process then gets the same allow list, which matters when
-the job and the catalog use different token endpoints. The defaults that the server sets exist only
-in the server JVM, so those processes do not inherit them.
+`JAVA_OPTS` reaches only the JVMs that a `bin/` launcher starts from this configuration directory.
+Other launchers that source the same `gravitino-env.sh`, such as `gravitino-optimizer.sh`, pass it to
+their JVM as well. `JAVA_TOOL_OPTIONS` and `JDK_JAVA_OPTIONS` also work, but every Java process that
+the server starts, such as a local job, reads them too. Such a process then gets the same allow
+list, which matters when the job and the catalog use different token endpoints. The defaults that
+the server sets exist only in the server JVM, so those processes do not inherit them.
+
+All Kafka catalogs in the server share this one property. List every token endpoint in a single
+comma-separated value, because a repeated `-D` for the same property keeps only the last one:
+
+```shell
+JAVA_OPTS+=" -Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp-a.example.com/oauth2/token,https://idp-b.example.com/oauth2/token"
+```
 
 See [Kafka catalog client upgrade](./migration-guide.md#kafka-catalog-client-upgrade) for how to
 migrate catalogs that used config providers or `LdapLoginModule`.
