@@ -84,7 +84,9 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
 
   @Override
   public Transform alwaysNull(int fieldId, String sourceName, int sourceId) {
-    // do nothing for alwaysNull, it doesn't need to be converted to a transform
+    // Omit void from Table.partitioning(). Spark and Trino reject void(...). The native
+    // partition-specs JSON keeps the field and its position, and a dropped source id is not
+    // resolved here.
     return null;
   }
 
@@ -94,18 +96,20 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
   }
 
   /**
-   * Transform assembled into Gravitino.
+   * Transform assembled into Gravitino using the given schema's id-to-name map.
+   *
+   * <p>Iceberg checks the current default spec against the current schema. {@code void} fields are
+   * omitted, so a dropped source id is not resolved. Historical specs stay in the native {@code
+   * partition-specs} JSON.
    *
    * @param partitionSpec Iceberg partition spec.
    * @param schema Iceberg schema.
-   * @return array of transforms for partition fields.
+   * @return array of transforms for partition fields. {@code void} fields are omitted.
    */
   public static Transform[] fromPartitionSpec(PartitionSpec partitionSpec, Schema schema) {
     FromIcebergPartitionSpec visitor = new FromIcebergPartitionSpec(schema.idToName());
     List<Transform> transforms = Lists.newArrayList();
-    List<PartitionField> fields = partitionSpec.fields();
-
-    for (PartitionField field : fields) {
+    for (PartitionField field : partitionSpec.fields()) {
       Transform transform = PartitionSpecVisitor.visit(schema, field, visitor);
       if (transform != null) {
         transforms.add(transform);

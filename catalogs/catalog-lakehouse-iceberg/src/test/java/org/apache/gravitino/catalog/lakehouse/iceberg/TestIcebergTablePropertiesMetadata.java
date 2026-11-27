@@ -70,6 +70,20 @@ public class TestIcebergTablePropertiesMetadata {
   }
 
   @Test
+  void testPartitionSpecsCannotBeSetOrRemoved() {
+    Map<String, String> property = Map.of("partition-specs", "[]");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, property));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PropertiesMetadataHelpers.validatePropertyForAlter(metadata, property, Map.of()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PropertiesMetadataHelpers.validatePropertyForAlter(metadata, Map.of(), property));
+  }
+
+  @Test
   void testDefaultSpecIdCannotBeSetOrRemoved() {
     Map<String, String> property = Map.of("default-spec-id", "1");
     Assertions.assertThrows(

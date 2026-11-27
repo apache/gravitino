@@ -23,6 +23,7 @@ import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.Getter;
@@ -42,6 +43,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.iceberg.DistributionMode;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
@@ -158,9 +160,27 @@ public class IcebergTable extends BaseTable {
    * @return A new IcebergTable instance.
    */
   public static IcebergTable fromIcebergTable(TableMetadata table, String tableName) {
+    return fromIcebergTable(table, tableName, AuditInfo.EMPTY);
+  }
+
+  /**
+   * Creates an {@link IcebergTable} from Iceberg metadata and keeps the supplied audit.
+   *
+   * <p>Iceberg metadata has no Gravitino creator or create time. Callers that already recorded an
+   * audit can pass it. Load paths pass {@link AuditInfo#EMPTY}.
+   *
+   * @param table The inner Table representing the IcebergTable.
+   * @param tableName The name of Table.
+   * @param auditInfo Audit recorded by the caller. Null is stored as {@link AuditInfo#EMPTY}.
+   * @return A new IcebergTable instance.
+   */
+  public static IcebergTable fromIcebergTable(
+      TableMetadata table, String tableName, AuditInfo auditInfo) {
     Map<String, String> properties = new HashMap<>(table.properties());
     properties.putAll(IcebergTablePropertiesUtil.buildReservedProperties(table));
     Schema schema = table.schema();
+    // Active fields are in the current schema. void is omitted, and historical specs stay in the
+    // partition-specs JSON.
     Transform[] partitionSpec = FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema);
     SortOrder[] sortOrder = FromIcebergSortOrder.fromSortOrder(table.sortOrder());
     IcebergColumn[] icebergColumns =
@@ -171,7 +191,7 @@ public class IcebergTable extends BaseTable {
         .withProperties(properties)
         .withColumns(icebergColumns)
         .withName(tableName)
-        .withAuditInfo(AuditInfo.EMPTY)
+        .withAuditInfo(auditInfo != null ? auditInfo : AuditInfo.EMPTY)
         .withPartitioning(partitionSpec)
         .withSortOrders(sortOrder)
         .withDistribution(getDistribution(properties))
@@ -215,7 +235,10 @@ public class IcebergTable extends BaseTable {
       } else {
         icebergTable.location = icebergTable.properties.get(PROP_LOCATION);
       }
-      icebergTable.partitioning = partitioning;
+      Transform[] normalizedPartitioning =
+          partitioning != null ? partitioning : Transforms.EMPTY_TRANSFORM;
+      // Copy so a caller who mutates the array passed to the builder cannot change partitioning().
+      icebergTable.partitioning = copyTransforms(normalizedPartitioning);
       icebergTable.distribution = distribution;
       icebergTable.sortOrders = sortOrders;
       if (null != comment) {
@@ -231,6 +254,13 @@ public class IcebergTable extends BaseTable {
    */
   public static Builder builder() {
     return new Builder();
+  }
+
+  private static Transform[] copyTransforms(Transform[] transforms) {
+    if (transforms == null || transforms.length == 0) {
+      return Transforms.EMPTY_TRANSFORM;
+    }
+    return Arrays.copyOf(transforms, transforms.length);
   }
 
   private static Distribution getDistribution(Map<String, String> properties) {

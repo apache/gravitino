@@ -54,7 +54,10 @@ import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.DistributionMode;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.junit.jupiter.api.AfterEach;
@@ -198,10 +201,37 @@ public class TestIcebergTable {
             new Transform[0],
             Distributions.NONE,
             sortOrders);
+    Assertions.assertEquals(PrincipalUtils.getCurrentUserName(), table.auditInfo().creator());
+    Assertions.assertNotNull(table.auditInfo().createTime());
+
+    NameIdentifier timestampIdentifier =
+        NameIdentifier.of(
+            META_LAKE_NAME, icebergCatalog.name(), icebergSchema.name(), "timestamp_table");
+    Column[] timestampColumns =
+        new Column[] {
+          Column.of("ts_tz", Types.TimestampType.withTimeZone(), "tz"),
+          Column.of("ts", Types.TimestampType.withoutTimeZone(), "ntz")
+        };
+    Table createdTimestamp =
+        icebergCatalogOperations.createTable(
+            timestampIdentifier, timestampColumns, ICEBERG_COMMENT, properties);
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(), createdTimestamp.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(), createdTimestamp.columns()[1].dataType());
+    Assertions.assertEquals("0", createdTimestamp.properties().get("default-spec-id"));
+    Table loadedTimestamp = icebergCatalogOperations.loadTable(timestampIdentifier);
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(6), loadedTimestamp.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(6), loadedTimestamp.columns()[1].dataType());
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(ICEBERG_COMMENT, table.comment());
     Assertions.assertEquals("val1", table.properties().get("key1"));
     Assertions.assertEquals("val2", table.properties().get("key2"));
+    Assertions.assertEquals("0", table.properties().get("default-spec-id"));
+    Assertions.assertArrayEquals(Transforms.EMPTY_TRANSFORM, table.partitioning());
+    Assertions.assertNotNull(table.properties().get("partition-specs"));
 
     Table loadedTable = icebergCatalogOperations.loadTable(tableIdentifier);
 
@@ -250,6 +280,7 @@ public class TestIcebergTable {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
+    properties.put("provider", "orc");
 
     IcebergColumn col1 =
         IcebergColumn.builder()
@@ -272,12 +303,23 @@ public class TestIcebergTable {
 
     Table table =
         icebergCatalogOperations.createTable(
-            tableIdentifier, columns, ICEBERG_COMMENT, properties, partitions);
+            tableIdentifier,
+            columns,
+            ICEBERG_COMMENT,
+            properties,
+            partitions,
+            Distributions.hash(8),
+            new SortOrder[0],
+            new Index[0]);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(ICEBERG_COMMENT, table.comment());
     Assertions.assertEquals("val1", table.properties().get("key1"));
     Assertions.assertEquals("val2", table.properties().get("key2"));
+    Assertions.assertEquals("orc", table.properties().get("provider"));
+    Assertions.assertEquals(8, table.distribution().number());
     Assertions.assertArrayEquals(partitions, table.partitioning());
+    Assertions.assertEquals("0", table.properties().get("default-spec-id"));
+    Assertions.assertNotNull(table.properties().get("partition-specs"));
 
     Table loadedTable = icebergCatalogOperations.loadTable(tableIdentifier);
 

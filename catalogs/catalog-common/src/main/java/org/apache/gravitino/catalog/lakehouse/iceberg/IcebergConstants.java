@@ -102,6 +102,9 @@ public class IcebergConstants {
   /** Read-only partition spec ID projected from Iceberg table metadata. */
   public static final String DEFAULT_SPEC_ID = "default-spec-id";
 
+  /** Read-only JSON array of every Iceberg partition spec, including historical specs. */
+  public static final String PARTITION_SPECS = "partition-specs";
+
   public static final String CHERRY_PICK_SNAPSHOT_ID = "cherry-pick-snapshot-id";
   public static final String SORT_ORDER = "sort-order";
   public static final String IDENTIFIER_FIELDS = "identifier-fields";

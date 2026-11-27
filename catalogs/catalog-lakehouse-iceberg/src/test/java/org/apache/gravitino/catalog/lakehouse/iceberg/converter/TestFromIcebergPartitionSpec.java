@@ -143,4 +143,20 @@ public class TestFromIcebergPartitionSpec extends TestBaseConvert {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> ConvertUtil.splitIcebergNameToFieldPath(""));
   }
+
+  @Test
+  public void testV1VoidPartitionFieldIsOmitted() {
+    Schema schema =
+        new Schema(
+            Types.NestedField.required(1, "id", Types.LongType.get()),
+            Types.NestedField.required(2, "region", Types.StringType.get()));
+    PartitionSpec partitionSpec =
+        PartitionSpec.builderFor(schema).alwaysNull("region", "region").identity("id").build();
+
+    Transform[] transforms =
+        FromIcebergPartitionSpec.fromPartitionSpec(
+            partitionSpec, new Schema(schema.findField("id")));
+
+    Assertions.assertArrayEquals(new Transform[] {Transforms.identity("id")}, transforms);
+  }
 }

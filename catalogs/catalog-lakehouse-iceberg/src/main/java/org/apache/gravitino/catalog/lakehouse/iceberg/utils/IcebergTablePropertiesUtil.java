@@ -26,14 +26,20 @@ import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropert
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.FORMAT_VERSION;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.IDENTIFIER_FIELDS;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.LOCATION;
+import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.PARTITION_SPECS;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.PROVIDER;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.SORT_ORDER;
 
 import com.google.common.base.Joiner;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.catalog.lakehouse.iceberg.converter.DescribeIcebergSortOrderVisitor;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.PartitionSpecParser;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.transforms.SortOrderVisitor;
@@ -56,6 +62,7 @@ public class IcebergTablePropertiesUtil {
             : "none";
     properties.put(CURRENT_SNAPSHOT_ID, currentSnapshotId);
     properties.put(DEFAULT_SPEC_ID, Integer.toString(table.defaultSpecId()));
+    properties.put(PARTITION_SPECS, partitionSpecsJson(table));
     properties.put(LOCATION, table.location());
 
     properties.put(FORMAT_VERSION, String.valueOf(table.formatVersion()));
@@ -70,6 +77,20 @@ public class IcebergTablePropertiesUtil {
     }
 
     return properties;
+  }
+
+  private static String partitionSpecsJson(TableMetadata table) {
+    List<PartitionSpec> specs = new ArrayList<>(table.specsById().values());
+    specs.sort(Comparator.comparingInt(PartitionSpec::specId));
+    StringBuilder json = new StringBuilder("[");
+    for (int i = 0; i < specs.size(); i++) {
+      if (i > 0) {
+        json.append(',');
+      }
+      json.append(PartitionSpecParser.toJson(specs.get(i)));
+    }
+    json.append(']');
+    return json.toString();
   }
 
   private static String describeIcebergSortOrder(org.apache.iceberg.SortOrder sortOrder) {
