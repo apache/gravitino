@@ -24,6 +24,7 @@ from typing import Optional
 from dataclasses_json import config, dataclass_json
 
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.utils.article_name import normalize_article_name
 from gravitino.utils.precondition import Precondition
 
 
@@ -61,6 +62,10 @@ class MetadataObjectDTO(MetadataObject):
         Args:
             full_name (str): The full name of the metadata object.
         """
+        if self._type == MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE:
+            self._full_name = normalize_article_name(full_name)
+            self._parent, self._name = None, self._full_name
+            return
         index = (
             -1
             if self._type

@@ -72,6 +72,10 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | Tool name                           | Description                                                                    | Tag              |
 |-------------------------------------|--------------------------------------------------------------------------------|------------------|
 | `list_metalakes`                    | Retrieve the metalakes the caller can access.                                  | `metalake`       |
+| `search_kb_articles`                | Browse or search published Article summaries.                                  | `kb_article`     |
+| `get_kb_article`                    | Read published Article content and visible bindings.                           | `kb_article`     |
+| `list_kb_articles_for_term`         | List published Articles directly bound to a Term.                              | `kb_article`     |
+| `list_kb_articles_for_object`       | List published Articles directly bound to an asset.                            | `kb_article`     |
 | `get_list_of_catalogs`              | Retrieve a list of all catalogs in the system.                                 | `catalog`        |
 | `create_catalog`                    | Create a new catalog.                                                          | `catalog`        |
 | `alter_catalog`                     | Alter an existing catalog.                                                     | `catalog`        |
@@ -284,6 +288,35 @@ Use `list_terms` to browse definitions by domain or name fragment,
 `get_term_hierarchy` to walk ancestors or descendants, and `list_terms_for_metadata`
 to look up definitions for an object. Tables include column terms and semantic
 models include metric terms.
+
+### Knowledge Base Articles (read-only)
+
+Use the `kb_article` tag to read `PUBLISHED` Articles in the selected metalake.
+When you know the Term or asset, start with `list_kb_articles_for_term` or
+`list_kb_articles_for_object`. Otherwise, choose a relevant Domain with
+`list_of_domains` and browse its summaries with `search_kb_articles`. Omit `q`
+when browsing. To narrow the results, add `q` to search titles, synonyms and
+bodies within that Domain. Keep the same scope when a page is empty.
+
+When a summary page returns `hasMore: true`, advance `offset` by the number of
+Articles returned.
+Call `get_kb_article` for a selected Article. It returns stored source text and
+its `MARKDOWN` or `HTML` format, plus visible binding previews. To continue a
+preview, advance the same paging arguments if `termsHasMore` or `objectsHasMore`
+is true.
+
+Each bound target requires its own read permission. For example, a table binding
+with `namespace=["warehouse", "sales"]` and `name="orders"` supplies the following
+arguments to `get_table_metadata_details` within the same metalake.
+
+```json
+{"catalog_name": "warehouse", "schema_name": "sales", "table_name": "orders"}
+```
+
+For a Semantic Model, pass its leaf name as `semantic_model_name` to
+`load_semantic_model` with the catalog and schema from its namespace. Preserve
+each component, including literal dots. For a bound Term, use its name with the
+Glossary tool `get_term` when available.
 
 ### Domains (read-only)
 

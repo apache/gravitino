@@ -29,8 +29,10 @@ from gravitino.api.authorization.user import User
 from gravitino.api.domain.domain import Domain
 from gravitino.api.domain.domain_change import DomainChangeVariant
 from gravitino.api.domain.domain_operations import DomainOperations
+from gravitino.api.kb.article_operations import KnowledgeBaseArticleOperations
 from gravitino.api.tag.tag_value import TagValue
 from gravitino.client.generic_domain import GenericDomain
+from gravitino.client.article_operations import ArticleOperations
 from gravitino.dto.requests.domain_create_request import (
     BackingTagCreate,
     DomainCreateRequest,
@@ -721,6 +723,10 @@ class GravitinoMetalake(
         resp.validate()
 
         return GenericJobHandle(resp.job())
+
+    def article_operations(self) -> KnowledgeBaseArticleOperations:
+        """Return article operations using this metalake's authenticated client."""
+        return ArticleOperations(self.name(), self.rest_client)
 
     def list_domains(self) -> list[str]:
         """List visible domain names, including subdomains."""

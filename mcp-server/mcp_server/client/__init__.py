@@ -20,6 +20,7 @@ from mcp_server.client.domain_operation import DomainOperation
 from mcp_server.client.glossary_operation import GlossaryOperation
 from mcp_server.client.gravitino_operation import GravitinoOperation
 from mcp_server.client.job_operation import JobOperation
+from mcp_server.client.kb_article_operation import KBArticleOperation
 from mcp_server.client.metalake_operation import MetalakeOperation
 from mcp_server.client.model_operation import ModelOperation
 from mcp_server.client.policy_operation import PolicyOperation

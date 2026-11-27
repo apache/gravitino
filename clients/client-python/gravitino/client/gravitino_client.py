@@ -41,6 +41,7 @@ from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.domain.domain import Domain
 from gravitino.api.domain.domain_change import DomainChangeVariant
 from gravitino.api.domain.domain_operations import DomainOperations
+from gravitino.api.kb.article_operations import KnowledgeBaseArticleOperations
 from gravitino.api.tag.tag_value import TagValue
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.auth.auth_data_provider import AuthDataProvider
@@ -101,6 +102,10 @@ class GravitinoClient(
             the GravitinoMetalake object
         """
         return self._metalake
+
+    def article_operations(self) -> KnowledgeBaseArticleOperations:
+        """Return article operations for the current metalake."""
+        return self.get_metalake().article_operations()
 
     def list_catalogs(self) -> List[str]:
         return self.get_metalake().list_catalogs()

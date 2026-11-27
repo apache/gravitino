@@ -276,6 +276,21 @@ public interface DomainDispatcher {
   DomainEntity[] listSubdomainInfos(String metalake, String name) throws NoSuchDomainException;
 
   /**
+   * Lists live definitions assigned directly to the Domain, in stable type and ID order.
+   * Authorization against the current Domain and the member query share one read snapshot.
+   *
+   * @param metalake The metalake name.
+   * @param name The requested Domain name.
+   * @param limit The page size, from 1 to 1000.
+   * @param offset The number of direct members to skip.
+   * @param authorize The effective MANAGE_DOMAIN check on the Domain and its current parent.
+   * @return The member types and names on the requested page.
+   * @throws NoSuchDomainException If the Domain is absent or hidden.
+   */
+  DefinitionMemberPage listDefinitionMembers(
+      String metalake, String name, int limit, int offset, Consumer<DomainEntity> authorize);
+
+  /**
    * Lists members in a domain's scope, with every applicable relation. Server callers apply domain
    * visibility and metadata access checks.
    *

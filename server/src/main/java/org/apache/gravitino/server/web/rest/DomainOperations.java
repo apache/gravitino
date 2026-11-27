@@ -36,6 +36,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -49,6 +50,7 @@ import org.apache.gravitino.dto.requests.DomainParentSetRequest;
 import org.apache.gravitino.dto.requests.DomainSetRequest;
 import org.apache.gravitino.dto.requests.DomainUpdateRequest;
 import org.apache.gravitino.dto.requests.DomainUpdatesRequest;
+import org.apache.gravitino.dto.responses.DefinitionMemberListResponse;
 import org.apache.gravitino.dto.responses.DomainListResponse;
 import org.apache.gravitino.dto.responses.DomainResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -466,6 +468,44 @@ public class DomainOperations {
                               .toArray(String[]::new)
                           : domainDispatcher.listSubdomains(metalake, domain)));
         });
+  }
+
+  /**
+   * Lists the names and types of definitions assigned directly to a managed Domain.
+   *
+   * @param metalake the metalake name
+   * @param domain the Domain name
+   * @param limit maximum number of direct definitions to return
+   * @param offset number of direct definitions to skip
+   * @return a page of definition members
+   */
+  @GET
+  @Path("{domain}/definition-members")
+  @Produces({"application/vnd.gravitino.v1+json", MediaType.APPLICATION_JSON})
+  @Timed(
+      name = "list-domain-definition-members." + MetricNames.HTTP_PROCESS_DURATION,
+      absolute = true)
+  @ResponseMetered(name = "list-domain-definition-members", absolute = true)
+  @AuthorizationExpression(expression = "")
+  public Response listDefinitionMembers(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("domain") String domain,
+      @QueryParam("limit") @DefaultValue("20") String limit,
+      @QueryParam("offset") @DefaultValue("0") String offset) {
+    return execute(
+        OperationType.LIST,
+        metalake,
+        domain,
+        () ->
+            Utils.ok(
+                new DefinitionMemberListResponse(
+                    domainDispatcher.listDefinitionMembers(
+                        metalake,
+                        domain,
+                        Integer.parseInt(limit),
+                        Integer.parseInt(offset),
+                        snapshot -> DomainAuthzHelper.requireManage(metalake, snapshot)))));
   }
 
   // Shared with the reverse membership query so every endpoint has the same snapshot shape.

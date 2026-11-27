@@ -87,6 +87,24 @@ paths:
   /metalakes/{metalake}/terms/{term}/hierarchy:
     $ref: "./terms.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1terms~1%7Bterm%7D~1hierarchy"
 
+  /metalakes/{metalake}/kb-articles:
+    $ref: "./kb-articles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1kb-articles"
+
+  /metalakes/{metalake}/kb-articles/{article}:
+    $ref: "./kb-articles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1kb-articles~1%7Barticle%7D"
+
+  /metalakes/{metalake}/kb-articles/{article}/content:
+    $ref: "./kb-articles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1kb-articles~1%7Barticle%7D~1content"
+
+  /metalakes/{metalake}/kb-articles/{article}/terms:
+    $ref: "./kb-articles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1kb-articles~1%7Barticle%7D~1terms"
+
+  /metalakes/{metalake}/kb-articles/{article}/objects:
+    $ref: "./kb-articles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1kb-articles~1%7Barticle%7D~1objects"
+
+  /metalakes/{metalake}/kb-articles/{article}/domains/{domain}:
+    $ref: "./kb-articles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1kb-articles~1%7Barticle%7D~1domains~1%7Bdomain%7D"
+
   /metalakes/{metalake}/tags:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags"
 
@@ -314,6 +332,9 @@ paths:
 
   /metalakes/{metalake}/domains/{domain}/objects:
     $ref: "./domains.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1domains~1%7Bdomain%7D~1objects"
+
+  /metalakes/{metalake}/domains/{domain}/definition-members:
+    $ref: "./domains.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1domains~1%7Bdomain%7D~1definition-members"
 
   /metalakes/{metalake}/objects/{type}/{fullName}/domains:
     $ref: "./domains.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7Btype%7D~1%7BfullName%7D~1domains"
