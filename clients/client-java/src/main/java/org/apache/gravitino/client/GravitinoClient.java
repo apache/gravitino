@@ -448,7 +448,8 @@ public class GravitinoClient extends GravitinoClientBase
    * @return The owner of the metadata object. If the metadata object doesn't set the owner, it will
    *     return Optional.empty().
    * @throws ForbiddenException If the caller cannot view the owner. The default authorizer also
-   *     returns this error for a missing glossary term.
+   *     returns this error when a glossary term or Knowledge Base Article is missing or hidden from
+   *     the caller.
    * @throws NoSuchMetadataObjectException If the server reports the metadata object as missing.
    */
   public Optional<Owner> getOwner(MetadataObject object) throws NoSuchMetadataObjectException {

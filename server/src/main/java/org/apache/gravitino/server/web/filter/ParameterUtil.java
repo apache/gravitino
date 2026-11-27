@@ -138,7 +138,7 @@ public class ParameterUtil {
       Parameter parameter = parameters[i];
       AuthorizationObjectType objectType = parameter.getAnnotation(AuthorizationObjectType.class);
       if (objectType != null) {
-        return Optional.of(String.valueOf(args[i]).toUpperCase());
+        return Optional.of(String.valueOf(args[i]).toUpperCase(Locale.ROOT));
       }
     }
     return Optional.empty();
