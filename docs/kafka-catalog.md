@@ -61,19 +61,20 @@ class needs its token endpoint URL in the list, for example
 handlers that create the token themselves, such as the AWS MSK IAM handler, do not read the token
 endpoint and work with the empty list.
 
-To keep the allow list out of the Java jobs that the server starts, add it to `JAVA_OPTS`, for
-example in `conf/gravitino-env.sh`:
+Set the allow list with `-D` in `JAVA_OPTS`, for example in `conf/gravitino-env.sh`:
 
 ```shell
 JAVA_OPTS+=" -Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp.example.com/oauth2/token"
 ```
 
-`JAVA_OPTS` reaches only the JVMs that a `bin/` launcher starts from this configuration directory.
-Other launchers that source the same `gravitino-env.sh`, such as `gravitino-optimizer.sh`, pass it to
-their JVM as well. `JAVA_TOOL_OPTIONS` and `JDK_JAVA_OPTIONS` also work, but every Java process that
-the server starts, such as a local job, reads them too. Such a process then gets the same allow
-list, which matters when the job and the catalog use different token endpoints. The defaults that
-the server sets exist only in the server JVM, so those processes do not inherit them.
+Any other Java process that receives the same option also gets the allow list. This includes Java
+jobs that the server starts, such as local Shell and Spark jobs, when the option reaches them
+through an environment variable that they inherit. `JAVA_TOOL_OPTIONS` and `JDK_JAVA_OPTIONS` are
+inherited this way. `JAVA_OPTS` is inherited only when it is exported, as the Docker image
+entrypoint does before it starts the server. Launchers that source the same `gravitino-env.sh`, such
+as `gravitino-optimizer.sh`, pass `JAVA_OPTS` to their own JVM. This matters when a job and a
+catalog use different token endpoints. The defaults that the server sets exist only in the server
+JVM, so those processes do not inherit them.
 
 All Kafka catalogs in the server share this one property. List every token endpoint in a single
 comma-separated value, because a repeated `-D` for the same property keeps only the last one:

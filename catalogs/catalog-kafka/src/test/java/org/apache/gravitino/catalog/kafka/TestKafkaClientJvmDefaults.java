@@ -177,11 +177,22 @@ public class TestKafkaClientJvmDefaults {
     try (JwksMockServerHelper idp = JwksMockServerHelper.create("kafka-test-key")) {
       AtomicInteger tokenRequests = countTokenRequests(idp);
       String tokenUrl = idp.baseUri() + "/token";
-      System.setProperty(
-          OAUTHBEARER_ALLOWED_URLS_PROPERTY, "https://other.example.com/token," + tokenUrl);
+      String otherUrl = "https://other.example.com/token";
+      // A catalog must keep access to its endpoint wherever it sits in the list.
+      String[] allowLists = {tokenUrl + "," + otherUrl, otherUrl + "," + tokenUrl};
 
-      Assertions.assertDoesNotThrow(() -> initialize(oauthBearerConfig(HANDLER, tokenUrl)));
-      Assertions.assertTrue(tokenRequests.get() > 0, "The listed endpoint must be called");
+      for (String allowList : allowLists) {
+        System.setProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY, allowList);
+        for (String handler : HANDLERS) {
+          int before = tokenRequests.get();
+          Assertions.assertDoesNotThrow(
+              () -> initialize(oauthBearerConfig(handler, tokenUrl)),
+              handler + " must read the endpoint from the list " + allowList);
+          Assertions.assertTrue(
+              tokenRequests.get() > before,
+              handler + " must call the endpoint from the list " + allowList);
+        }
+      }
     }
   }
 
