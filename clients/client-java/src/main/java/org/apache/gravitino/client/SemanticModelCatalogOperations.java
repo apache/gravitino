@@ -373,7 +373,7 @@ class SemanticModelCatalogOperations implements SemanticModelCatalog {
     return Namespace.of(namespace.level(2), namespace.level(3));
   }
 
-  private static String ossieMediaType(OssieFormat format) {
+  static String ossieMediaType(OssieFormat format) {
     return format == OssieFormat.JSON ? OSSIE_JSON_MEDIA_TYPE : OSSIE_YAML_MEDIA_TYPE;
   }
 }

@@ -38,6 +38,7 @@ class MetadataObjects:
             MetadataObject.Type.ROLE,
             MetadataObject.Type.TAG,
             MetadataObject.Type.DOMAIN,
+            MetadataObject.Type.ONTOLOGY,
             MetadataObject.Type.POLICY,
             MetadataObject.Type.JOB,
             MetadataObject.Type.JOB_TEMPLATE,
@@ -73,8 +74,9 @@ class MetadataObjects:
     ) -> MetadataObject:
         if isinstance(name_or_names, str):
             Precondition.check_argument(
-                type_ != MetadataObject.Type.DOMAIN or parent is None,
-                "A domain metadata object must not have a parent",
+                type_ not in {MetadataObject.Type.DOMAIN, MetadataObject.Type.ONTOLOGY}
+                or parent is None,
+                f"A {type_.value} metadata object must not have a parent",
             )
             name = name_or_names
             full_name = (
@@ -136,6 +138,7 @@ class MetadataObjects:
             MetadataObject.Type.CATALOG,
             MetadataObject.Type.ROLE,
             MetadataObject.Type.DOMAIN,
+            MetadataObject.Type.ONTOLOGY,
         }:
             return None
 

@@ -78,6 +78,9 @@ class MetadataObject(ABC):
         DOMAIN = "domain"
         """A business grouping of leaf metadata objects."""
 
+        ONTOLOGY = "ontology"
+        """A metalake-level vocabulary of concepts and relationships."""
+
         TAG = "tag"
         """A tag is used to help manage other metadata object."""
 
