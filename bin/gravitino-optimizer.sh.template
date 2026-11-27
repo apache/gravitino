@@ -76,13 +76,17 @@ if [[ "$JVM_VERSION" -eq 17 ]]; then
   JAVA_OPTS+=" --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED"
 fi
 
-# Same classpath shape as gravitino-iceberg-rest-server.sh: prefer the
-# self-contained optimizer/libs tree; fall back to root libs only when absent.
+# optimizer/libs has 4 CLI jars; shared-libs lists the rest to take from root libs/.
+SHARED_LIBS_LIST="${GRAVITINO_HOME}/optimizer/conf/shared-libs"
+if [[ -f "${SHARED_LIBS_LIST}" ]]; then
+  while IFS= read -r jar_name || [[ -n "${jar_name}" ]]; do
+    [[ -z "${jar_name}" || "${jar_name}" =~ ^[[:space:]]*# ]] && continue
+    GRAVITINO_CLASSPATH="${GRAVITINO_HOME}/libs/${jar_name}:${GRAVITINO_CLASSPATH}"
+  done < "${SHARED_LIBS_LIST}"
+fi
 if [ -d "${GRAVITINO_HOME}/optimizer/libs" ]; then
   addJarInDir "${GRAVITINO_HOME}/optimizer/libs"
   addDirToClasspath "${GRAVITINO_HOME}/optimizer/conf"
-else
-  addJarInDir "${GRAVITINO_HOME}/libs"
 fi
 
 ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_OPTIMIZER_NAME} "$@"

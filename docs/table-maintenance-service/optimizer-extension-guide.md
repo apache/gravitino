@@ -112,8 +112,7 @@ Notes:
 
 - Build a JAR containing your classes and `META-INF/services` files.
 - Put the JAR on the runtime classpath, for example `${GRAVITINO_HOME}/optimizer/libs/`.
-  Like Iceberg REST server, the optimizer CLI uses a self-contained `optimizer/libs`
-  directory (see `gravitino-optimizer.sh`).
+  The CLI also loads jars listed in `optimizer/conf/shared-libs` from root `libs/`.
 - Restart the process before testing.
 
 If you also extend Gravitino server job execution, see [Manage jobs in Gravitino](../manage-jobs-in-gravitino.md).

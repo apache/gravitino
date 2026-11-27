@@ -112,16 +112,59 @@ tasks {
     finalizedBy(copyDepends)
   }
 
-  // Same packaging shape as iceberg-rest-server: ship a self-contained
-  // optimizer/libs from the module runtimeClasspath.
+  // optimizer/libs: only the 4 CLI-owned jars. Other runtime jars are listed in
+  // optimizer/conf/shared-libs and loaded from ${GRAVITINO_HOME}/libs at startup.
+  fun isOptimizerLocalJar(name: String): Boolean {
+    if (name.startsWith("gravitino-optimizer-api-") ||
+      name.startsWith("gravitino-updaters-") ||
+      name.startsWith("commons-cli-")
+    ) {
+      return true
+    }
+    return name.startsWith("gravitino-optimizer-") && !name.startsWith("gravitino-optimizer-api-")
+  }
+
   register("copyLibs", Copy::class) {
     dependsOn(copyDepends, "build")
-    from("build/libs")
+    from("build/libs") {
+      include(
+        "gravitino-optimizer-*.jar",
+        "gravitino-optimizer-api-*.jar",
+        "gravitino-updaters-*.jar",
+        "commons-cli-*.jar"
+      )
+      exclude("*-tests.jar", "*-sources.jar", "*-javadoc.jar", "*-empty.jar")
+    }
     into("$rootDir/distribution/package/optimizer/libs")
   }
 
-  register("copyLibAndConfigs", Copy::class) {
-    dependsOn("copyLibs")
+  val writeSharedLibsList by registering {
+    dependsOn(copyDepends)
+    val sharedListFile = file("$rootDir/distribution/package/optimizer/conf/shared-libs")
+    outputs.file(sharedListFile)
+    doLast {
+      val shared =
+        configurations.runtimeClasspath.get()
+          .files
+          .map { it.name }
+          .filter { it.endsWith(".jar") }
+          .filterNot { isOptimizerLocalJar(it) }
+          .filterNot {
+            it.endsWith("-tests.jar") ||
+              it.endsWith("-sources.jar") ||
+              it.endsWith("-javadoc.jar") ||
+              it.endsWith("-empty.jar") ||
+              it.startsWith("error_prone_annotations-")
+          }
+          .distinct()
+          .sorted()
+      sharedListFile.parentFile.mkdirs()
+      sharedListFile.writeText(shared.joinToString("\n", postfix = "\n"))
+    }
+  }
+
+  register("copyLibAndConfigs") {
+    dependsOn("copyLibs", writeSharedLibsList)
   }
 }
 
