@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -39,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import org.apache.doris.spark.client.DorisFrontendClient;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
@@ -63,6 +65,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.mockito.MockedConstruction;
 
 /** Unit tests for the governed Doris catalog boundary. */
 public class TestGravitinoDorisCatalogSpark35 {
@@ -233,6 +236,31 @@ public class TestGravitinoDorisCatalogSpark35 {
         catalog.loadTable(Identifier.of(new String[] {"db"}, "table"))
             instanceof AuthorizationTable);
     verifyNoInteractions(driver);
+  }
+
+  @Test
+  void testAuthorizationDenialPreventsNativeFrontendAccess() throws Exception {
+    Driver driver = mock(Driver.class);
+    TableCatalog tables = mock(TableCatalog.class);
+    when(tables.loadTable(NameIdentifier.of("db", "table"), Set.of(Privilege.Name.SELECT_TABLE)))
+        .thenThrow(new ForbiddenException("denied"));
+    DorisTestDriver.setDelegate(driver);
+    GravitinoDorisCatalogSpark35 catalog =
+        initializeCatalog(
+            tables,
+            Map.of(
+                "jdbc-url", "jdbc:doris-validator-test://host/db",
+                "jdbc-driver", DorisTestDriver.class.getName(),
+                "spark.bypass.doris.fenodes", "fe:8030"),
+            Map.of());
+    try (MockedConstruction<DorisFrontendClient> frontends =
+        mockConstruction(DorisFrontendClient.class)) {
+      assertTrue(
+          catalog.loadTable(Identifier.of(new String[] {"db"}, "table"))
+              instanceof AuthorizationTable);
+      assertTrue(frontends.constructed().isEmpty());
+      verifyNoInteractions(driver);
+    }
   }
 
   @Test

@@ -22,6 +22,7 @@ package org.apache.gravitino.spark.connector.jdbc.doris;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
@@ -122,5 +123,80 @@ public class TestDorisPropertiesConverter35 {
         DorisPropertiesConverter35.getInstance()
             .toSparkCatalogProperties(properties)
             .get("fetchSize"));
+  }
+
+  @Test
+  void testNativeOptionsAreCatalogManagedAndNotPassedToJdbc() {
+    Map<String, String> properties =
+        Map.of(
+            "jdbc-url", "jdbc:mysql://fe:9030/db",
+            "spark.bypass.doris.fenodes", "fe:8030",
+            "spark.bypass.doris.read.mode", "thrift",
+            "spark.bypass.doris.request.tablet.size", "2",
+            "spark.bypass.doris.batch.size", "1024",
+            "spark.bypass.doris.read.arrow-flight-sql.port", "8070");
+    Map<String, String> options = DorisPropertiesConverter35.nativeOptions(properties);
+    assertEquals(
+        Map.of(
+            "doris.fenodes", "fe:8030",
+            "doris.read.mode", "thrift",
+            "doris.request.tablet.size", "2",
+            "doris.batch.size", "1024",
+            "doris.read.arrow-flight-sql.port", "8070"),
+        options);
+    Map<String, String> jdbc =
+        DorisPropertiesConverter35.getInstance().toSparkCatalogProperties(properties);
+    assertTrue(options.keySet().stream().noneMatch(jdbc::containsKey));
+  }
+
+  @Test
+  void testNativeOptionsRejectUnmanagedConnectionAndQueryOverrides() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            DorisPropertiesConverter35.nativeOptions(
+                Map.of("spark.bypass.doris.read.mode", "thrift")));
+    assertInvalidNativeOption("doris.password", "secret");
+    for (String name : List.of("doris.fenodes", "DORIS_password", "doris.table.identifier")) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              DorisPropertiesConverter35.validateNativeReadOptions(
+                  new CaseInsensitiveStringMap(Map.of(name, "override"))));
+    }
+  }
+
+  @Test
+  void testJdbcOnlyCatalogPreservesExistingDorisPrefixedBypassOption() {
+    Map<String, String> properties =
+        Map.of(
+            "jdbc-url", "jdbc:mysql://fe:9030/db",
+            "spark.bypass.doris.custom", "legacy-value");
+
+    assertTrue(DorisPropertiesConverter35.nativeOptions(properties).isEmpty());
+    assertEquals(
+        "legacy-value",
+        DorisPropertiesConverter35.getInstance()
+            .toSparkCatalogProperties(properties)
+            .get("doris.custom"));
+  }
+
+  @Test
+  void testNativeOptionsRejectInvalidTabletSizeAndReadMode() {
+    for (String value : List.of("0", "-1", "bad", "2147483648")) {
+      assertInvalidNativeOption("doris.request.tablet.size", value);
+    }
+    assertInvalidNativeOption("doris.read.mode", "other");
+    for (String key : List.of("doris.batch.size", "doris.read.arrow-flight-sql.port")) {
+      assertInvalidNativeOption(key, "65536");
+    }
+  }
+
+  private static void assertInvalidNativeOption(String key, String value) {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            DorisPropertiesConverter35.nativeOptions(
+                Map.of("spark.bypass.doris.fenodes", "fe:8030", "spark.bypass." + key, value)));
   }
 }

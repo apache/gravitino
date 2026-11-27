@@ -17,6 +17,7 @@
  * under the License.
  */
 import com.diffplug.gradle.spotless.SpotlessExtension
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 
 plugins {
   `maven-publish`
@@ -40,6 +41,26 @@ val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
+val dorisConnector = "org.apache.doris:spark-doris-connector-spark-3.5:26.1.0"
+
+// The published Doris connector targets Scala 2.12. Keep its classes for Scala 2.13 unit tests,
+// but do not let Spark's service loader initialize its incompatible DataSource implementation.
+val scala213DorisTestJar = if (scalaVersion == "2.13") {
+  val dorisJar = configurations.create("dorisScala213TestJarInput") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+  }
+  dependencies.add(dorisJar.name, dorisConnector)
+  tasks.register<Zip>("scala213DorisTestJar") {
+    archiveFileName.set("doris-spark-test-no-datasource.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("doris-test"))
+    from({ zipTree(dorisJar.singleFile) })
+    exclude("META-INF/services/org.apache.spark.sql.sources.DataSourceRegister")
+  }
+} else {
+  null
+}
 
 // The connector's shared sources are compiled here rather than consumed as a jar, so that every
 // supported Spark version builds them against its own API. `spark35` holds the one thing a Spark 4
@@ -113,6 +134,7 @@ dependencies {
   }
   compileOnly("org.apache.spark:spark-core_$scalaVersion:$sparkVersion")
   compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
+  compileOnly(dorisConnector)
   compileOnly("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
@@ -230,6 +252,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.lance.namespace.apache.client)
   testImplementation(libs.mysql.driver)
+  testImplementation(dorisConnector)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.aws.policy)
@@ -264,6 +287,27 @@ dependencies {
 }
 
 tasks.test {
+  if (scala213DorisTestJar != null) {
+    classpath = classpath.filter { it.name != "spark-doris-connector-spark-3.5-26.1.0.jar" } + files(scala213DorisTestJar)
+  }
+  val dorisStandaloneIT = project.hasProperty("dorisStandaloneIT")
+  useJUnitPlatform {
+    if (dorisStandaloneIT) {
+      includeTags("doris-standalone")
+    } else {
+      excludeTags("doris-standalone")
+    }
+  }
+  if (dorisStandaloneIT) {
+    systemProperty("gravitino.test.doris.standalone", "true")
+  }
+  // Standalone executors use uninstrumented JARs. Instrumenting only the test driver changes the
+  // default serialVersionUID of classes without an explicit value and breaks task serialization.
+  if (dorisStandaloneIT && System.getenv("GRAVITINO_TEST_SPARK_MASTER") != null) {
+    extensions.configure<JacocoTaskExtension> {
+      isEnabled = false
+    }
+  }
   val skipITs = project.hasProperty("skipITs")
   val enableSparkSQLITs = project.hasProperty("enableSparkSQLITs")
   if (!enableSparkSQLITs) {
@@ -285,6 +329,7 @@ tasks.test {
     dependsOn(":catalogs:catalog-lakehouse-paimon:jar")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar")
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar")
+    dependsOn(":catalogs:catalog-jdbc-doris:jar")
   }
 }
 

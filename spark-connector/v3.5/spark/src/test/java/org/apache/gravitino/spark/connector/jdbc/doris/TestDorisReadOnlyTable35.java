@@ -21,25 +21,42 @@ package org.apache.gravitino.spark.connector.jdbc.doris;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.doris.spark.client.DorisFrontendClient;
+import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.spark.connector.jdbc.SparkJdbcTable;
+import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.SupportsRead;
 import org.apache.spark.sql.connector.catalog.SupportsWrite;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCapability;
+import org.apache.spark.sql.connector.read.ScanBuilder;
+import org.apache.spark.sql.connector.read.SupportsPushDownRequiredColumns;
+import org.apache.spark.sql.connector.read.SupportsPushDownV2Filters;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScanBuilder;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
+import org.mockito.MockedConstruction;
 
-/** Tests for the specialized Doris batch-read table boundary. */
+/** Tests for the specialized Doris batch-read table and native reader boundaries. */
 public class TestDorisReadOnlyTable35 {
 
   @Test
@@ -79,5 +96,102 @@ public class TestDorisReadOnlyTable35 {
           () -> table.newScanBuilder(new CaseInsensitiveStringMap(Map.of(key, "override"))));
     }
     verifyNoInteractions(jdbcTable);
+  }
+
+  @Test
+  void testNativeScanChecksJdbcConnectionBeforeConstructingNativeDelegate() {
+    SparkJdbcTable jdbcTable = mock(SparkJdbcTable.class);
+    JDBCScanBuilder jdbcBuilder = mock(JDBCScanBuilder.class);
+    CaseInsensitiveStringMap options = new CaseInsensitiveStringMap(Map.of());
+    when(jdbcTable.newScanBuilder(options)).thenReturn(jdbcBuilder);
+    when(jdbcTable.schema()).thenReturn(new StructType());
+    Table nativeTable = mock(Table.class, withSettings().extraInterfaces(SupportsRead.class));
+    ScanBuilder nativeBuilder =
+        mock(
+            ScanBuilder.class,
+            withSettings()
+                .extraInterfaces(
+                    SupportsPushDownRequiredColumns.class, SupportsPushDownV2Filters.class));
+    when(((SupportsRead) nativeTable).newScanBuilder(any())).thenReturn(nativeBuilder);
+    Runnable validation = mock(Runnable.class);
+    DorisReadOnlyTable35 table = new DorisReadOnlyTable35(jdbcTable, () -> nativeTable, validation);
+
+    assertEquals(DorisHybridScanBuilder35.class, table.newScanBuilder(options).getClass());
+    InOrder order = inOrder(jdbcTable, validation, nativeTable);
+    order.verify(jdbcTable).newScanBuilder(options);
+    order.verify(validation).run();
+    order.verify((SupportsRead) nativeTable).newScanBuilder(any());
+  }
+
+  @Test
+  void testChangedNativeOptionsPreventNativeTableConstruction() {
+    SparkJdbcTable jdbcTable = mock(SparkJdbcTable.class);
+    CaseInsensitiveStringMap options = new CaseInsensitiveStringMap(Map.of());
+    when(jdbcTable.newScanBuilder(options)).thenReturn(mock(JDBCScanBuilder.class));
+    Runnable factoryCalled = mock(Runnable.class);
+    DorisReadOnlyTable35 table =
+        new DorisReadOnlyTable35(
+            jdbcTable,
+            () -> {
+              factoryCalled.run();
+              return mock(Table.class);
+            },
+            () -> {
+              throw new IllegalStateException("catalog settings changed");
+            });
+
+    assertThrows(IllegalStateException.class, () -> table.newScanBuilder(options));
+    verifyNoInteractions(factoryCalled);
+  }
+
+  @Test
+  void testIncompatibleNativeSchemaKeepsJdbcReader() {
+    SparkJdbcTable jdbcTable = mock(SparkJdbcTable.class);
+    JDBCScanBuilder jdbcBuilder = mock(JDBCScanBuilder.class);
+    CaseInsensitiveStringMap options = new CaseInsensitiveStringMap(Map.of());
+    when(jdbcTable.newScanBuilder(options)).thenReturn(jdbcBuilder);
+    DorisReadOnlyTable35 table = new DorisReadOnlyTable35(jdbcTable, () -> null, () -> {});
+
+    assertSame(jdbcBuilder, table.newScanBuilder(options));
+  }
+
+  @Test
+  void testRequiresExactNativeColumnNamesAndTypes() {
+    StructType schema = new StructType().add("id", DataTypes.IntegerType);
+    assertTrue(DorisNativeTableFactory35.schemasCompatible(schema, schema));
+    assertFalse(
+        DorisNativeTableFactory35.schemasCompatible(
+            schema, new StructType().add("ID", DataTypes.IntegerType)));
+    assertFalse(
+        DorisNativeTableFactory35.schemasCompatible(
+            schema, new StructType().add("id", DataTypes.LongType)));
+    assertFalse(DorisNativeTableFactory35.schemasCompatible(schema, new StructType()));
+    for (String name : List.of("a`b", "a.b")) {
+      StructType invalid = new StructType().add(name, DataTypes.IntegerType);
+      assertFalse(DorisNativeTableFactory35.schemasCompatible(invalid, invalid));
+    }
+  }
+
+  @Test
+  void testFailedSchemaLoadClosesFrontendAndRedactsCause() throws Exception {
+    try (MockedConstruction<DorisFrontendClient> frontends =
+        mockConstruction(
+            DorisFrontendClient.class,
+            (frontend, context) ->
+                when(frontend.getTableSchema("db", "table"))
+                    .thenThrow(new IllegalStateException("test-secret")))) {
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  DorisNativeTableFactory35.create(
+                      Identifier.of(new String[] {"db"}, "table"),
+                      new StructType(),
+                      Map.of("doris.fenodes", "fe:8030"),
+                      new JdbcCredential("user", "test-secret")));
+      assertFalse(failure.toString().contains("test-secret"));
+      assertNull(failure.getCause());
+      verify(frontends.constructed().get(0)).close();
+    }
   }
 }
