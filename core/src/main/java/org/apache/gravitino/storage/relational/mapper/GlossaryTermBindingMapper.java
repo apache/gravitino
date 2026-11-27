@@ -88,16 +88,16 @@ public interface GlossaryTermBindingMapper {
       @Param("targetType") String targetType,
       @Param("targetIds") Collection<Long> targetIds);
 
-  /** Lists live bindings of a term, optionally filtered by target types, in keyset order. */
+  /**
+   * Lists live bindings of a term, optionally filtered by target types, ordered by target type and
+   * ID.
+   */
   @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(type = GlossaryTermBindingSQLProviderFactory.class, method = "listByTerm")
   List<GlossaryTermBindingPO> listByTerm(
       @Param("metalakeId") long metalakeId,
       @Param("termId") long termId,
-      @Param("targetTypes") @Nullable Collection<String> targetTypes,
-      @Param("afterType") @Nullable String afterType,
-      @Param("afterId") long afterId,
-      @Param("limit") int limit);
+      @Param("targetTypes") @Nullable Collection<String> targetTypes);
 
   /** Lists live bindings belonging to a table and all its live columns. */
   @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
@@ -132,4 +132,35 @@ public interface GlossaryTermBindingMapper {
   /** Deletes one selected retired row. */
   @DeleteProvider(type = GlossaryTermBindingSQLProviderFactory.class, method = "purge")
   int purge(@Param("row") GlossaryTermBindingPO row);
+
+  /**
+   * Identifies roots with live bindings before expanding a multi-term preview.
+   *
+   * @param metalakeId the metalake ID
+   * @param termIds the IDs of visible terms
+   * @return IDs with at least one binding candidate in this snapshot
+   */
+  @SelectProvider(
+      type = GlossaryTermBindingSQLProviderFactory.class,
+      method = "listTermsWithBindings")
+  List<Long> listTermsWithBindings(
+      @Param("metalakeId") long metalakeId, @Param("termIds") Collection<Long> termIds);
+
+  /**
+   * Fetches binding candidates for a lookup preview in stable term and target order.
+   *
+   * @param metalakeId the metalake ID
+   * @param termIds the root term IDs
+   * @param after exclusive target cursor for a single term, or null for a first page
+   * @param limit the maximum number of candidates to return
+   * @return live candidates in target order
+   */
+  @SelectProvider(
+      type = GlossaryTermBindingSQLProviderFactory.class,
+      method = "listBindingCandidates")
+  List<GlossaryTermBindingPO> listBindingCandidates(
+      @Param("metalakeId") long metalakeId,
+      @Param("termIds") Collection<Long> termIds,
+      @Param("after") @Nullable GlossaryTermBindingPO after,
+      @Param("limit") int limit);
 }

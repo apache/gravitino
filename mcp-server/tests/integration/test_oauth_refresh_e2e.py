@@ -40,7 +40,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import List, Optional
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from fastmcp import Client
@@ -121,6 +121,15 @@ def _gravitino_handler(state: _GravitinoState):
                     }
                 ).encode("utf-8")
                 self.send_response(401)
+            elif urlsplit(self.path).path == f"/api/metalakes/{METALAKE}/terms":
+                query = parse_qs(urlsplit(self.path).query)
+                if query != {"status": ["APPROVED"], "details": ["true"]}:
+                    self.send_error(
+                        400, "Expected an approved-only detailed term read"
+                    )
+                    return
+                payload = json.dumps({"code": 0, "terms": []}).encode("utf-8")
+                self.send_response(200)
             else:
                 payload = json.dumps(
                     {
@@ -251,6 +260,26 @@ def test_mcp_fetches_token_and_forwards_bearer(oauth_stack):
     assert form["client_secret"] == ["it-secret"]
     assert form["scope"] == ["gravitino"]
     assert gravitino.authorizations == ["Bearer tok-1"]
+
+
+def test_glossary_uses_caller_credentials_before_oauth(oauth_stack):
+    """Only a headerless glossary call needs the service token."""
+
+    async def list_terms(headers):
+        async with Client(
+            StreamableHttpTransport(url=oauth_stack["mcp_url"], headers=headers)
+        ) as client:
+            result = await client.call_tool("list_terms")
+            return json.loads(result.content[0].text)
+
+    assert asyncio.run(list_terms({"Authorization": "Bearer caller"})) == []
+    assert oauth_stack["idp"].hits == 0
+    assert asyncio.run(list_terms({})) == []
+    assert oauth_stack["idp"].hits == 1
+    assert oauth_stack["gravitino"].authorizations == [
+        "Bearer caller",
+        "Bearer tok-1",
+    ]
 
 
 def test_mcp_reuses_cached_token_on_second_call(oauth_stack):

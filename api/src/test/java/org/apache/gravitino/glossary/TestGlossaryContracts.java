@@ -20,16 +20,11 @@ package org.apache.gravitino.glossary;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
-import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Tests the public T1 defaults and binding-page value contract. */
+/** Tests the public glossary defaults and value contracts. */
 public class TestGlossaryContracts {
 
   /** Unsupported conditional edits must not reach the legacy write, even for a no-op. */
@@ -97,80 +92,6 @@ public class TestGlossaryContracts {
     }
   }
 
-  /** Covers empty visible pages with continuation and one bounded request per call. */
-  @Test
-  void testFirstPagePreservesEmptyContinuation() {
-    TermBindingPage page = TermBindingPage.of(new TermBinding[0], "opaque-next-page");
-    for (TermBinding.Kind kind : Arrays.asList(null, TermBinding.Kind.USED_BY)) {
-      AtomicInteger reads = new AtomicInteger();
-      GlossaryTerm term =
-          term(
-              (proxy, method, args) -> {
-                if (method.isDefault()) {
-                  return InvocationHandler.invokeDefault(proxy, method, args);
-                }
-                Assertions.assertEquals("listBindings", method.getName());
-                Assertions.assertEquals(3, args.length);
-                Assertions.assertSame(kind, args[0]);
-                Assertions.assertEquals(TermBindingPage.DEFAULT_PAGE_SIZE, args[1]);
-                Assertions.assertNull(args[2]);
-                reads.incrementAndGet();
-                return page;
-              });
-      TermBindingPage result = term.listBindings(kind);
-      Assertions.assertArrayEquals(page.bindings(), result.bindings());
-      Assertions.assertEquals(page.nextPageToken(), result.nextPageToken());
-      Assertions.assertEquals(1, reads.get());
-      Assertions.assertEquals("opaque-next-page", page.nextPageToken().orElseThrow());
-    }
-  }
-
-  @Test
-  void testFirstPagePreservesMissingTermFailure() {
-    NoSuchTermException failure = new NoSuchTermException("Term is missing or hidden");
-    GlossaryTerm term =
-        term(
-            (proxy, method, args) -> {
-              if (method.isDefault()) {
-                return InvocationHandler.invokeDefault(proxy, method, args);
-              }
-              throw failure;
-            });
-    Assertions.assertSame(
-        failure, Assertions.assertThrows(NoSuchTermException.class, () -> term.listBindings(null)));
-  }
-
-  @Test
-  void testBindingPageCopiesArraysAndMarksExhaustion() {
-    TermBinding binding = binding();
-    TermBinding[] source = {binding};
-    TermBindingPage page = TermBindingPage.of(source, null);
-    source[0] = null;
-    page.bindings()[0] = null;
-    Assertions.assertArrayEquals(new TermBinding[] {binding}, page.bindings());
-    Assertions.assertFalse(page.nextPageToken().isPresent());
-    Assertions.assertFalse(
-        TermBindingPage.of(new TermBinding[0], null).nextPageToken().isPresent());
-  }
-
-  @Test
-  void testBindingPageInputBounds() {
-    Assertions.assertThrows(IllegalArgumentException.class, () -> TermBindingPage.of(null, null));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> TermBindingPage.of(new TermBinding[] {null}, null));
-    for (String blank : new String[] {"", " ", "\t"}) {
-      Assertions.assertThrows(
-          IllegalArgumentException.class, () -> TermBindingPage.of(new TermBinding[0], blank));
-    }
-    TermBinding[] maximum = new TermBinding[TermBindingPage.MAX_PAGE_SIZE];
-    Arrays.fill(maximum, binding());
-    Assertions.assertEquals(maximum.length, TermBindingPage.of(maximum, null).bindings().length);
-    TermBinding[] tooMany = Arrays.copyOf(maximum, maximum.length + 1);
-    tooMany[maximum.length] = binding();
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> TermBindingPage.of(tooMany, null));
-  }
-
   @Test
   void testTermPublicationValidation() {
     TermPublication p = new TermPublication(10L, 2L, TermPublication.State.SUBMITTED, 1L, 2L);
@@ -190,11 +111,6 @@ public class TestGlossaryContracts {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> new TermPublication(10L, 1L, TermPublication.State.SUBMITTED, null, 0L));
-  }
-
-  private static TermBinding binding() {
-    return TermBinding.implementedBy(
-        MetadataObjects.parse("dw.sales.customers", MetadataObject.Type.TABLE));
   }
 
   private static GlossaryTerm term(InvocationHandler handler) {

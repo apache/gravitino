@@ -32,6 +32,7 @@ import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.utils.SqlLikePattern;
 import org.apache.ibatis.annotations.Param;
 
 public class SchemaMetaBaseSQLProvider {
@@ -128,11 +129,10 @@ public class SchemaMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE catalog_id = #{catalogId}"
-        // The descendantPrefix has its LIKE metacharacters escaped with '!' by the caller
-        // (SchemaPOStorageOps#escapeLikeMetacharacters), so '!' is declared as the ESCAPE
-        // character to keep the prefix match literal across MySQL, H2, and PostgreSQL.
         + " AND (schema_name = #{schemaName}"
-        + " OR schema_name LIKE CONCAT(#{descendantPrefix}, '%') ESCAPE '!')"
+        + " OR schema_name LIKE CONCAT(#{descendantPrefix}, '%') "
+        + SqlLikePattern.ESCAPE_CLAUSE
+        + ")"
         + " AND deleted_at = 0";
   }
 
