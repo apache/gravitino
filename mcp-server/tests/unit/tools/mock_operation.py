@@ -16,6 +16,7 @@
 # under the License.
 
 from typing import Optional
+from unittest.mock import create_autospec
 
 from mcp_server.client import (
     CatalogOperation,
@@ -30,6 +31,7 @@ from mcp_server.client import (
 )
 from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
+from mcp_server.client.kb_article_operation import KBArticleOperation
 from mcp_server.client.metalake_operation import MetalakeOperation
 from mcp_server.client.partition_operation import PartitionOperation
 from mcp_server.client.semantic_model_operation import SemanticModelOperation
@@ -63,6 +65,9 @@ class MockOperation(GravitinoOperation):
 
     def as_domain_operation(self) -> DomainOperation:
         return MockDomainOperation()
+
+    def as_kb_article_operation(self) -> KBArticleOperation:
+        return create_autospec(KBArticleOperation, instance=True)
 
     def as_tag_operation(self) -> TagOperation:
         return MockTagOperation()

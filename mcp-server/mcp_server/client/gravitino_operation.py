@@ -21,6 +21,7 @@ from mcp_server.client.catalog_operation import CatalogOperation
 from mcp_server.client.domain_operation import DomainOperation
 from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
+from mcp_server.client.kb_article_operation import KBArticleOperation
 from mcp_server.client.metalake_operation import MetalakeOperation
 from mcp_server.client.model_operation import ModelOperation
 from mcp_server.client.partition_operation import PartitionOperation
@@ -177,3 +178,7 @@ class GravitinoOperation(ABC):
     def as_domain_operation(self) -> DomainOperation:
         """Access the read-only domain operation interface."""
         pass
+
+    @abstractmethod
+    def as_kb_article_operation(self) -> KBArticleOperation:
+        """Access the read-only Knowledge Base Article operations."""
