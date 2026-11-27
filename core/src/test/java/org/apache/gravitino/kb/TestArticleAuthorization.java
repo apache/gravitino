@@ -624,7 +624,7 @@ class TestArticleAuthorization extends TestJDBCBackend {
     assertThrows(
         ForbiddenException.class, () -> as("viewer", () -> guarded.createArticle(LAKE, request)));
     var draft = as("writer", () -> guarded.createArticle(LAKE, request));
-    Mockito.verify(policy).onChange(null, draft.article());
+    Mockito.verify(policy).onChange(null, draft.article(), true);
     var object = MetadataObjects.of(null, "draft", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
     assertEquals("writer", as("writer", () -> owners.getOwner(LAKE, object)).orElseThrow().name());
     assertThrows(
