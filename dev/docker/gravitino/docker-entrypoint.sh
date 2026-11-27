@@ -61,7 +61,11 @@ if [ -d "${iceberg_bundle_dir}" ]; then
   mkdir -p "${iceberg_rest_experiment_lib_dir}"
   find "${iceberg_bundle_dir}" -name '*.jar' \
     -exec ln -sfv {} "${lakehouse_iceberg_lib_dir}" \; \
-    -exec ln -sfv {} "${iceberg_rest_lib_dir}" \; \
+    -exec ln -sfv {} "${iceberg_rest_lib_dir}" \;
+  # The experimental server packages its matching AWS SDK bundle through Gradle.
+  # Linking the stable AWS bundle here would mix incompatible SDK classes.
+  find "${iceberg_bundle_dir}" -name '*.jar' \
+    ! -name 'gravitino-iceberg-aws-bundle-*.jar' \
     -exec ln -sfv {} "${iceberg_rest_experiment_lib_dir}" \;
 fi
 

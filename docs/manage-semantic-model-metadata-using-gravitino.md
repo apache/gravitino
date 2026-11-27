@@ -586,8 +586,8 @@ includes metrics only from models the caller can discover through `USE_SEMANTIC_
 [Ownership and Privileges](#ownership-and-privileges). Discovery does not revalidate access to
 source tables or views and does not grant access to source data.
 
-Discovery reflects each model's current committed definition: renaming a model changes the
-namespace returned for its metrics, replacing its definition changes the discovered metrics,
+Discovery reflects each model's active revision: renaming a model changes the
+namespace returned for its metrics, publishing a definition changes the discovered metrics,
 and dropping it removes its metrics from discovery. Manage metric definitions through their
 containing Semantic Models; discovery does not provide a separate metric lifecycle or execute
 metric expressions.
@@ -600,8 +600,9 @@ for response and error details.
 
 ### Alter a Semantic Model
 
-Changes are applied in order in one request. If any change or the resulting model is invalid, none
-of the changes is persisted.
+Changes apply in order to the latest saved revision. A rename must be sent on its own, updates the
+model name immediately, and creates no revision. Comment, property, and definition changes save a
+new revision.
 
 | Change | REST update |
 |--------|-------------|
@@ -647,10 +648,49 @@ altered = models.alter_semantic_model(
 </TabItem>
 </Tabs>
 
-Definition replacement replaces all datasets, relationships, and metrics. Include everything you
-want to retain. In Java, use `SemanticModelChange.replaceDefinition(definition)`; in Python, use
-`SemanticModelChange.replace_definition(definition)`. Each replacement revalidates the complete
-definition and its source access. Comment and property changes do not revalidate sources.
+A definition replacement includes the complete definition and revalidates its sources. Load
+`latest` to prepare an edit, then send its revision as `expectedRevision`. Java passes this number
+before the change arguments, and Python uses the keyword `expected_revision`. On HTTP 409
+(`OptimisticLockException`), reload latest and reapply the edit. You can also supply this
+precondition for a comment, property, or rename request.
+
+### Read and Export Revision History
+
+A regular load or Ossie export uses the active revision. By default every save publishes
+immediately. A deployment with a deferred publication policy saves drafts and keeps the previous
+published revision active. With authorization enabled, only callers with modify access can see
+drafts in the revision history. If `latest` is a draft, `GET /revisions/latest` returns HTTP 404
+to a read-only caller. The regular model URL returns the active revision when one exists.
+Each model keeps its newest 100 revisions by default. The server setting
+`gravitino.entity.store.semanticModel.versionRetentionCount` accepts 1 through 1000.
+The active revision is always retained. Explicitly published revisions stay readable for the
+lifetime of the model.
+
+Relative to the Semantic Model URL, use `GET /revisions` to list summaries newest first,
+`GET /revisions/latest` to load the newest save, and `GET /revisions/7` to load revision 7.
+Append `/ossie?format=json` to export a selected revision as JSON. The response metadata
+includes `revision` and `status`, and published revisions report `publishedBy` and `publishedAt`.
+History also returns the writer's audit information. Use a previously retained definition in a
+conditional alter to restore it as a new revision.
+
+```java
+SemanticModel latest = models.loadSemanticModel(ident, SemanticModelCatalog.LATEST_REVISION);
+SemanticModelRevision[] history = models.listSemanticModelRevisions(ident);
+OssieDocument old = models.exportOssieDocument(ident, 1, OssieFormat.YAML);
+models.alterSemanticModel(
+    ident, latest.revision(), SemanticModelChange.replaceDefinition(definition));
+```
+
+```python
+latest = models.load_semantic_model(ident, revision="latest")
+history = models.list_semantic_model_revisions(ident)
+old = models.export_ossie_document(ident, revision=1)
+models.alter_semantic_model(
+    ident,
+    SemanticModelChange.replace_definition(definition),
+    expected_revision=latest.revision(),
+)
+```
 
 ## Apache Ossie Import and Export
 
@@ -883,8 +923,9 @@ An authorized request for an absent model returns `false` (`dropped: false` in R
 
 The [Gravitino MCP server](./gravitino-mcp-server.md#semantic-models) provides
 `list_of_semantic_models`, `load_semantic_model`, `create_semantic_model`, `alter_semantic_model`,
-`drop_semantic_model`, `list_metrics`, `list_metric_infos`, and `list_semantic_model_datasets`.
+`drop_semantic_model`, `list_metrics`, `list_metric_infos`, `list_semantic_model_datasets`,
+and `list_semantic_model_revisions`.
 Enable the `semantic_model` tool tag when filtering tools. Metric discovery tools return the same
 full namespaces as REST.
 Create and alter use the native REST definition format. Use REST or the SDKs for Ossie import and
-export. The current Web UI does not provide Semantic Model workflows.
+export.

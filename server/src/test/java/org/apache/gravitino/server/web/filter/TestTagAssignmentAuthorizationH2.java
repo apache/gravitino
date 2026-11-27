@@ -114,6 +114,8 @@ import org.mockito.stubbing.Answer;
 /** Verifies tag assignment authorization against persisted H2 metadata. */
 @Tag("server-tag-assignment-h2-test")
 public class TestTagAssignmentAuthorizationH2 extends TestJDBCBackend {
+  private static final String READER_ROLE = "reader";
+
   @TestTemplate
   void testCreatedAccessTagInvalidatesMissingTagAuthorization() throws Throwable {
     String metalake = "missing_tag_auth_h2";
@@ -1223,6 +1225,8 @@ public class TestTagAssignmentAuthorizationH2 extends TestJDBCBackend {
     RelationalEntityStore store = newStore();
     PolicyManager policies = new PolicyManager(RandomIdGenerator.INSTANCE, store);
     TagManager tags = new TagManager(RandomIdGenerator.INSTANCE, store);
+    // Stored before MockedSecurity, which stubs AuthorizationUtils; bound to the tag below.
+    putPolicy(store, metalake, "access", Policy.BuiltInType.ACCESS_CONTROL, selectContent());
     UserPrincipal principal = new UserPrincipal("tester");
     try (EnvOverride overrides = new EnvOverride();
         MockedSecurity security = new MockedSecurity(principal)) {
@@ -1283,7 +1287,6 @@ public class TestTagAssignmentAuthorizationH2 extends TestJDBCBackend {
                           metalake, "table", "catalog.schema.table2", request)));
       assertEquals(200, catalogOwnerResponse.getStatus());
       assertEquals(2, tags.listMetadataObjectsForTag(metalake, "visible").length);
-      putPolicy(store, metalake, "access", Policy.BuiltInType.ACCESS_CONTROL, selectContent());
       tags.addPolicyForTag(metalake, "visible", "access", AllValuesSelector.get());
       assertEquals(2, tags.listMetadataObjectsForTag(metalake, "visible").length);
       when(authorizer.authorize(any(), any(), any(), eq(Privilege.Name.APPLY_TAG), any()))
@@ -1326,7 +1329,7 @@ public class TestTagAssignmentAuthorizationH2 extends TestJDBCBackend {
   }
 
   private static PolicyContent selectContent() {
-    return PolicyContents.accessControl(List.of(Privilege.Name.SELECT_TABLE), List.of("reader"));
+    return PolicyContents.accessControl(List.of(Privilege.Name.SELECT_TABLE), List.of(READER_ROLE));
   }
 
   private static PolicyEntity newPolicy(
@@ -1349,6 +1352,12 @@ public class TestTagAssignmentAuthorizationH2 extends TestJDBCBackend {
       Policy.BuiltInType type,
       PolicyContent content)
       throws IOException {
+    if (type == Policy.BuiltInType.ACCESS_CONTROL
+        && !store.exists(
+            AuthorizationUtils.ofRole(metalake, READER_ROLE), Entity.EntityType.ROLE)) {
+      // An access control policy must name an existing role.
+      putRole(store, metalake, READER_ROLE, List.of());
+    }
     PolicyEntity policy = newPolicy(metalake, name, type, content);
     store.put(policy, false);
     return policy;

@@ -846,7 +846,6 @@ CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
   `idempotency_key`  VARCHAR(36)         NOT NULL     COMMENT 'client-provided UUIDv7 idempotency key',
   `http_method`      VARCHAR(16)         NOT NULL     COMMENT 'HTTP method of the request',
   `request_uri`      MEDIUMTEXT          NOT NULL     COMMENT 'encoded request path and sorted query string',
-  `generation`       BIGINT              NOT NULL     COMMENT 'reservation fencing token',
   `http_status`      INT(10) UNSIGNED    DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
   `response_summary` MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
   `audit_info`       MEDIUMTEXT          NOT NULL     COMMENT 'idempotency record audit info',
@@ -856,8 +855,31 @@ CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
   KEY `idx_iim_expires` (`expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency records';
 
+CREATE TABLE IF NOT EXISTS `ontology_meta` (
+    `ontology_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'ontology id',
+    `ontology_name` VARCHAR(128) NOT NULL COMMENT 'ontology name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'ontology identity audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'last allocated version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ontology deleted at',
+    PRIMARY KEY (`ontology_id`),
+    UNIQUE KEY `uk_onm_mid_name_del` (`metalake_id`, `ontology_name`, `deleted_at`),
+    KEY `idx_onm_deleted` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'ontology identity';
 
-CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
-  stripe INT NOT NULL PRIMARY KEY,
-  generation BIGINT NOT NULL
-) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS `ontology_version_info` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `ontology_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'ontology id',
+    `version` INT UNSIGNED NOT NULL COMMENT 'version',
+    `ontology_comment` TEXT DEFAULT NULL COMMENT 'comment snapshot',
+    `definition` MEDIUMTEXT NOT NULL COMMENT 'normalized OntologyDefinition (JSON)',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'properties snapshot (JSON)',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'version audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_onvi_oid_ver_del` (`ontology_id`, `version`, `deleted_at`),
+    KEY `idx_onvi_mid` (`metalake_id`, `deleted_at`),
+    KEY `idx_onvi_deleted` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'ontology versions';

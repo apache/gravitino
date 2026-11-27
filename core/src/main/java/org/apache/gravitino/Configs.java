@@ -368,8 +368,8 @@ public class Configs {
   public static final ConfigEntry<Long> SEMANTIC_MODEL_VERSION_RETENTION_COUNT =
       new ConfigBuilder("gravitino.entity.store.semanticModel.versionRetentionCount")
           .doc(
-              "Number of newest Semantic Model revisions to retain (1–1000). The active "
-                  + "revision is retained independently of this count.")
+              "Number of newest Semantic Model revisions to retain (1–1000). Active and explicitly "
+                  + "published revisions are retained independently of this count.")
           .version(ConfigConstants.VERSION_2_0_0)
           .longConf()
           .checkValue(v -> v >= 1L && v <= 1000L, "Semantic Model retention count must be 1–1000")
@@ -411,6 +411,14 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault("org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer");
+
+  /** Whether the built-in authorizer evaluates tag access policies; disabled by default. */
+  public static final ConfigEntry<Boolean> ENABLE_TAG_BASED_AUTHORIZATION =
+      new ConfigBuilder("gravitino.authorization.tagBasedAuthorization.enabled")
+          .doc("Enable tag based authorization in the built-in authorizer.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .booleanConf()
+          .createWithDefault(false);
 
   public static final ConfigEntry<Integer> GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE =
       new ConfigBuilder("gravitino.authorization.threadPoolSize")

@@ -173,6 +173,14 @@ public class GravitinoMetricsIT {
             jdbcUrl,
             OptimizerConfig.OPTIMIZER_PREFIX
                 + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
+                + GenericJdbcMetricsRepository.JDBC_USER,
+            "sa",
+            OptimizerConfig.OPTIMIZER_PREFIX
+                + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
+                + GenericJdbcMetricsRepository.JDBC_PASSWORD,
+            "",
+            OptimizerConfig.OPTIMIZER_PREFIX
+                + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
                 + GenericJdbcMetricsRepository.JDBC_DRIVER,
             "org.h2.Driver");
     return new OptimizerEnv(new OptimizerConfig(config));

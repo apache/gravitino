@@ -143,6 +143,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `list_metric_infos`                 | List complete visible metrics across Semantic Models in a schema.              | `semantic_model` |
 | `list_semantic_model_datasets`      | List visible datasets directly associated with a source table or view.         | `semantic_model` |
 | `load_semantic_model`               | Load a Semantic Model's metadata and definition.                               | `semantic_model` |
+| `list_semantic_model_revisions`     | List visible retained revisions newest first.                                  | `semantic_model` |
 | `create_semantic_model`             | Create a Semantic Model from a native REST definition.                         | `semantic_model` |
 | `alter_semantic_model`              | Apply Semantic Model updates atomically.                                       | `semantic_model` |
 | `drop_semantic_model`               | Drop a Semantic Model's metadata.                                              | `semantic_model` |
@@ -234,13 +235,19 @@ For example, call `create_semantic_model` with the following arguments after the
 non-empty `datasets` array and supports optional `relationships`, `metrics`,
 `aiContext`, and `customExtensions` fields.
 `comment` and `properties` are optional. Load, create, and alter return the model object
-with its definition, properties, and audit information.
+with its definition, properties, audit information, revision, and publication status.
+`load_semantic_model` uses the active revision by default. Pass a positive revision number or
+`"latest"` as `revision` to load a saved revision. Use `list_semantic_model_revisions` to
+read revision summaries, including publisher details for published revisions. Drafts require
+modify access.
 
 `alter_semantic_model` accepts `catalog_name`, `schema_name`, `semantic_model_name`, and
 an ordered, non-empty `updates` array. Supported `@type` values are `rename`,
 `updateComment`, `setProperty`, `removeProperty`, and `replaceDefinition`. For example,
 `[{"@type": "updateComment", "newComment": null}]` clears the comment.
-`replaceDefinition` requires the complete native definition and revalidates source access.
+Send `rename` on its own. `replaceDefinition` requires the complete native definition and
+revalidates source access. Load `"latest"`, then pass the returned revision as `expected_revision`.
+On a conflict, reload, reapply the edits, and retry.
 
 `drop_semantic_model` takes the model's catalog, schema, and name and returns a JSON boolean
 indicating whether it was dropped. It removes semantic metadata without deleting source tables or data.

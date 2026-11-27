@@ -76,6 +76,7 @@ import org.apache.gravitino.dto.responses.BulkUserResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -487,6 +488,35 @@ public class TestBulkOperations extends BaseOperationsTest {
     Assertions.assertEquals(1, bulkResponse.getErrors().length);
     Assertions.assertEquals("ghost", bulkResponse.getErrors()[0].getName());
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, bulkResponse.getErrors()[0].getCode());
+  }
+
+  @Test
+  public void testBulkRemoveRolesReportsReferencedRoleAsInUse() {
+    when(manager.deleteRoles(any(), any()))
+        .thenReturn(
+            Arrays.asList(
+                BulkItemResult.success(0, "role1"),
+                BulkItemResult.failure(
+                    1,
+                    "referenced",
+                    new InUseException(
+                        "Role referenced is referenced by access control policies"))));
+
+    BulkRemoveRequest request = new BulkRemoveRequest(new String[] {"role1", "referenced"});
+    Response response =
+        target("/bulk/metalakes/metalake1/roles/remove")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    BulkRemoveResponse bulkResponse = response.readEntity(BulkRemoveResponse.class);
+    Assertions.assertArrayEquals(new String[] {"role1"}, bulkResponse.getNames());
+    Assertions.assertEquals(1, bulkResponse.getErrors().length);
+    Assertions.assertEquals("referenced", bulkResponse.getErrors()[0].getName());
+    Assertions.assertEquals(ErrorConstants.IN_USE_CODE, bulkResponse.getErrors()[0].getCode());
+    Assertions.assertEquals(
+        InUseException.class.getSimpleName(), bulkResponse.getErrors()[0].getType());
   }
 
   @Test

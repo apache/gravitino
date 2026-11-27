@@ -157,6 +157,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public SemanticModelEntity publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) throws IOException {
+    return SemanticModelMetaService.getInstance().publishRevision(ident, revision, principal);
+  }
+
+  @Override
   public List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace) throws IOException {
     return SemanticModelMetaService.getInstance().listSemanticModelIdentifiers(namespace);
   }
@@ -489,14 +495,22 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       Class<E> clazz,
       Consumer<E> postDeleteAction)
       throws IOException {
-    if (entityType != Entity.EntityType.FILESET) {
-      return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
+    switch (entityType) {
+      case FILESET:
+        return deleteWithCallback(
+            ident,
+            entityType,
+            () -> clazz.cast(FilesetMetaService.getInstance().deleteFilesetAndGet(ident)),
+            postDeleteAction);
+      case ROLE:
+        return deleteWithCallback(
+            ident,
+            entityType,
+            () -> clazz.cast(RoleMetaService.getInstance().deleteRoleAndGet(ident)),
+            postDeleteAction);
+      default:
+        return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     }
-    return deleteWithCallback(
-        ident,
-        entityType,
-        () -> clazz.cast(FilesetMetaService.getInstance().deleteFilesetAndGet(ident)),
-        postDeleteAction);
   }
 
   @Override

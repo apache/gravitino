@@ -20,6 +20,7 @@ from gravitino.exceptions.base import (
     ForbiddenException,
     IllegalMetadataObjectException,
     IllegalPrivilegeException,
+    InUseException,
     MetalakeNotInUseException,
     NoSuchMetadataObjectException,
     NoSuchMetalakeException,
@@ -47,6 +48,7 @@ class RoleErrorHandler(CodeMappingErrorHandler):
         ErrorConstants.UNSUPPORTED_OPERATION_CODE: UnsupportedOperationException,
         ErrorConstants.FORBIDDEN_CODE: ForbiddenException,
         ErrorConstants.NOT_IN_USE_CODE: MetalakeNotInUseException,
+        ErrorConstants.IN_USE_CODE: InUseException,
         ErrorConstants.INTERNAL_ERROR_CODE: RuntimeError,
     }
 

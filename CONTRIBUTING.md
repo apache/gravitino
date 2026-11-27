@@ -99,6 +99,23 @@ Pull request tests run with GitHub Actions in your fork, not in `apache/gravitin
 3. Open the pull request. Its **Fork CI** check verifies the suite jobs and the exact tested head, base branch and base SHA. A pre-PR run is accepted only if its inferred base matches the PR. After retargeting a PR, push again or ask a committer for a trusted run. The separate **ASF Allowlist Check** scans the PR's workflow YAML using reviewed upstream code.
 4. Keep your branch up to date before merging. Strict branch protection requires an up-to-date branch. If the base changes, update your branch and run CI again. The **Fork CI** check can stay green after the base branch moves on; strict branch protection, not the check, blocks the merge until the branch is updated.
 
+### Warming the Gradle cache in your fork
+
+If Fork CI hits Maven Central's HTTP 429 rate limit, **Warm Gradle cache** can populate your fork's default-branch cache for PR branches that use the same Gradle build files as upstream `main`.
+
+Before enabling daily warm-ups, check your fork's cache usage under **Actions → Caches**. A hosted run produced a 4.76 GB Gradle cache. If upstream Gradle changes create a new key, two entries of that size use about 9.52 GB of GitHub's default 10 GB per repository. When a new entry pushes the repository over its limit, GitHub evicts the least recently accessed entries first. These can include caches used by other PR branches. [Measured cache size](https://github.com/yuqi1129/gravitino/actions/runs/45794362869/job/139821766623) · [GitHub's cache limits and eviction policy](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#usage-limits-and-eviction-policy)
+
+Sync your fork's default branch to get the workflow. In your fork, open **Actions → Warm Gradle cache** and select **Enable workflow** if prompted. It checks daily and resolves Gradle dependencies across the repository only on a cache miss. To warm the cache immediately, select **Run workflow** on your fork's default branch. [GitHub's workflow enablement guide](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)
+
+If Fork CI still downloads missing dependencies after a cache hit, compare the full Gradle cache key in the affected job's `actions/setup-java` log with the key in the latest successful **Warm Gradle cache** run.
+
+If the keys differ because upstream `main` changed its Gradle files, keep the existing entries. For a PR targeting `main`, use **Run workflow** on the PR branch or **Re-run all jobs** on its current commit so Fork CI picks up the latest upstream base. **Re-run failed jobs** reuses the base SHA from the successful eligibility job. Check the key again after the new run starts. A PR that changes the Gradle files used in the key may need its own cache.
+
+If the keys match, open **Actions → Caches** in your fork and find the entry by key and branch.
+
+1. If the **default branch** has a partial entry for that key, delete that entry, run **Warm Gradle cache** on the default branch, and wait for it to save the new cache. An exact hit skips dependency resolution.
+2. If the **PR branch** has a stale entry for the same key, delete that branch's entry before rerunning **Fork CI**. GitHub checks the current branch first, so a matching PR-branch entry takes precedence over the warmed default-branch entry. [GitHub's cache lookup order](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#cache-key-matching)
+
 ### Running Fork CI again
 
 `apache/gravitino` cannot start or cancel runs in your fork, so you control Fork CI from your fork. To run CI again without changing code, use any of these:

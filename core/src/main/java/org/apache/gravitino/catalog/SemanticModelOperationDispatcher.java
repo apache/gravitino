@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Catalog;
@@ -175,15 +176,26 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
 
   @Override
   public SemanticModel loadSemanticModelRevision(
-      NameIdentifier ident, SemanticModelRevisionSelector selector) {
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      Consumer<SemanticModelRevision> checkVisibility) {
     checkModelParent(ident);
-    return managedOperations.loadSemanticModelRevision(ident, selector);
+    SemanticModel model = managedOperations.loadSemanticModelRevision(ident, selector);
+    checkVisibility.accept(model);
+    return model;
   }
 
   @Override
   public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
     checkModelParent(ident);
     return managedOperations.listSemanticModelRevisions(ident);
+  }
+
+  @Override
+  public SemanticModel publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) {
+    checkModelParent(ident);
+    return managedOperations.publishSemanticModelRevision(ident, revision, principal);
   }
 
   @Override
@@ -222,12 +234,16 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
   /** {@inheritDoc} */
   @Override
   public SemanticModelExport exportSemanticModel(
-      NameIdentifier ident, SemanticModelRevisionSelector selector, OssieFormat format) {
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      OssieFormat format,
+      Consumer<SemanticModelRevision> checkVisibility) {
     SemanticModel model;
     if (selector == SemanticModelRevisionSelector.ACTIVE) {
       model = loadSemanticModel(ident);
+      checkVisibility.accept(model);
     } else {
-      model = loadSemanticModelRevision(ident, selector);
+      model = loadSemanticModelRevision(ident, selector, checkVisibility);
     }
     return new SemanticModelExport(
         OssieDocumentConverter.exportDocument(model, format), model.revision());

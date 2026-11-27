@@ -77,6 +77,7 @@ public class SemanticModelVersionInfoPostgreSQLProvider
         + SemanticModelVersionInfoMapper.TABLE_NAME
         + " WHERE semantic_model_id = #{semanticModelId}"
         + " AND version <= #{versionRetentionLine} AND version <> #{activeVersion}"
+        + " AND publication_status <> 'PUBLISHED_EXPLICITLY'"
         + " AND deleted_at = 0 LIMIT #{limit})";
   }
 

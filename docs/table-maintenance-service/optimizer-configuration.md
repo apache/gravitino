@@ -261,8 +261,11 @@ and
 [Secured Gravitino and Iceberg REST](./optimizer.md#secured-gravitino-and-iceberg-rest-object-storage).
 
 Passwords and OAuth credentials in `updater_options` (and secrets in `spark_conf`) travel with
-the job command line and `jobConf`; avoid logging raw `jobConf` (the submit-update-stats CLI
-redacts them in DRY-RUN / SUBMIT output).
+the job command line and `jobConf`; avoid logging raw `jobConf`. The submit-update-stats CLI
+redacts credential-like keys in DRY-RUN / SUBMIT output with the same keyword substring matching
+as [`gravitino.secret.sensitiveKeyKeywords`](../gravitino-server-config.md#sensitive-property-key-matching)
+(default keywords include `password`, `token`, and `credential`), so names such as
+`gravitino.optimizer.jdbcMetrics.jdbcPassword` are masked.
 
 Everything under `gravitino.optimizer.jobSubmitterConfig.` becomes the `jobConf` of jobs this CLI submits, so the two layers carry the same keys under different names.
 
@@ -281,7 +284,7 @@ A direct job submission carries its own `jobConf`. This is `builtin-iceberg-upda
   "catalog_name": "rest_catalog",
   "table_identifier": "db.t1",
   "update_mode": "all",
-  "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\",\"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}",
+  "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\",\"gravitino.optimizer.jdbcMetrics.jdbcUrl\":\"jdbc:postgresql://localhost:5432/optimizer\",\"gravitino.optimizer.jdbcMetrics.jdbcUser\":\"postgres\",\"gravitino.optimizer.jdbcMetrics.jdbcPassword\":\"postgres\",\"gravitino.optimizer.jdbcMetrics.jdbcDriver\":\"org.postgresql.Driver\",\"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}",
   "spark_conf": "{\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
   "spark_master": "local[2]",
   "spark_executor_instances": "1",

@@ -40,7 +40,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.policy.Policy;
@@ -50,7 +52,6 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.PolicyRoleRelMapper;
 import org.apache.gravitino.storage.relational.po.PolicyRoleRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
-import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
@@ -65,6 +66,7 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   @TestTemplate
   public void testReferencesFollowPolicyContent() throws IOException {
     createAndInsertMakeLake(METALAKE);
+    createRoles(METALAKE, "analyst", "auditor", "steward");
     PolicyEntity policy = accessControlPolicy("reader", Arrays.asList("analyst", "auditor"));
     backend.insert(policy, false);
 
@@ -86,6 +88,7 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   @TestTemplate
   public void testOverwriteAttachesReferencesToTheSurvivingPolicyRow() throws IOException {
     createAndInsertMakeLake(METALAKE);
+    createRoles(METALAKE, "analyst", "auditor");
     PolicyEntity original = accessControlPolicy("reader", Collections.singletonList("analyst"));
     backend.insert(original, false);
 
@@ -102,6 +105,7 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   @TestTemplate
   public void testFailedPolicyWriteLeavesNoReferences() throws IOException {
     createAndInsertMakeLake(METALAKE);
+    createRoles(METALAKE, "analyst", "steward");
     PolicyEntity policy = accessControlPolicy("reader", Collections.singletonList("analyst"));
     backend.insert(policy, false);
 
@@ -140,6 +144,7 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   public void testRoleNameAtTheLengthLimitIsAccepted() throws IOException {
     createAndInsertMakeLake(METALAKE);
     String longestRoleName = "r".repeat(EntityFieldLimits.MAX_NAME_LENGTH);
+    createRoles(METALAKE, longestRoleName);
     PolicyEntity policy = accessControlPolicy("reader", Collections.singletonList(longestRoleName));
     backend.insert(policy, false);
 
@@ -149,6 +154,7 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   @TestTemplate
   public void testFailedReferenceUpdateKeepsThePreviousPolicy() throws IOException, SQLException {
     createAndInsertMakeLake(METALAKE);
+    createRoles(METALAKE, "analyst", "auditor");
     PolicyEntity policy = accessControlPolicy("reader", Collections.singletonList("analyst"));
     backend.insert(policy, false);
     String versionsOfPolicy = "SELECT COUNT(*) FROM policy_version_info WHERE policy_id = ?";
@@ -175,6 +181,7 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   @TestTemplate
   public void testDuplicateRoleNamesCollapseToOneReference() throws IOException {
     createAndInsertMakeLake(METALAKE);
+    createRoles(METALAKE, "analyst");
     PolicyEntity policy = accessControlPolicy("reader", Arrays.asList("analyst", "analyst"));
     backend.insert(policy, false);
 
@@ -228,6 +235,7 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   @TestTemplate
   public void testPolicyDeleteClearsReferences() throws IOException, SQLException {
     createAndInsertMakeLake(METALAKE);
+    createRoles(METALAKE, "analyst");
     PolicyEntity policy = accessControlPolicy("reader", Collections.singletonList("analyst"));
     backend.insert(policy, false);
 
@@ -241,6 +249,8 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
     createAndInsertMakeLake(METALAKE);
     String otherMetalake = METALAKE + "_other";
     createAndInsertMakeLake(otherMetalake);
+    createRoles(METALAKE, "analyst");
+    createRoles(otherMetalake, "analyst");
 
     PolicyEntity policy = accessControlPolicy("reader", Collections.singletonList("analyst"));
     backend.insert(policy, false);
@@ -260,6 +270,8 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
     createAndInsertMakeLake(METALAKE);
     String otherMetalake = METALAKE + "_other";
     createAndInsertMakeLake(otherMetalake);
+    createRoles(METALAKE, "analyst");
+    createRoles(otherMetalake, "analyst");
     backend.insert(accessControlPolicy("reader", Collections.singletonList("analyst")), false);
     backend.insert(
         accessControlPolicy(otherMetalake, "writer", Collections.singletonList("analyst")), false);
@@ -295,6 +307,7 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   @TestTemplate
   public void testUpdateReadBeforeMetalakeDeleteFailsWithoutReferences() throws Exception {
     createAndInsertMakeLake(METALAKE);
+    createRoles(METALAKE, "analyst", "auditor");
     PolicyEntity policy = accessControlPolicy("reader", Collections.singletonList("analyst"));
     backend.insert(policy, false);
 
@@ -322,6 +335,7 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   @TestTemplate
   public void testSupersededReferencesLeaveNoTombstone() throws IOException, SQLException {
     createAndInsertMakeLake(METALAKE);
+    createRoles(METALAKE, "analyst", "auditor");
     PolicyEntity policy = accessControlPolicy("reader", Arrays.asList("analyst", "auditor"));
     backend.insert(policy, false);
 
@@ -345,6 +359,7 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   public void testLegacyCleanupRemovesOnlyReferencesOfDeletedPolicies()
       throws IOException, SQLException {
     createAndInsertMakeLake(METALAKE);
+    createRoles(METALAKE, "analyst", "auditor");
     PolicyEntity deleted = accessControlPolicy("reader", Arrays.asList("analyst", "auditor"));
     PolicyEntity live = accessControlPolicy("writer", Collections.singletonList("analyst"));
     backend.insert(deleted, false);
@@ -368,23 +383,28 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   }
 
   /**
-   * Holds a policy row the way an in-flight update does, waits until the metalake delete is blocked
-   * on that row, and only then lets the update add a reference and commit.
+   * Holds the metalake row the way an in-flight policy update does, waits until the metalake delete
+   * is blocked on that row, and only then lets the update add a reference and commit.
    *
-   * <p>The delete clears that reference only if its reference cleanup runs after the policy delete
-   * it was blocked on. With the cleanup ordered first, it has already run by the time the update
-   * commits, and the new reference is left active.
+   * <p>A policy update locks the metalake before the roles it names and its own row, the order the
+   * metalake delete locks them in. The delete therefore cannot run any of its cleanup until the
+   * update commits, and then clears the reference the update added.
    */
   private void assertMetalakeDeleteClearsReferenceAddedWhileWaiting(boolean cascade)
       throws Exception {
-    createAndInsertMakeLake(METALAKE);
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE);
+    createRoles(METALAKE, "analyst", "auditor");
     PolicyEntity policy = accessControlPolicy("reader", Collections.singletonList("analyst"));
     backend.insert(policy, false);
 
     Throwable deleteFailure =
         new TransactionLockWaits(backendType)
             .whileTransactionHeld(
-                () -> lockPolicyRow(policy.id()),
+                () ->
+                    LiveEndpointService.lockLiveEndpoint(
+                        NameIdentifier.of(METALAKE),
+                        Entity.EntityType.METALAKE,
+                        new NamespacedEntityId(metalake.id())),
                 () ->
                     backend.delete(
                         NameIdentifier.of(METALAKE), Entity.EntityType.METALAKE, cascade),
@@ -420,17 +440,18 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
     }
   }
 
-  /** Takes the policy row lock in the current transaction, which an update holds until commit. */
-  private void lockPolicyRow(long policyId) throws SQLException {
-    SqlSession session = SqlSessions.getSqlSession();
-    try (PreparedStatement lock =
-        session
-            .getConnection()
-            .prepareStatement("SELECT policy_id FROM policy_meta WHERE policy_id = ? FOR UPDATE")) {
-      lock.setLong(1, policyId);
-      lock.executeQuery().close();
-    } finally {
-      SqlSessions.closeSqlSession();
+  /** Creates live roles, without privileges, for policies to name. */
+  private void createRoles(String metalake, String... roleNames) throws IOException {
+    for (String roleName : roleNames) {
+      backend.insert(
+          createRoleEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              AuthorizationUtils.ofRoleNamespace(metalake),
+              roleName,
+              AUDIT_INFO,
+              Collections.emptyList(),
+              null),
+          false);
     }
   }
 

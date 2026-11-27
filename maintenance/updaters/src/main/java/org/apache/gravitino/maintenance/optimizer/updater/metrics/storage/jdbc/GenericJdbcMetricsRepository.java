@@ -30,8 +30,6 @@ import org.apache.gravitino.utils.MapUtils;
 public class GenericJdbcMetricsRepository extends JdbcMetricsRepository {
 
   public static final String JDBC_METRICS_PREFIX = "jdbcMetrics.";
-  private static final String DEFAULT_H2_JDBC_URL =
-      "jdbc:h2:file:./data/metrics.db;DB_CLOSE_DELAY=-1;MODE=MYSQL;AUTO_SERVER=TRUE";
 
   public static final String JDBC_URL = "jdbcUrl";
   public static final String JDBC_USER = "jdbcUser";
@@ -46,16 +44,23 @@ public class GenericJdbcMetricsRepository extends JdbcMetricsRepository {
   public void initialize(Map<String, String> optimizerProperties) {
     Map<String, String> effectiveJdbcProperties = buildEffectiveJdbcProperties(optimizerProperties);
 
-    String jdbcUrl = effectiveJdbcProperties.getOrDefault(JDBC_URL, DEFAULT_H2_JDBC_URL);
-    if (StringUtils.isBlank(jdbcUrl)) {
-      jdbcUrl = DEFAULT_H2_JDBC_URL;
-    }
-    String username = effectiveJdbcProperties.getOrDefault(JDBC_USER, DEFAULT_USER);
-
+    String jdbcUrl = effectiveJdbcProperties.get(JDBC_URL);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(jdbcUrl), "Property %s must be non-empty", JDBC_URL);
+    String username = effectiveJdbcProperties.get(JDBC_USER);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(username), "Property %s must be non-empty", JDBC_USER);
+    String driver = effectiveJdbcProperties.get(JDBC_DRIVER);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(driver), "Property %s must be non-empty", JDBC_DRIVER);
 
     effectiveJdbcProperties.put(JDBC_URL, jdbcUrl);
+    effectiveJdbcProperties.put(JDBC_USER, username);
+    effectiveJdbcProperties.put(JDBC_DRIVER, driver);
+    if (!effectiveJdbcProperties.containsKey(JDBC_PASSWORD)
+        || effectiveJdbcProperties.get(JDBC_PASSWORD) == null) {
+      effectiveJdbcProperties.put(JDBC_PASSWORD, "");
+    }
     DataSourceJdbcConnectionProvider connectionProvider =
         new DataSourceJdbcConnectionProvider(effectiveJdbcProperties);
     initializeStorage(connectionProvider);

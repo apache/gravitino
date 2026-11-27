@@ -249,6 +249,25 @@ public class TestIcebergIdempotencyKey extends IcebergNamespaceTestBase {
   }
 
   @Test
+  void testInvalidBodyOnRetryStillReplays() {
+    Assertions.assertEquals(200, doCreateNamespace(NAMESPACE).getStatus());
+    try (Response first = createTable("valid_then_invalid", KEY);
+        Response invalidRetry =
+            getTableClientBuilder(NAMESPACE, Optional.empty())
+                .header(IcebergIdempotencyManager.IDEMPOTENCY_KEY, KEY)
+                .post(Entity.json("{}"))) {
+      Assertions.assertEquals(200, first.getStatus());
+      String firstBody = first.readEntity(String.class);
+      Assertions.assertEquals(200, invalidRetry.getStatus());
+      Assertions.assertEquals(firstBody, invalidRetry.readEntity(String.class));
+    }
+    try (Response missing =
+        getTableClientBuilder(NAMESPACE, Optional.of("valid_then_invalid")).get()) {
+      Assertions.assertEquals(200, missing.getStatus());
+    }
+  }
+
+  @Test
   void testReplayPreservesWireJsonAndOmitsEtag() {
     Assertions.assertEquals(200, doCreateNamespace(NAMESPACE).getStatus());
     try (Response first = createTable("wire_json", KEY);

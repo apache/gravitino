@@ -40,12 +40,14 @@ import org.apache.gravitino.semantic.SemanticModel.Status;
 @Accessors(fluent = true)
 public class SemanticModelVersionInfoPO {
 
-  /** Database publication state. */
+  /** Database publication state, including the retention distinction between published states. */
   public enum PublicationStatus {
     /** A revision that has not been published. */
     DRAFT,
     /** A revision made active at save time. */
-    PUBLISHED_ON_SAVE
+    PUBLISHED_ON_SAVE,
+    /** A revision made active by a separate publication operation. */
+    PUBLISHED_EXPLICITLY
   }
 
   private Long id;

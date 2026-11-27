@@ -179,7 +179,9 @@ public class SemanticModelMetaBaseSQLProvider {
         + TABLE_NAME
         + " SET current_version = #{newSemanticModelMeta.currentVersion},"
         + " last_version = #{newSemanticModelMeta.lastVersion}"
-        + ", active_version = #{newSemanticModelMeta.activeVersion}"
+        + (newSemanticModelPO.getActiveVersion() == 0
+            ? ""
+            : ", active_version = #{newSemanticModelMeta.activeVersion}")
         + " WHERE semantic_model_id = #{oldSemanticModelMeta.semanticModelId}"
         + " AND semantic_model_name = #{oldSemanticModelMeta.semanticModelName}"
         + " AND current_version = #{oldSemanticModelMeta.currentVersion}"
