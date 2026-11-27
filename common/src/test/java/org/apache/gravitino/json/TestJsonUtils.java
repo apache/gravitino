@@ -121,6 +121,37 @@ public class TestJsonUtils {
     expected = "\"varchar(30)\"";
     Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
 
+    type = Types.StringType.of("utf8mb4", "utf8mb4_bin");
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected = "{\"type\":\"string\",\"charset\":\"utf8mb4\",\"collation\":\"utf8mb4_bin\"}";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+    Assertions.assertEquals(type, JsonUtils.objectMapper().readValue(jsonValue, Type.class));
+
+    type = Types.FixedCharType.of(20, "latin1", "latin1_bin");
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected =
+        "{\"type\":\"char\",\"length\":20,\"charset\":\"latin1\","
+            + "\"collation\":\"latin1_bin\"}";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+    Assertions.assertEquals(type, JsonUtils.objectMapper().readValue(jsonValue, Type.class));
+
+    type = Types.VarCharType.of(30, "utf8mb4", null);
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected = "{\"type\":\"varchar\",\"length\":30,\"charset\":\"utf8mb4\"}";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+    Assertions.assertEquals(type, JsonUtils.objectMapper().readValue(jsonValue, Type.class));
+
+    Assertions.assertEquals(
+        Types.StringType.get(),
+        JsonUtils.objectMapper()
+            .readValue("{\"type\":\"string\",\"charset\":null,\"collation\":null}", Type.class));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            JsonUtils.objectMapper()
+                .readValue(
+                    "{\"type\":\"varchar\",\"length\":-1,\"charset\":\"utf8mb4\"}", Type.class));
+
     type = Types.DecimalType.of(10, 2);
     jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
     expected = "\"decimal(10,2)\"";

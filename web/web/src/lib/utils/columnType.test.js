@@ -23,6 +23,13 @@ import { formatColumnType } from './columnType'
 describe('formatColumnType', () => {
   it.each([
     ['a primitive type', 'string', 'string'],
+    ['an attributed string', { type: 'string', charset: 'utf8mb4', collation: 'utf8mb4_bin' }, 'string'],
+    ['an attributed char', { type: 'char', length: 12, charset: 'latin1', collation: 'latin1_bin' }, 'char(12)'],
+    [
+      'an attributed varchar',
+      { type: 'varchar', length: 100, charset: 'utf8mb4', collation: 'utf8mb4_0900_ai_ci' },
+      'varchar(100)'
+    ],
     ['a list', { type: 'list', containsNull: true, elementType: 'string' }, 'list<string>'],
     [
       'a list of non-null elements',

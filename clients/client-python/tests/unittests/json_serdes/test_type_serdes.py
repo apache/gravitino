@@ -78,6 +78,55 @@ class TestTypeSerdes(unittest.TestCase):
         for simple_string, type_ in self._primitive_and_none_types.items():
             self.assertEqual(TypeSerdes.serialize(type_), simple_string)
 
+    def test_character_type_metadata_serde(self):
+        character_types = {
+            Types.StringType.of("utf8mb4", "utf8mb4_bin"): {
+                "type": "string",
+                "charset": "utf8mb4",
+                "collation": "utf8mb4_bin",
+            },
+            Types.FixedCharType.of(10, "latin1", "latin1_bin"): {
+                "type": "char",
+                "length": 10,
+                "charset": "latin1",
+                "collation": "latin1_bin",
+            },
+            Types.VarCharType.of(20, "utf8mb4", None): {
+                "type": "varchar",
+                "length": 20,
+                "charset": "utf8mb4",
+            },
+        }
+
+        for character_type, expected in character_types.items():
+            serialized = TypeSerdes.serialize(character_type)
+            self.assertEqual(serialized, expected)
+            self.assertEqual(TypeSerdes.deserialize(serialized), character_type)
+
+        self.assertEqual(
+            TypeSerdes.deserialize(
+                {"type": "string", "charset": None, "collation": None}
+            ),
+            Types.StringType.get(),
+        )
+
+    def test_invalid_character_type_metadata(self):
+        for metadata in (
+            {"type": "string", "charset": 123},
+            {"type": "string", "collation": False},
+        ):
+            with self.subTest(metadata=metadata), self.assertRaises(ValueError):
+                TypeSerdes.deserialize(metadata)
+
+    def test_invalid_character_type_length(self):
+        for length in (-1, "20", True):
+            with self.subTest(length=length), self.assertRaises(
+                IllegalArgumentException
+            ):
+                TypeSerdes.deserialize(
+                    {"type": "varchar", "length": length, "charset": "utf8mb4"}
+                )
+
     def test_serialize_struct_type_of_primitive_and_none_types(self):
         types = self._primitive_and_none_types.values()
         fields = [

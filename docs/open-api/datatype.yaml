@@ -27,6 +27,7 @@ components:
         WritableDataType instead.
       oneOf:
         - $ref: "#/components/schemas/PrimitiveType"
+        - $ref: "#/components/schemas/CharacterType"
         - $ref: "#/components/schemas/StructType"
         - $ref: "#/components/schemas/ListType"
         - $ref: "#/components/schemas/MapType"
@@ -44,6 +45,7 @@ components:
         represented type.
       oneOf:
         - $ref: "#/components/schemas/WritablePrimitiveType"
+        - $ref: "#/components/schemas/CharacterType"
         - $ref: "#/components/schemas/WritableStructType"
         - $ref: "#/components/schemas/WritableListType"
         - $ref: "#/components/schemas/WritableMapType"
@@ -68,6 +70,103 @@ components:
           minLength: 1
           pattern: '.*\S.*'
           description: The non-blank string representation of this type in the catalog
+
+    CharacterType:
+      description: >-
+        The object form of a string, char, or varchar type with optional provider-defined
+        character set and collation metadata. Metadata values are compared using exact,
+        case-sensitive equality. Character types without metadata use PrimitiveType's string form.
+      oneOf:
+        - $ref: "#/components/schemas/AttributedStringType"
+        - $ref: "#/components/schemas/AttributedFixedCharType"
+        - $ref: "#/components/schemas/AttributedVarCharType"
+
+    AttributedStringType:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - "string"
+        charset:
+          type: string
+          nullable: true
+          minLength: 1
+          pattern: '.*\S.*'
+        collation:
+          type: string
+          nullable: true
+          minLength: 1
+          pattern: '.*\S.*'
+      example: {
+        "type": "string",
+        "charset": "utf8mb4",
+        "collation": "utf8mb4_0900_ai_ci"
+      }
+
+    AttributedFixedCharType:
+      type: object
+      required:
+        - type
+        - length
+      properties:
+        type:
+          type: string
+          enum:
+            - "char"
+        length:
+          type: integer
+          format: int32
+          minimum: 0
+        charset:
+          type: string
+          nullable: true
+          minLength: 1
+          pattern: '.*\S.*'
+        collation:
+          type: string
+          nullable: true
+          minLength: 1
+          pattern: '.*\S.*'
+      example: {
+        "type": "char",
+        "length": 32,
+        "charset": "utf8mb4",
+        "collation": "utf8mb4_bin"
+      }
+
+    AttributedVarCharType:
+      type: object
+      required:
+        - type
+        - length
+      properties:
+        type:
+          type: string
+          enum:
+            - "varchar"
+        length:
+          type: integer
+          format: int32
+          minimum: 0
+        charset:
+          type: string
+          nullable: true
+          minLength: 1
+          pattern: '.*\S.*'
+        collation:
+          type: string
+          nullable: true
+          minLength: 1
+          pattern: '.*\S.*'
+      example: {
+        "type": "varchar",
+        "length": 255,
+        "charset": "utf8mb4",
+        "collation": "utf8mb4_0900_ai_ci"
+      }
 
     WritablePrimitiveType:
       description: >-

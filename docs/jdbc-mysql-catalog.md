@@ -145,6 +145,18 @@ Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-o
 | `Binary`             | `Binary`            |
 | `BOOLEAN`            | `BIT`               |
 
+MySQL character columns include their effective character set and collation in the corresponding
+Gravitino `String`, `VarChar`, or `FixedChar` type. Creating or altering a MySQL table from an
+attributed character type emits `CHARACTER SET` and `COLLATE`, so these semantics survive metadata
+round trips. MySQL reports character lengths through JDBC; Gravitino does not reinterpret them as
+byte lengths.
+
+Loading a table with character columns performs one additional query to
+`information_schema.columns` to retrieve this metadata. Because attributed character types use an
+object JSON representation, clients that predate this representation read them as `UnparsedType`.
+Also, a character type created without explicit metadata does not compare equal to the effective
+attributed type returned by MySQL after loading the table.
+
 :::info
 MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** that represents an unresolvable data type.

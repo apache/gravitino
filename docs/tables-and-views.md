@@ -69,6 +69,9 @@ provider's page for its type mapping.
 | String                    | `Types.StringType.get()`                                                | `"string"`                                                                                                                         |
 | FixedChar(length)         | `Types.FixedCharType.of(length)`                                        | `"char(l)"`                                                                                                                        |
 | VarChar(length)           | `Types.VarCharType.of(length)`                                          | `"varchar(l)"`                                                                                                                     |
+| String with character metadata | `Types.StringType.of(charset, collation)`                          | `{"type":"string","charset":"utf8mb4","collation":"utf8mb4_bin"}`                                                        |
+| FixedChar with character metadata | `Types.FixedCharType.of(length, charset, collation)`              | `{"type":"char","length":l,"charset":"utf8mb4","collation":"utf8mb4_bin"}`                                             |
+| VarChar with character metadata | `Types.VarCharType.of(length, charset, collation)`                  | `{"type":"varchar","length":l,"charset":"utf8mb4","collation":"utf8mb4_bin"}`                                          |
 | Timestamp                 | `Types.TimestampType.withoutTimeZone()`                                 | `"timestamp"`                                                                                                                      |
 | Timestamp(p)              | `Types.TimestampType.withoutTimeZone(p)`                                | `"timestamp(p)"`                                                                                                                   |
 | TimestampWithTimezone     | `Types.TimestampType.withTimeZone()`                                    | `"timestamp_tz"`                                                                                                                   |
@@ -89,6 +92,12 @@ provider's page for its type mapping.
 | Null                      | `Types.NullType.get()`                                                  | `"null"`                                                                                                                           |
 | Geometry                  | `Types.GeometryType.crs84()`                                            | `"geometry"`                                                                                                                       |
 | Geography                 | `Types.GeographyType.crs84()`                                           | `"geography"`                                                                                                                      |
+
+Character set and collation are optional, provider-defined metadata. Gravitino compares them
+exactly and preserves them in REST and client serialization. The original string JSON forms remain
+unchanged when both attributes are absent. Connectors for engines that do not expose character set
+or collation still map the character type and length, but cannot carry those two attributes into the
+engine's native type system.
 
 Decimal precision is in the range 1-38, and scale is in the range 0-precision. The optional
 precision for time and timestamp types is in the range 0-12.
