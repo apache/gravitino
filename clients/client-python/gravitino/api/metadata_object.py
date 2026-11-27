@@ -81,6 +81,9 @@ class MetadataObject(ABC):
         GLOSSARY_TERM = "glossary_term"
         """A glossary term identified by its name within a metalake."""
 
+        KNOWLEDGE_BASE_ARTICLE = "knowledge_base_article"
+        """A Knowledge Base Article identified by its name within a metalake."""
+
         TAG = "tag"
         """A tag is used to help manage other metadata object."""
 

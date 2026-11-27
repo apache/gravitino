@@ -20,6 +20,7 @@ from typing import Optional, Dict
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.authorization.supports_roles import SupportsRoles
+from gravitino.api.kb.article_operations import KnowledgeBaseArticleOperations
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.exceptions.base import UnsupportedOperationException
 
@@ -58,6 +59,12 @@ class Metalake(Auditable):
             Optional[Dict[str, str]]: The properties of the metalake.
         """
         pass
+
+    def article_operations(self) -> KnowledgeBaseArticleOperations:
+        """Return Knowledge Base Article operations for this metalake."""
+        raise UnsupportedOperationException(
+            "Metalake does not support article operations."
+        )
 
     def supports_roles(self) -> SupportsRoles:
         """Return role operations supported by this metalake.

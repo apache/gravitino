@@ -23,6 +23,7 @@ from collections.abc import Collection
 from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
+from gravitino.utils.precondition import Precondition
 
 
 class SecurableObject(MetadataObject, ABC):
@@ -129,6 +130,10 @@ class SecurableObjects:
             type_: MetadataObject.Type,
             privileges: list[Privilege],
         ) -> None:
+            Precondition.check_argument(
+                type_ != MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE,
+                "Article privileges must be granted on the metalake",
+            )
             super().__init__(name, type_, parent)
             self._privileges = list(set(privileges))
 

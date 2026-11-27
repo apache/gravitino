@@ -18,6 +18,7 @@
 from typing import ClassVar, Optional, Union, overload
 
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.utils.article_name import normalize_article_name
 from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.utils.precondition import Precondition
 
@@ -39,6 +40,7 @@ class MetadataObjects:
             MetadataObject.Type.TAG,
             MetadataObject.Type.DOMAIN,
             MetadataObject.Type.GLOSSARY_TERM,
+            MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE,
             MetadataObject.Type.POLICY,
             MetadataObject.Type.JOB,
             MetadataObject.Type.JOB_TEMPLATE,
@@ -75,9 +77,13 @@ class MetadataObjects:
         if isinstance(name_or_names, str):
             Precondition.check_argument(
                 type_
-                not in {MetadataObject.Type.DOMAIN, MetadataObject.Type.GLOSSARY_TERM}
+                not in {
+                    MetadataObject.Type.DOMAIN,
+                    MetadataObject.Type.GLOSSARY_TERM,
+                    MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE,
+                }
                 or parent is None,
-                "Domains and glossary terms must not have a parent",
+                "Domains, glossary terms and articles must not have a parent",
             )
             name = name_or_names
             full_name = (
@@ -140,6 +146,7 @@ class MetadataObjects:
             MetadataObject.Type.ROLE,
             MetadataObject.Type.DOMAIN,
             MetadataObject.Type.GLOSSARY_TERM,
+            MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE,
         }:
             return None
 
@@ -207,6 +214,7 @@ class MetadataObjects:
             MetadataObject.Type.ROLE,
             MetadataObject.Type.DOMAIN,
             MetadataObject.Type.GLOSSARY_TERM,
+            MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE,
         }:
             return MetadataObjects.of([full_name], type_)
 
@@ -216,7 +224,11 @@ class MetadataObjects:
         def __init__(
             self, name: str, type_: MetadataObject.Type, parent: Optional[str] = None
         ) -> None:
-            self._name = name
+            self._name = (
+                normalize_article_name(name)
+                if type_ == MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE
+                else name
+            )
             self._type = type_
             self._parent = parent
 

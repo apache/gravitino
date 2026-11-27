@@ -361,3 +361,23 @@ class BackingTagAlreadyBoundException(AlreadyExistsException):
 
 class NonEmptyDomainException(NotEmptyException):
     """Raised when deleting a domain with subdomains or glossary terms."""
+
+
+class NoSuchKnowledgeBaseArticleException(NotFoundException):
+    """The article does not exist or is not visible to the caller."""
+
+
+class KnowledgeBaseArticleAlreadyExistsException(AlreadyExistsException):
+    """An article with the requested name already exists."""
+
+
+class ArticleRevisionConflictException(OptimisticLockException):
+    """The supplied article revision no longer matches the current revision."""
+
+
+class NoSuchTermException(NotFoundException):
+    """The glossary term does not exist or is not visible to the caller."""
+
+
+class UnapprovedTermException(GravitinoRuntimeException):
+    """An article cannot acquire a binding to an unapproved glossary term."""
