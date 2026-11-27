@@ -73,12 +73,13 @@ public final class ArticleManager {
     this(ids, maxBodyBytes, authorizationEnabled, (before, after) -> {});
   }
 
-  /** Creates a manager whose write policy participates in each effective write transaction. */
+  /** Creates a manager with a transactional write policy and authorization disabled. */
   public ArticleManager(IdGenerator ids, int maxBodyBytes, TransactionHook policy) {
     this(ids, maxBodyBytes, false, policy);
   }
 
-  private ArticleManager(
+  /** Creates a manager with the configured authorization mode and transactional write policy. */
+  public ArticleManager(
       IdGenerator ids, int maxBodyBytes, boolean authorizationEnabled, TransactionHook policy) {
     this.authorizationEnabled = authorizationEnabled;
     this.ids = Preconditions.checkNotNull(ids, "ids");
@@ -173,7 +174,7 @@ public final class ArticleManager {
         throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
       }
     }
-    return SqlSessions.readSnapshot(
+    return SqlSessions.readSnapshotOrJoin(
         () -> {
           try {
             MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
@@ -242,7 +243,7 @@ public final class ArticleManager {
     if (!authorizationEnabled) {
       return loadStored(ident, fetch);
     }
-    return SqlSessions.readSnapshot(
+    return SqlSessions.readSnapshotOrJoin(
         () -> {
           ArticleAccess access = ArticleAccess.forRequest(NameIdentifierUtil.getMetalake(ident));
           if (!access.canView()) {

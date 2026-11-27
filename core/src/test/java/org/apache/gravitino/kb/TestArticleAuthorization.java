@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.kb;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -29,6 +30,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -67,6 +69,7 @@ import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.TransactionHook;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.tag.TagManager;
@@ -349,6 +352,77 @@ class TestArticleAuthorization extends TestJDBCBackend {
         OwnerMetaService.getInstance()
             .getOwner(draft.article().nameIdentifier(), Entity.EntityType.KNOWLEDGE_BASE_ARTICLE)
             .isEmpty());
+  }
+
+  @TestTemplate
+  void authorizationAndWritePolicyApplyTogether() throws Exception {
+    TransactionHook policy = Mockito.mock(TransactionHook.class);
+    ArticleManager guarded = new ArticleManager(ids::incrementAndGet, 1024, true, policy);
+    var request = article("draft", ArticleStatus.DRAFT);
+    assertThrows(
+        ForbiddenException.class, () -> as("viewer", () -> guarded.createArticle(LAKE, request)));
+    var draft = as("writer", () -> guarded.createArticle(LAKE, request));
+    Mockito.verify(policy).onChange(null, draft.article());
+    var object = MetadataObjects.of(null, "draft", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
+    assertEquals("writer", as("writer", () -> owners.getOwner(LAKE, object)).orElseThrow().name());
+    assertThrows(
+        NoSuchKnowledgeBaseArticleException.class,
+        () -> as("viewer", () -> guarded.loadArticle(LAKE, "draft")));
+    Mockito.verifyNoMoreInteractions(policy);
+  }
+
+  @TestTemplate
+  void authorizedReadsShareTheCallersSnapshot() throws Exception {
+    var published =
+        as("writer", () -> manager.createArticle(LAKE, article("guide", ArticleStatus.PUBLISHED)));
+    Callable<ArticleManager.Result> unpublish =
+        () ->
+            as(
+                "writer",
+                () ->
+                    manager.alterArticle(
+                        LAKE,
+                        "guide",
+                        published.revisionToken(),
+                        KnowledgeBaseArticleChange.updateStatus(ArticleStatus.DRAFT)));
+    ExecutorService writer = Executors.newSingleThreadExecutor();
+    try {
+      as(
+          "viewer",
+          () ->
+              SqlSessions.readSnapshot(
+                  () -> {
+                    assertEquals(published, manager.loadArticle(LAKE, "guide"));
+                    assertDoesNotThrow(() -> writer.submit(unpublish).get(30, TimeUnit.SECONDS));
+                    assertEquals(
+                        published.revisionToken(),
+                        manager.getArticleContent(LAKE, "guide").revisionToken());
+                    assertEquals(List.of(published.article()), manager.listArticles(LAKE));
+                    return null;
+                  }));
+    } finally {
+      writer.shutdownNow();
+    }
+    assertTrue(as("viewer", () -> manager.listArticles(LAKE)).isEmpty());
+  }
+
+  @TestTemplate
+  void authorizedReadsRejectAnOrdinaryTransaction() throws Exception {
+    as(
+        "writer",
+        () -> {
+          SqlSessions.getSqlSession();
+          try {
+            assertThrows(IllegalStateException.class, () -> manager.loadArticle(LAKE, "guide"));
+            assertThrows(
+                IllegalStateException.class, () -> manager.getArticleContent(LAKE, "guide"));
+            assertThrows(IllegalStateException.class, () -> manager.listArticles(LAKE));
+            assertTrue(SqlSessions.hasActiveSession());
+          } finally {
+            SqlSessions.closeSqlSession();
+          }
+          return null;
+        });
   }
 
   @TestTemplate
