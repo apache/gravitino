@@ -19,13 +19,17 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg.converter;
 
 import com.google.common.collect.Lists;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
 
 /**
@@ -35,6 +39,9 @@ import org.apache.iceberg.transforms.PartitionSpecVisitor;
  * core/src/main/java/org/apache/iceberg/spark/Spark3Util/SpecTransformToSparkTransform.java
  */
 public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform> {
+
+  /** Iceberg {@code void} transform name kept as a Gravitino apply transform. */
+  public static final String VOID_TRANSFORM = "void";
 
   private final Map<Integer, String> idToName;
 
@@ -84,8 +91,9 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
 
   @Override
   public Transform alwaysNull(int fieldId, String sourceName, int sourceId) {
-    // do nothing for alwaysNull, it doesn't need to be converted to a transform
-    return null;
+    // Keep the slot so later fields stay at their Iceberg positions after v1 partition evolution.
+    return Transforms.apply(
+        VOID_TRANSFORM, new Expression[] {NamedReference.field(fieldName(sourceId))});
   }
 
   @Override
@@ -94,22 +102,54 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
   }
 
   /**
-   * Transform assembled into Gravitino.
+   * Builds a field-id → dotted-name map from every schema retained in {@code metadata}.
+   *
+   * <p>Historical partition specs can still reference source IDs that the current schema dropped.
+   * Those names live in earlier schemas. The current schema is applied last so renames win.
+   *
+   * @param metadata Iceberg table metadata
+   * @return merged id-to-name map
+   */
+  public static Map<Integer, String> idToNameAcrossSchemas(TableMetadata metadata) {
+    Map<Integer, String> idToName = new HashMap<>();
+    for (Schema schema : metadata.schemas()) {
+      idToName.putAll(schema.idToName());
+    }
+    idToName.putAll(metadata.schema().idToName());
+    return idToName;
+  }
+
+  /**
+   * Transform assembled into Gravitino using the given schema's id-to-name map.
    *
    * @param partitionSpec Iceberg partition spec.
    * @param schema Iceberg schema.
    * @return array of transforms for partition fields.
    */
   public static Transform[] fromPartitionSpec(PartitionSpec partitionSpec, Schema schema) {
-    FromIcebergPartitionSpec visitor = new FromIcebergPartitionSpec(schema.idToName());
+    return fromPartitionSpec(partitionSpec, schema, schema.idToName());
+  }
+
+  /**
+   * Transform assembled into Gravitino.
+   *
+   * <p>{@code idToName} may include names from retained Iceberg schemas so historical specs whose
+   * source columns were later dropped still resolve. {@code schema} is only used to dispatch the
+   * Iceberg transform type.
+   *
+   * @param partitionSpec Iceberg partition spec.
+   * @param schema Iceberg schema used by {@link PartitionSpecVisitor}.
+   * @param idToName field-id to dotted Iceberg name, including retained schemas when needed.
+   * @return array of transforms for partition fields, including {@code void} placeholders.
+   */
+  public static Transform[] fromPartitionSpec(
+      PartitionSpec partitionSpec, Schema schema, Map<Integer, String> idToName) {
+    FromIcebergPartitionSpec visitor = new FromIcebergPartitionSpec(idToName);
     List<Transform> transforms = Lists.newArrayList();
     List<PartitionField> fields = partitionSpec.fields();
 
     for (PartitionField field : fields) {
-      Transform transform = PartitionSpecVisitor.visit(schema, field, visitor);
-      if (transform != null) {
-        transforms.add(transform);
-      }
+      transforms.add(PartitionSpecVisitor.visit(schema, field, visitor));
     }
     return transforms.toArray(new Transform[0]);
   }

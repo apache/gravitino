@@ -42,6 +42,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.utils.IcebergTableProperti
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitionSpecs;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -215,14 +216,18 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
     Map<String, String> properties = new HashMap<>(table.properties());
     properties.putAll(IcebergTablePropertiesUtil.buildReservedProperties(table));
     Schema schema = table.schema();
-    Transform[] partitionSpec = FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema);
+    // Historical specs may still reference source IDs dropped from the current schema.
+    Map<Integer, String> idToName = FromIcebergPartitionSpec.idToNameAcrossSchemas(table);
+    Transform[] partitionSpec =
+        FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema, idToName);
     SortOrder[] sortOrder = FromIcebergSortOrder.fromSortOrder(table.sortOrder());
     IcebergColumn[] icebergColumns =
         schema.columns().stream().map(ConvertUtil::fromNestedField).toArray(IcebergColumn[]::new);
     Map<Integer, Transform[]> allSpecs = new TreeMap<>();
     for (PartitionSpec spec : table.specsById().values()) {
       allSpecs.put(
-          spec.specId(), copyTransforms(FromIcebergPartitionSpec.fromPartitionSpec(spec, schema)));
+          spec.specId(),
+          copyTransforms(FromIcebergPartitionSpec.fromPartitionSpec(spec, schema, idToName)));
     }
     Preconditions.checkState(
         allSpecs.containsKey(table.defaultSpecId()),
@@ -244,6 +249,20 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
     icebergTable.icebergPartitionSpecs = ImmutableMap.copyOf(allSpecs);
     icebergTable.icebergDefaultSpecId = table.defaultSpecId();
     return icebergTable;
+  }
+
+  /**
+   * Keeps the columns from the create request.
+   *
+   * <p>{@link #fromIcebergTable} converts Iceberg metadata, which rewrites types such as timestamp
+   * precision. Create must return the caller's columns. Partition specs stay on this table.
+   *
+   * @param columns columns supplied by the caller
+   * @return this table
+   */
+  public IcebergTable withColumns(Column[] columns) {
+    this.columns = columns;
+    return this;
   }
 
   @Override

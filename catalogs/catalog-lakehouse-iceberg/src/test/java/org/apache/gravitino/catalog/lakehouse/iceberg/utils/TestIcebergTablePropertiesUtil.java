@@ -22,12 +22,15 @@ import java.nio.file.Path;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
+import org.apache.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergPartitionSpec;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.SupportsPartitionSpecs;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.PartitionSpecParser;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -57,6 +60,9 @@ class TestIcebergTablePropertiesUtil {
     Assertions.assertEquals(1, evolved.defaultSpecId());
     Assertions.assertEquals(
         "1", IcebergTable.fromIcebergTable(evolved, "events").properties().get("default-spec-id"));
+    Assertions.assertEquals(
+        partitionSpecsJson(evolved),
+        IcebergTable.fromIcebergTable(evolved, "events").properties().get("partition-specs"));
   }
 
   @Test
@@ -131,5 +137,82 @@ class TestIcebergTablePropertiesUtil {
         partitioned.partitioning(), specs.partitionSpecs().get(specs.defaultPartitionSpecId()));
     Assertions.assertNotSame(
         partitioned.partitioning(), specs.partitionSpecs().get(specs.defaultPartitionSpecId()));
+  }
+
+  @Test
+  void testFromIcebergTableLoadsAfterV2PartitionColumnDrop() {
+    Schema initialSchema =
+        new Schema(
+            Types.NestedField.required(1, "id", Types.LongType.get()),
+            Types.NestedField.required(2, "region", Types.StringType.get()));
+    PartitionSpec initialSpec =
+        PartitionSpec.builderFor(initialSchema).identity("region").identity("id").build();
+    TableMetadata metadata =
+        TableMetadata.buildFromEmpty(2)
+            .setLocation(temporaryDirectory.toUri().toString())
+            .setCurrentSchema(initialSchema, 2)
+            .setDefaultPartitionSpec(initialSpec)
+            .setDefaultSortOrder(SortOrder.unsorted())
+            .build();
+
+    PartitionSpec evolvedSpec = PartitionSpec.builderFor(initialSchema).identity("id").build();
+    TableMetadata afterSpecChange =
+        TableMetadata.buildFrom(metadata).setDefaultPartitionSpec(evolvedSpec).build();
+    Schema withoutRegion = new Schema(Types.NestedField.required(1, "id", Types.LongType.get()));
+    TableMetadata afterDrop =
+        TableMetadata.buildFrom(afterSpecChange).setCurrentSchema(withoutRegion, 2).build();
+
+    Assertions.assertNull(afterDrop.schema().findField(2));
+    Assertions.assertTrue(
+        afterDrop.specsById().get(0).fields().stream().anyMatch(field -> field.sourceId() == 2));
+
+    IcebergTable loaded = IcebergTable.fromIcebergTable(afterDrop, "events");
+    SupportsPartitionSpecs specs = loaded.supportsPartitionSpecs();
+    Assertions.assertEquals(1, specs.defaultPartitionSpecId());
+    Assertions.assertEquals(2, specs.partitionSpecs().size());
+    Transform[] historical = specs.partitionSpecs().get(0);
+    Assertions.assertEquals(2, historical.length);
+    Assertions.assertEquals(Transforms.identity("region"), historical[0]);
+    Assertions.assertEquals(Transforms.identity("id"), historical[1]);
+    Assertions.assertArrayEquals(
+        new Transform[] {Transforms.identity("id")}, specs.partitionSpecs().get(1));
+  }
+
+  @Test
+  void testFromIcebergTableKeepsV1VoidPartitionPositions() {
+    Schema schema =
+        new Schema(
+            Types.NestedField.required(1, "id", Types.LongType.get()),
+            Types.NestedField.required(2, "region", Types.StringType.get()));
+    PartitionSpec initialSpec =
+        PartitionSpec.builderFor(schema).identity("region").identity("id").build();
+    TableMetadata metadata =
+        TableMetadata.buildFromEmpty(1)
+            .setLocation(temporaryDirectory.toUri().toString())
+            .setCurrentSchema(schema, 2)
+            .setDefaultPartitionSpec(initialSpec)
+            .setDefaultSortOrder(SortOrder.unsorted())
+            .build();
+    PartitionSpec voided =
+        PartitionSpec.builderFor(schema).alwaysNull("region", "region").identity("id").build();
+    TableMetadata evolved =
+        TableMetadata.buildFrom(metadata).setDefaultPartitionSpec(voided).build();
+
+    IcebergTable loaded = IcebergTable.fromIcebergTable(evolved, "events");
+    Transform[] current = loaded.supportsPartitionSpecs().partitionSpecs().get(1);
+    Assertions.assertEquals(2, current.length);
+    Assertions.assertEquals(FromIcebergPartitionSpec.VOID_TRANSFORM, current[0].name());
+    Assertions.assertEquals(Transforms.identity("id"), current[1]);
+    Assertions.assertArrayEquals(loaded.partitioning(), current);
+    Assertions.assertEquals(
+        partitionSpecsJson(evolved), loaded.properties().get("partition-specs"));
+  }
+
+  private static String partitionSpecsJson(TableMetadata metadata) {
+    return "["
+        + PartitionSpecParser.toJson(metadata.specsById().get(0))
+        + ","
+        + PartitionSpecParser.toJson(metadata.spec())
+        + "]";
   }
 }

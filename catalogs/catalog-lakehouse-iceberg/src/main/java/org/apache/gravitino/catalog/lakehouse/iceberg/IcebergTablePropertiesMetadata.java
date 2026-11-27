@@ -42,6 +42,9 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   /** Read-only partition spec ID projected from Iceberg table metadata. */
   public static final String DEFAULT_SPEC_ID = IcebergConstants.DEFAULT_SPEC_ID;
 
+  /** Read-only JSON array of every Iceberg partition spec, including historical specs. */
+  public static final String PARTITION_SPECS = IcebergConstants.PARTITION_SPECS;
+
   public static final String CHERRY_PICK_SNAPSHOT_ID = IcebergConstants.CHERRY_PICK_SNAPSHOT_ID;
   public static final String SORT_ORDER = IcebergConstants.SORT_ORDER;
   public static final String IDENTIFIER_FIELDS = IcebergConstants.IDENTIFIER_FIELDS;
@@ -83,6 +86,10 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
                 false),
             stringReservedPropertyEntry(
                 DEFAULT_SPEC_ID, "The current default partition spec from Iceberg metadata", false),
+            stringReservedPropertyEntry(
+                PARTITION_SPECS,
+                "Every Iceberg partition spec, including historical specs, as a JSON array",
+                false),
             stringReservedPropertyEntry(
                 CHERRY_PICK_SNAPSHOT_ID,
                 "Selecting a specific snapshot in a merge operation",

@@ -148,6 +148,16 @@ public final class EntityCombinedTable implements Table {
     return table.supportPartitions();
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>A loaded table is the connector snapshot stored as a {@link
+   * org.apache.gravitino.dto.rel.TableDTO}. That snapshot keeps {@link #partitioning()} and {@link
+   * #properties()}, including the Iceberg {@code partition-specs} property, and does not implement
+   * this capability. {@code loadTable().supportsPartitionSpecs()} throws. Server code reads
+   * historical specs through {@link PartitionSpecDispatcher}, the same way it reads partitions
+   * through {@link PartitionDispatcher}.
+   */
   @Override
   public SupportsPartitionSpecs supportsPartitionSpecs() {
     return table.supportsPartitionSpecs();

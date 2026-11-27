@@ -202,6 +202,28 @@ public class TestIcebergTable {
             sortOrders);
     Assertions.assertEquals(PrincipalUtils.getCurrentUserName(), table.auditInfo().creator());
     Assertions.assertNotNull(table.auditInfo().createTime());
+
+    NameIdentifier timestampIdentifier =
+        NameIdentifier.of(
+            META_LAKE_NAME, icebergCatalog.name(), icebergSchema.name(), "timestamp_table");
+    Column[] timestampColumns =
+        new Column[] {
+          Column.of("ts_tz", Types.TimestampType.withTimeZone(), "tz"),
+          Column.of("ts", Types.TimestampType.withoutTimeZone(), "ntz")
+        };
+    Table createdTimestamp =
+        icebergCatalogOperations.createTable(
+            timestampIdentifier, timestampColumns, ICEBERG_COMMENT, properties);
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(), createdTimestamp.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(), createdTimestamp.columns()[1].dataType());
+    Assertions.assertEquals(0, createdTimestamp.supportsPartitionSpecs().defaultPartitionSpecId());
+    Table loadedTimestamp = icebergCatalogOperations.loadTable(timestampIdentifier);
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(6), loadedTimestamp.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(6), loadedTimestamp.columns()[1].dataType());
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(ICEBERG_COMMENT, table.comment());
     Assertions.assertEquals("val1", table.properties().get("key1"));

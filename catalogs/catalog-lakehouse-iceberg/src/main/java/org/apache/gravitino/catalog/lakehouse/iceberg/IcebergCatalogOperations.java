@@ -627,10 +627,12 @@ public class IcebergCatalogOperations
       loadTableResponse.validate();
 
       LOG.info("Created Iceberg table {}", tableIdent.name());
-      // Reload metadata so historical specs are present, and keep the creator recorded above.
-      // fromIcebergTable cannot read that audit from Iceberg metadata.
-      return IcebergTable.fromIcebergTable(
-          loadTableResponse.tableMetadata(), tableIdent.name(), createdTable.auditInfo());
+      // Reload metadata so historical specs are present. Keep the creator recorded above and the
+      // caller's columns: reloading rewrites types such as timestamp precision.
+      IcebergTable reloaded =
+          IcebergTable.fromIcebergTable(
+              loadTableResponse.tableMetadata(), tableIdent.name(), createdTable.auditInfo());
+      return reloaded.withColumns(createdTable.columns());
     } catch (AlreadyExistsException e) {
       throw new TableAlreadyExistsException(e, "Table already exists: %s", tableIdent.name());
     } catch (ValidationException | BadRequestException e) {
