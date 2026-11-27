@@ -60,6 +60,21 @@ public interface RelationalBackend
     return get(identifier, Entity.EntityType.TABLE).id();
   }
 
+  /**
+   * Resolves a Semantic Model ID from its identity, whether or not it has an active revision.
+   *
+   * <p>The default reads the active revision. A backend that supports deferred publication must
+   * override it so that a model with only drafts still resolves.
+   *
+   * @param identifier the full Semantic Model identifier
+   * @return the stable Semantic Model ID
+   * @throws NoSuchEntityException if the Semantic Model or its namespace does not exist
+   * @throws IOException if the lookup fails
+   */
+  default long getSemanticModelId(NameIdentifier identifier) throws IOException {
+    return this.<SemanticModelEntity>get(identifier, Entity.EntityType.SEMANTIC_MODEL).id();
+  }
+
   /** Loads a retained Semantic Model snapshot or the latest saved revision. */
   default SemanticModelEntity loadSemanticModelRevision(
       NameIdentifier ident, SemanticModelRevisionSelector selector) throws IOException {
