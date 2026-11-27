@@ -553,6 +553,7 @@ components:
             - "TABLE"
             - "VIEW"
             - "SEMANTIC_MODEL"
+            - "ONTOLOGY"
             - "FILESET"
             - "TOPIC"
             - "MODEL"
