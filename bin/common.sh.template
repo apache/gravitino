@@ -110,6 +110,30 @@ function addDirToClasspath(){
 # Rotate a launch script's .out file before the process starts, so the file does not grow across
 # restarts. The previous files are kept as <file>.1 (newest) to <file>.N (oldest), where N is
 # GRAVITINO_OUT_FILE_KEEP (default 5). Set it to 0 to keep no previous file.
+# Returns 0 when the JVM system property named by $1 is set in JAVA_OPTS or in one of the option
+# variables that the java launcher reads itself (JAVA_TOOL_OPTIONS, JDK_JAVA_OPTIONS and
+# _JAVA_OPTIONS). Both -Dname=value and -Dname, with or without surrounding double quotes, count.
+function has_jvm_system_property() {
+  local name="${1//./\\.}"
+  local pattern="(^|[[:space:]]|\")-D${name}(=|[[:space:]]|\"|$)"
+  local opts
+  for opts in "${JAVA_OPTS:-}" "${JAVA_TOOL_OPTIONS:-}" "${JDK_JAVA_OPTIONS:-}" "${_JAVA_OPTIONS:-}"; do
+    if [[ "${opts}" =~ ${pattern} ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Appends -D$1=$2 to JAVA_OPTS unless the property is already set (see has_jvm_system_property).
+# The launcher passes JAVA_OPTS on the command line, which overrides JAVA_TOOL_OPTIONS and
+# JDK_JAVA_OPTIONS, so a default added here would otherwise replace the operator's value.
+function add_default_jvm_system_property() {
+  if ! has_jvm_system_property "$1"; then
+    JAVA_OPTS+=" -D$1=$2"
+  fi
+}
+
 function rotate_out_file() {
   local out_file="$1"
   local keep="${GRAVITINO_OUT_FILE_KEEP:-5}"

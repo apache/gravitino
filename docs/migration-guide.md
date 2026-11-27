@@ -133,6 +133,15 @@ and shutdown steps in [Upgrade Gravitino](./how-to-upgrade.md) before applying t
     `CatalogChange.setSecretReference` (REST update type `setSecretReference`) with an external
     secret that holds the whole property value. Use the locator recorded during the inventory.
     Neither `setSecretBinding` nor `setSecretReference` is available in the 1.3 client or REST API.
+- The server start script `bin/gravitino.sh` sets an empty
+  `org.apache.kafka.sasl.oauthbearer.allowed.urls` unless `JAVA_OPTS`, `JAVA_TOOL_OPTIONS`,
+  `JDK_JAVA_OPTIONS` or `_JAVA_OPTIONS` already sets it. This affects only Kafka catalogs whose
+  `sasl.login.callback.handler.class` is Kafka's
+  `org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler`, which fetches a
+  token from `sasl.oauthbearer.token.endpoint.url`. These catalogs fail to connect after the
+  upgrade until the token endpoint URL is added to the list, for example
+  `-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp.example.com/oauth2/token`. Catalogs
+  whose login handler creates the token itself, such as the AWS MSK IAM handler, need no change.
 - The Kafka 3.9 client rejects `com.sun.security.auth.module.LdapLoginModule` in JAAS
   configurations by default. `JndiLoginModule` was already rejected by the 3.4 client. Check both
   the `sasl.jaas.config` of each Kafka catalog and the `KafkaClient` entry in the file named by the

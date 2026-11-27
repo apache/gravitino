@@ -182,6 +182,17 @@ if [[ "$JVM_VERSION" -eq 17 ]]; then
 fi
 
 #JAVA_OPTS+=" -Djava.security.krb5.conf=/etc/krb5.conf"
+# Harden the Kafka client used by the Kafka catalog. A caller who can create a catalog must not be
+# able to make the server read local files or call internal URLs through Kafka client settings
+# (CVE-2024-31141, CVE-2025-27817). Each default is skipped when JAVA_OPTS, JAVA_TOOL_OPTIONS,
+# JDK_JAVA_OPTIONS or _JAVA_OPTIONS already sets the property, so an operator can override it.
+#  - automatic.config.providers=none: no config provider is loaded without explicit configuration.
+#  - sasl.oauthbearer.allowed.urls (empty): Kafka's built-in OAUTHBEARER login callback handler
+#    may not fetch a token from any sasl.oauthbearer.token.endpoint.url. A catalog that uses that
+#    handler needs its token endpoint URL in this comma-separated list.
+add_default_jvm_system_property org.apache.kafka.automatic.config.providers none
+add_default_jvm_system_property org.apache.kafka.sasl.oauthbearer.allowed.urls ""
+
 
 addJarInDir "${GRAVITINO_HOME}/libs"
 
