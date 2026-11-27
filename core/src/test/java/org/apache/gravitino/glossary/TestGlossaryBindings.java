@@ -22,12 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.StringWriter;
 import java.security.PrivilegedExceptionAction;
+import java.sql.PreparedStatement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -71,9 +73,11 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.dto.glossary.TermBindingDTO;
 import org.apache.gravitino.dto.glossary.TermDTO;
 import org.apache.gravitino.dto.responses.ObjectTermsResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.LookupTooBroadException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
@@ -114,18 +118,21 @@ import org.apache.gravitino.storage.relational.service.GlossaryTermBindingServic
 import org.apache.gravitino.storage.relational.service.GlossaryTermBindingService.LostBinding;
 import org.apache.gravitino.storage.relational.service.GlossaryTermBindingService.TargetType;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
+import org.apache.gravitino.storage.relational.service.MetadataObjectService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.ViewMetaService;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.ThrowableFunction;
+import org.apache.ibatis.session.SqlSession;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
@@ -135,6 +142,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 import org.mockito.AdditionalAnswers;
+import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -2249,6 +2257,21 @@ class TestGlossaryBindings extends TestJDBCBackend {
                         null)));
     Mockito.verifyNoInteractions(env.internalTableDispatcher());
     assertTrue(openManager.listObjectTerms(LAKE, live, null).isEmpty());
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    List<String> words = List.of("Restricted");
+    assertEquals(
+        0,
+        as("lakeOwner", () -> views.listTerms(LAKE, null, null, null, List.of("absent"), true))
+            .length);
+    assertEquals(
+        1, as("lakeOwner", () -> views.listTerms(LAKE, null, null, null, words, false)).length);
+    assertThrows(
+        ForbiddenException.class,
+        () -> as("lakeOwner", () -> views.listTerms(LAKE, null, null, null, words, true)));
+    openManager.associateTerms(LAKE, live, new String[] {"Restricted"}, null);
+    assertThrows(
+        ForbiddenException.class,
+        () -> as("lakeOwner", () -> views.listTerms(LAKE, null, null, null, words, true)));
   }
 
   @TestTemplate
@@ -2340,10 +2363,278 @@ class TestGlossaryBindings extends TestJDBCBackend {
                 () ->
                     manager.listTermBindings(
                         LAKE, "RestrictedTargets", null, null, GlossaryTerm.Status.DRAFT)));
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    List<String> match = List.of("RestrictedTargets");
+    openManager.createTerm(LAKE, TermSpec.builder("EmptyOne").build());
+    openManager.createTerm(LAKE, TermSpec.builder("EmptyTwo").build());
+    List<Integer> fetched = new ArrayList<>();
+    List<Integer> probes = new ArrayList<>();
+    try (MockedStatic<SqlSessions> ignored = observeBindingReads(fetched, probes)) {
+      TermDTO preview =
+          new GlossaryTermViews(openManager).listTerms(LAKE, null, null, null, match, true)[0];
+      assertEquals(20, preview.getBindings().size());
+      assertEquals(Boolean.TRUE, preview.getBindingsTruncated());
+      assertEquals(List.of(21), fetched);
+      assertEquals(List.of(), probes);
+      fetched.clear();
+      TermDTO[] mixed =
+          new GlossaryTermViews(openManager)
+              .listTerms(
+                  LAKE,
+                  null,
+                  null,
+                  null,
+                  List.of("RestrictedTargets", "EmptyOne", "EmptyTwo"),
+                  true);
+      assertEquals(
+          List.of(20, 0, 0), Arrays.stream(mixed).map(t -> t.getBindings().size()).toList());
+      assertEquals(List.of(21), fetched);
+      assertEquals(List.of(1), probes);
+    }
+    LookupTooBroadException perTerm = assertLookupStopsAtBindingBudget(views, match, 1000);
+    assertEquals(
+        "Glossary lookup is too broad. Omit embedded bindings or narrow the query.",
+        perTerm.getMessage());
+    TermDTO definition =
+        as("metricReader", () -> views.listTerms(LAKE, null, null, null, match, false))[0];
+    assertEquals("RestrictedTargets", definition.getName());
+    assertNull(definition.getBindings());
+    assertNull(definition.getBindingsTruncated());
+
+    // Each root can prove that exactly 1,000 hidden targets exhaust its own list.
+    // Ten such roots together exceed the request budget once the roots themselves are counted.
+    for (int i = 0; i < 10; i++) {
+      openManager.createTerm(LAKE, TermSpec.builder("Shared" + i).withSynonyms("group").build());
+    }
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
+        PreparedStatement insert =
+            session
+                .getConnection()
+                .prepareStatement(
+                    "INSERT INTO glossary_term_binding (metalake_id, term_id, target_type, target_id, deleted_at) "
+                        + "SELECT t.metalake_id, t.term_id, b.target_type, b.target_id, 0 FROM glossary_term_meta t "
+                        + "JOIN glossary_term_binding b ON b.metalake_id=t.metalake_id "
+                        + "WHERE t.name LIKE 'Shared%' AND b.term_id=? AND b.target_type='COLUMN' AND b.target_id<=?")) {
+      insert.setLong(1, term.id());
+      insert.setLong(2, columns.get(999).id());
+      assertEquals(10000, insert.executeUpdate());
+      session.commit(true);
+    }
+    TermDTO allHidden =
+        as("metricReader", () -> views.listTerms(LAKE, null, null, null, List.of("Shared0"), true))[
+            0];
+    assertEquals(List.of(), allHidden.getBindings());
+    assertEquals(Boolean.FALSE, allHidden.getBindingsTruncated());
+    LookupTooBroadException total = assertLookupStopsAtBindingBudget(views, List.of("group"), 9990);
+    assertEquals(perTerm.getMessage(), total.getMessage());
+    assertEquals(
+        10,
+        as("metricReader", () -> views.listTerms(LAKE, null, null, null, List.of("group"), false))
+            .length);
+
     GlossaryManager hidden = manager.withTermVisibility(ignored -> false);
     assertThrows(
         NoSuchTermException.class,
         () -> hidden.listTermBindings(LAKE, "RestrictedTargets", null, null, null));
+  }
+
+  @TestTemplate
+  void testLookupBatchesCandidatesAndTargetsAcrossTerms() throws Exception {
+    List<ColumnEntity> columns = IntStream.range(0, 43).mapToObj(i -> col("col_" + i, i)).toList();
+    insertTable("preview_targets", columns);
+    long lake = MetalakeMetaService.getInstance().getMetalakeIdByName(LAKE);
+    List<Long> termIds = new ArrayList<>();
+    for (ColumnEntity column : columns) {
+      GlossaryTermEntity term =
+          openManager.createTerm(
+              LAKE, TermSpec.builder(column.name()).withSynonyms("shared").build());
+      termIds.add(term.id());
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              GlossaryTermBindingService.getInstance()
+                  .add(lake, term.id(), TargetType.COLUMN, column.id()));
+    }
+    List<Integer> fetched = new ArrayList<>();
+    List<Integer> probes = new ArrayList<>();
+    List<Integer> resolved = new ArrayList<>();
+    try (MockedStatic<SqlSessions> reads = observeBindingReads(fetched, probes);
+        MockedStatic<MetadataObjectService> objects =
+            Mockito.mockStatic(
+                MetadataObjectService.class,
+                call -> {
+                  if (call.getMethod().getName().equals("resolveMetadataObjects")) {
+                    resolved.add(call.<List<Long>>getArgument(1).size());
+                  }
+                  return call.callRealMethod();
+                })) {
+      TermDTO[] terms =
+          new GlossaryTermViews(openManager)
+              .listTerms(LAKE, null, null, null, List.of("shared"), true);
+      assertEquals(columns.size(), terms.length);
+      for (TermDTO term : terms) {
+        assertEquals(1, term.getBindings().size());
+        assertEquals(term.getName(), term.getBindings().get(0).getObject().name());
+        assertEquals(Boolean.FALSE, term.getBindingsTruncated());
+      }
+      assertEquals(List.of(43), probes);
+      assertTrue(fetched.size() <= 5, fetched::toString);
+      assertEquals(columns.size(), fetched.stream().mapToInt(Integer::intValue).sum());
+      assertTrue(resolved.size() <= 3, resolved::toString);
+      assertEquals(columns.size(), resolved.stream().mapToInt(Integer::intValue).sum());
+    }
+
+    // The first page ends on the first binding of the 21st term. Its 20 additional bindings
+    // cross the cursor boundary. Its neighbors must still receive only their own targets.
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          for (ColumnEntity column : columns.subList(0, 20)) {
+            GlossaryTermBindingService.getInstance()
+                .add(lake, termIds.get(20), TargetType.COLUMN, column.id());
+          }
+        });
+    TermDTO[] mixed =
+        new GlossaryTermViews(openManager)
+            .listTerms(LAKE, null, null, null, List.of("shared"), true);
+    assertEquals(columns.size(), mixed.length);
+    for (TermDTO term : mixed) {
+      boolean spansPages = term.getName().equals(columns.get(20).name());
+      List<String> expected =
+          spansPages
+              ? columns.subList(0, 20).stream().map(ColumnEntity::name).toList()
+              : List.of(term.getName());
+      assertEquals(expected, term.getBindings().stream().map(b -> b.getObject().name()).toList());
+      assertEquals(spansPages, term.getBindingsTruncated());
+    }
+  }
+
+  @TestTemplate
+  void testLookupPreviewCountsVisibleBindingsAcrossBatches() throws Exception {
+    List<ColumnEntity> hidden = new ArrayList<>();
+    List<ColumnEntity> visible = new ArrayList<>();
+    for (int i = 0; i < 21; i++) {
+      int hiddenBefore = i == 0 ? 20 : 3;
+      for (int j = 0; j < hiddenBefore; j++) {
+        hidden.add(col("hidden_" + hidden.size(), hidden.size()));
+      }
+      visible.add(col("visible_" + i, i));
+    }
+    insertTable("hidden", hidden);
+    insertTable("visible", visible);
+    role(
+        "denyHidden",
+        SecurableObjects.parse(
+            CAT + "." + SCH + ".hidden",
+            MetadataObject.Type.TABLE,
+            List.of(Privileges.deny("SELECT_TABLE"))));
+    user("limitedColumns", "viewDef", "readTable", "denyHidden");
+    long lake = MetalakeMetaService.getInstance().getMetalakeIdByName(LAKE);
+    GlossaryTermEntity term = openManager.createTerm(LAKE, TermSpec.builder("ColumnTerm").build());
+    GlossaryTermBindingService bindings = GlossaryTermBindingService.getInstance();
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            hidden.forEach(
+                column -> bindings.add(lake, term.id(), TargetType.COLUMN, column.id())));
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    int previous = 0;
+    for (int n : List.of(0, 1, 20, 21)) {
+      List<ColumnEntity> added = visible.subList(previous, n);
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              added.forEach(
+                  column -> bindings.add(lake, term.id(), TargetType.COLUMN, column.id())));
+      TermDTO result =
+          as(
+              "limitedColumns",
+              () -> views.listTerms(LAKE, null, null, null, List.of(term.name()), true))[0];
+      assertEquals(
+          visible.subList(0, Math.min(20, n)).stream().map(ColumnEntity::name).toList(),
+          result.getBindings().stream().map(binding -> binding.getObject().name()).toList());
+      assertEquals(n == 21, result.getBindingsTruncated());
+      previous = n;
+    }
+
+    // The metric has a lower ID than the columns on the preceding pages.
+    MetadataObject model =
+        MetadataObjects.of(List.of(CAT, SCH, SMODEL), MetadataObject.Type.SEMANTIC_MODEL);
+    openManager.associateMetricTerms(LAKE, model, "net_revenue", new String[] {term.name()}, null);
+    user("onlyMetrics", "viewDef", "readModel");
+    TermDTO metrics =
+        as(
+            "onlyMetrics",
+            () -> views.listTerms(LAKE, null, null, null, List.of(term.name()), true))[0];
+    assertEquals(
+        List.of("net_revenue"),
+        metrics.getBindings().stream().map(TermBindingDTO::getMetric).toList());
+    assertEquals(Boolean.FALSE, metrics.getBindingsTruncated());
+
+    openManager.createTerm(LAKE, TermSpec.builder("Second").build());
+    openManager.associateMetricTerms(LAKE, model, "net_revenue", new String[] {"Second"}, null);
+    // Two roots, all columns through the 21st visible one, then the second root's hidden metric.
+    // The first root's trailing metric must not consume the second root's budget.
+    List<Integer> fetched = new ArrayList<>();
+    try (MockedConstruction<TermLookupBudget> ignored =
+            limitLookupTo(2 + hidden.size() + visible.size() + 1);
+        MockedStatic<SqlSessions> reads = observeBindingReads(fetched, new ArrayList<>())) {
+      TermDTO[] both =
+          as(
+              "limitedColumns",
+              () -> views.listTerms(LAKE, null, null, null, List.of(term.name(), "Second"), true));
+      assertEquals(2, both.length);
+      assertEquals(Boolean.TRUE, both[0].getBindingsTruncated());
+      assertEquals(20, both[0].getBindings().size());
+      assertEquals(List.of(), both[1].getBindings());
+      assertEquals(Boolean.FALSE, both[1].getBindingsTruncated());
+      assertEquals(List.of(21, 21, 21, 21, 18, 1), fetched);
+    }
+  }
+
+  @TestTemplate
+  void testLookupBudgetCountsLiteralNameMatchesAcrossCandidatePages() {
+    for (String name : List.of("Sales Team A", "Sales Team B", "Sales  Team C")) {
+      openManager.createTerm(LAKE, TermSpec.builder(name).withSynonyms("group").build());
+    }
+    GlossaryTermViews views = new GlossaryTermViews(openManager);
+    try (MockedConstruction<TermLookupBudget> ignored = limitLookupTo(1)) {
+      assertArrayEquals(
+          new String[] {"Sales  Team C"},
+          views.listTermNames(LAKE, null, "Sales  Team", null, List.of("group")));
+    }
+    try (MockedConstruction<TermLookupBudget> ignored = limitLookupTo(1)) {
+      assertThrows(
+          LookupTooBroadException.class,
+          () -> views.listTermNames(LAKE, null, "Sales Team", null, List.of("group")));
+    }
+  }
+
+  @TestTemplate
+  void testStatusFilteredRelationsUseOnlyTheEligibleLookupBudget() {
+    GlossaryTerm.Status old = GlossaryTerm.Status.DEPRECATED;
+    openManager.createTerm(LAKE, TermSpec.builder("Parent").build());
+    openManager.createTerm(LAKE, TermSpec.builder("OldParent").withStatus(old).build());
+    openManager.createTerm(LAKE, TermSpec.builder("Peer").build());
+    openManager.createTerm(
+        LAKE,
+        TermSpec.builder("Root").withBroader("Parent", "OldParent").withRelated("Peer").build());
+    openManager.createTerm(LAKE, TermSpec.builder("Child").withBroader("Root").build());
+    openManager.createTerm(
+        LAKE, TermSpec.builder("OldChild").withStatus(old).withBroader("Root").build());
+    openManager.createTerm(
+        LAKE, TermSpec.builder("OldPeer").withStatus(old).withRelated("Root").build());
+    GlossaryTermViews views = new GlossaryTermViews(openManager);
+    try (MockedConstruction<TermLookupBudget> ignored = limitLookupTo(4)) {
+      TermDTO root =
+          views
+              .listTerms(LAKE, null, null, GlossaryTerm.Status.APPROVED, List.of("Root"), false)[0];
+      assertArrayEquals(new String[] {"Parent"}, root.getBroader());
+      assertArrayEquals(new String[] {"Child"}, root.getNarrower());
+      assertArrayEquals(new String[] {"Peer"}, root.getRelated());
+    }
+    try (MockedConstruction<TermLookupBudget> ignored = limitLookupTo(4)) {
+      assertThrows(
+          LookupTooBroadException.class,
+          () -> views.listTerms(LAKE, null, null, null, List.of("Root"), false));
+    }
   }
 
   @TestTemplate
@@ -2391,6 +2682,25 @@ class TestGlossaryBindings extends TestJDBCBackend {
       openManager.associateMetricTerms(LAKE, model, metrics[i], new String[] {all[i]}, null);
     }
     GlossaryTermViews views = new GlossaryTermViews(manager);
+    TermDTO[] matches =
+        as(
+            "limited",
+            () ->
+                views.listTerms(
+                    LAKE,
+                    null,
+                    null,
+                    GlossaryTerm.Status.APPROVED,
+                    List.of("Approved", "Other"),
+                    true));
+    assertEquals(2, matches.length);
+    assertArrayEquals(new String[] {"Visible"}, matches[0].getDomains());
+    assertArrayEquals(new String[0], matches[1].getDomains());
+    for (TermDTO match : matches) {
+      assertEquals(4, match.getBindings().size());
+      assertEquals(Boolean.FALSE, match.getBindingsTruncated());
+    }
+    assertArrayEquals(new String[] {"Private"}, openManager.getTerm(LAKE, "Other").domains());
     List<String> calls = new ArrayList<>();
     try (MockedStatic<SqlSessions> ignored =
         Mockito.mockStatic(
@@ -2733,6 +3043,59 @@ class TestGlossaryBindings extends TestJDBCBackend {
       assertEquals(5, bindings.size());
       Mockito.verify(tableService, Mockito.never())
           .getTableIdBySchemaIdAndName(Mockito.anyLong(), Mockito.anyString());
+    }
+  }
+
+  private static MockedStatic<SqlSessions> observeBindingReads(
+      List<Integer> fetched, List<Integer> probes) {
+    return Mockito.mockStatic(
+        SqlSessions.class,
+        lookup -> {
+          Object mapper = lookup.callRealMethod();
+          if (lookup.getMethod().getName().equals("getMapper")
+              && lookup.getArgument(0) == GlossaryTermBindingMapper.class) {
+            return Mockito.mock(
+                GlossaryTermBindingMapper.class,
+                call -> {
+                  Object result = AdditionalAnswers.delegatesTo(mapper).answer(call);
+                  if (call.getMethod().getName().equals("listBindingCandidates")) {
+                    fetched.add(((List<?>) result).size());
+                  } else if (call.getMethod().getName().equals("listTermsWithBindings")) {
+                    probes.add(((List<?>) result).size());
+                  }
+                  return result;
+                });
+          }
+          return mapper;
+        });
+  }
+
+  private static MockedConstruction<TermLookupBudget> limitLookupTo(int remaining) {
+    TermLookupBudget budget = new TermLookupBudget();
+    budget.consume(budget.remaining() - remaining);
+    return Mockito.mockConstruction(
+        TermLookupBudget.class,
+        Mockito.withSettings().defaultAnswer(AdditionalAnswers.delegatesTo(budget)));
+  }
+
+  private LookupTooBroadException assertLookupStopsAtBindingBudget(
+      GlossaryTermViews views, List<String> words, int expected) {
+    AtomicInteger resolved = new AtomicInteger();
+    try (MockedStatic<MetadataObjectService> ignored =
+        Mockito.mockStatic(
+            MetadataObjectService.class,
+            call -> {
+              if (call.getMethod().getName().equals("resolveMetadataObjects")) {
+                resolved.addAndGet(call.<List<Long>>getArgument(1).size());
+              }
+              return call.callRealMethod();
+            })) {
+      LookupTooBroadException error =
+          assertThrows(
+              LookupTooBroadException.class,
+              () -> as("metricReader", () -> views.listTerms(LAKE, null, null, null, words, true)));
+      assertEquals(expected, resolved.get());
+      return error;
     }
   }
 

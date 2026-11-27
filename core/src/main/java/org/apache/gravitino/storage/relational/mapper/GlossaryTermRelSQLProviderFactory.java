@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collection;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GlossaryTermRelBaseSQLProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.GlossaryTermRelPostgreSQLProvider;
@@ -110,8 +111,10 @@ public class GlossaryTermRelSQLProviderFactory {
       @Param("metalakeId") long metalakeId,
       @Param("ids") Collection<Long> ids,
       @Param("type") String type,
-      @Param("reverse") boolean reverse) {
-    return getProvider().listEdges(metalakeId, ids, type, reverse);
+      @Param("reverse") boolean reverse,
+      @Param("status") @Nullable String status,
+      @Param("limit") @Nullable Integer limit) {
+    return getProvider().listEdges(metalakeId, ids, type, reverse, status, limit);
   }
 
   /** Delegates {@link GlossaryTermRelBaseSQLProvider#expired}. */

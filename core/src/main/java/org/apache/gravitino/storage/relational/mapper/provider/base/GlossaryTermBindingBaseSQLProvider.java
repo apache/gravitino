@@ -23,6 +23,7 @@ import java.util.Collection;
 import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermBindingMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
@@ -269,5 +270,37 @@ public class GlossaryTermBindingBaseSQLProvider {
         + TABLE
         + " WHERE term_id=#{row.termId} AND target_type=#{row.targetType}"
         + " AND target_id=#{row.targetId} AND deleted_at=#{row.deletedAt} AND deleted_at>0";
+  }
+
+  /** Identifies roots with live bindings before expanding a multi-term preview. */
+  public String listTermsWithBindings() {
+    return """
+        <script>
+        SELECT t.term_id FROM %s t
+        WHERE t.metalake_id=#{metalakeId} AND t.deleted_at=0 AND t.term_id IN
+        <foreach collection="termIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        AND EXISTS (SELECT 1 FROM %s b WHERE b.term_id=t.term_id
+          AND b.metalake_id=t.metalake_id AND b.deleted_at=0)
+        ORDER BY t.term_id
+        </script>
+        """
+        .formatted(GlossaryTermMetaMapper.TABLE_NAME, TABLE);
+  }
+
+  /** Fetches binding candidates for a lookup preview in stable term and target order. */
+  public String listBindingCandidates() {
+    return """
+        <script>
+        SELECT term_id AS termId, target_type AS targetType, target_id AS targetId FROM %s
+        WHERE metalake_id=#{metalakeId} AND deleted_at=0 AND term_id IN
+        <foreach collection="termIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        <if test="after != null">
+          AND (target_type &gt; #{after.targetType}
+            OR (target_type=#{after.targetType} AND target_id &gt; #{after.targetId}))
+        </if>
+        ORDER BY term_id, target_type, target_id LIMIT #{limit}
+        </script>
+        """
+        .formatted(TABLE);
   }
 }

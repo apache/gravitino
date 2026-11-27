@@ -39,6 +39,7 @@ import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper
 import org.apache.gravitino.storage.relational.service.LiveEndpointService;
 import org.apache.gravitino.storage.relational.service.LiveEndpointService.Endpoint;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /** Plans Article asset edits and projects live, readable bindings in stable ID order. */
 final class ArticleAssets {
@@ -185,6 +186,7 @@ final class ArticleAssets {
 
   private static Map<Binding, Target> liveTargets(long lake, List<Binding> rows) {
     Map<Binding, Target> result = new HashMap<>();
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
     var groups =
         rows.stream()
             .collect(
@@ -204,17 +206,21 @@ final class ArticleAssets {
               chain.add(row.catalogId());
             }
             if (row.schemaId() != null) {
-              parents.add(row.schemaName());
+              parents.add(HierarchicalSchemaUtil.physicalToLogical(row.schemaName(), separator));
               chain.add(row.schemaId());
             }
             if (row.tableId() != null) {
               parents.add(row.tableName());
               chain.add(row.tableId());
             }
+            String targetName =
+                type == MetadataObject.Type.SCHEMA
+                    ? HierarchicalSchemaUtil.physicalToLogical(row.name(), separator)
+                    : row.name();
             result.put(
                 new Binding(name, row.id()),
                 new Target(
-                    ArticleObjectIdentifier.of(type, parents, row.name()),
+                    ArticleObjectIdentifier.of(type, parents, targetName),
                     new NamespacedEntityId(
                         row.id(), chain.stream().mapToLong(Long::longValue).toArray())));
           }

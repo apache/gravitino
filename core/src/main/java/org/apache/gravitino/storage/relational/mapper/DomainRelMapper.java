@@ -115,4 +115,18 @@ public interface DomainRelMapper {
       method = "deleteDomainRelsByLegacyTimeline")
   Integer deleteDomainRelsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  /**
+   * Bounds authorization work before reading the subdomains of a domain filter.
+   *
+   * @param metalakeId the metalake ID
+   * @param parentId the parent domain ID
+   * @param limit the maximum count to return
+   * @return the number of live child domains up to the limit
+   */
+  @SelectProvider(type = DomainRelSQLProviderFactory.class, method = "countLiveChildren")
+  int countLiveChildren(
+      @Param("metalakeId") long metalakeId,
+      @Param("parentId") long parentId,
+      @Param("limit") int limit);
 }
