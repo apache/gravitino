@@ -137,11 +137,21 @@ paths:
         - access control
       summary: Delete role
       operationId: deleteRole
+      description: Deletes a role. A role that an access control policy names cannot be deleted; remove it from those policies first.
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/DeleteResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "409":
+          description: Conflict - An access control policy names the role
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                RoleInUseException:
+                  $ref: "#/components/examples/RoleInUseException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -398,6 +408,17 @@ components:
         "message": "Role does not exist",
         "stack": [
           "org.apache.gravitino.exceptions.NoSuchRoleException: Role does not exist",
+          "..."
+        ]
+      }
+
+    RoleInUseException:
+      value: {
+        "code": 1010,
+        "type": "InUseException",
+        "message": "Role role1 in metalake metalake1 is referenced by access control policies; remove it from those policies before deleting it",
+        "stack": [
+          "org.apache.gravitino.exceptions.InUseException: Role role1 in metalake metalake1 is referenced by access control policies; remove it from those policies before deleting it",
           "..."
         ]
       }
