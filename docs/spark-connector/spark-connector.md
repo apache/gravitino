@@ -63,6 +63,22 @@ To configure the Gravitino client, use properties prefixed with `spark.sql.gravi
 during initialization. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#java-client-configuration)
 for supported client configuration.
 
+### Custom HTTP request headers
+
+Set `spark.sql.gravitino.client.request.header.<header-name>` to send custom headers on requests
+from the connector to the Gravitino server. For example:
+
+```properties
+spark.sql.gravitino.client.request.header.X-Job-Id=job-123
+spark.sql.gravitino.client.request.header.X-Execution-Id=run-456
+```
+
+Headers are read from the application configuration when a client is created and are reused for
+that client's requests. They do not provide per-statement context in a shared Spark application.
+They are not forwarded to underlying catalog services or GVFS clients. Use the connector's
+authentication settings for authentication headers. Configured headers cannot override the
+client-managed `Authorization`, `Content-Type`, `Accept`, or client version headers.
+
 ### Per-user identity in `token` mode
 
 When `spark.sql.gravitino.authType` is `token`, the connector presents a bearer token and resolves it

@@ -89,6 +89,10 @@ public class GravitinoCatalogStoreFactoryOptions {
           .defaultValue(ImmutableMap.of())
           .withDescription("The config of Gravitino client");
 
+  /** Prefix for custom HTTP headers sent to the Gravitino server. */
+  public static final String GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX =
+      "gravitino.client.request.header.";
+
   public static final String AUTH_TYPE = "gravitino.client.auth.type";
   public static final String OAUTH2 = "oauth2";
   public static final String BASIC = "basic";
