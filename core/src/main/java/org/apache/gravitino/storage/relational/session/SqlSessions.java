@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 public final class SqlSessions {
   private static final Logger LOG = LoggerFactory.getLogger(SqlSessions.class);
   private static final ThreadLocal<SqlSession> sessions = new ThreadLocal<>();
+  private static final ThreadLocal<SqlSession> readSnapshots = new ThreadLocal<>();
   private static final ThreadLocal<AtomicInteger> sessionCount =
       ThreadLocal.withInitial(() -> new AtomicInteger(0));
   private static final ThreadLocal<Throwable> rollbackCause = new ThreadLocal<>();
@@ -98,10 +99,26 @@ public final class SqlSessions {
             : TransactionIsolationLevel.REPEATABLE_READ;
     SqlSession session = factory.openSession(isolation);
     sessions.set(session);
+    readSnapshots.set(session);
     sessionCount.get().incrementAndGet();
     try (SnapshotScope ignored = SqlSessions::rollbackAndCloseSqlSession) {
       return read.get();
+    } finally {
+      readSnapshots.remove();
     }
+  }
+
+  /**
+   * Runs the reads in the caller's read snapshot, or opens one if there is no active session.
+   *
+   * @param read the reads to run in the snapshot
+   * @param <T> the result type
+   * @return the result of the reads
+   * @throws IllegalStateException if the active session was not opened by {@link #readSnapshot}
+   */
+  public static <T> T readSnapshotOrJoin(Supplier<T> read) {
+    SqlSession current = sessions.get();
+    return current != null && current == readSnapshots.get() ? read.get() : readSnapshot(read);
   }
 
   /**

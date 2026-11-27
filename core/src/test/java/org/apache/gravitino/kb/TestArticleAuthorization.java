@@ -20,6 +20,7 @@
 package org.apache.gravitino.kb;
 
 import static org.apache.gravitino.storage.relational.service.GlossaryDomainFixtures.insertDomain;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -89,6 +91,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.service.DomainMetaService;
 import org.apache.gravitino.storage.relational.service.DomainRelService;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.TransactionHook;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.tag.TagManager;
@@ -375,6 +378,77 @@ class TestArticleAuthorization extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void authorizationAndWritePolicyApplyTogether() throws Exception {
+    TransactionHook policy = Mockito.mock(TransactionHook.class);
+    ArticleManager guarded = new ArticleManager(ids::incrementAndGet, 1024, true, policy);
+    var request = article("draft", ArticleStatus.DRAFT);
+    assertThrows(
+        ForbiddenException.class, () -> as("viewer", () -> guarded.createArticle(LAKE, request)));
+    var draft = as("writer", () -> guarded.createArticle(LAKE, request));
+    Mockito.verify(policy).onChange(null, draft.article());
+    var object = MetadataObjects.of(null, "draft", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
+    assertEquals("writer", as("writer", () -> owners.getOwner(LAKE, object)).orElseThrow().name());
+    assertThrows(
+        NoSuchKnowledgeBaseArticleException.class,
+        () -> as("viewer", () -> guarded.loadArticle(LAKE, "draft")));
+    Mockito.verifyNoMoreInteractions(policy);
+  }
+
+  @TestTemplate
+  void authorizedReadsShareTheCallersSnapshot() throws Exception {
+    var published =
+        as("writer", () -> manager.createArticle(LAKE, article("guide", ArticleStatus.PUBLISHED)));
+    Callable<ArticleManager.Result> unpublish =
+        () ->
+            as(
+                "writer",
+                () ->
+                    manager.alterArticle(
+                        LAKE,
+                        "guide",
+                        published.revisionToken(),
+                        KnowledgeBaseArticleChange.updateStatus(ArticleStatus.DRAFT)));
+    ExecutorService writer = Executors.newSingleThreadExecutor();
+    try {
+      as(
+          "viewer",
+          () ->
+              SqlSessions.readSnapshot(
+                  () -> {
+                    assertEquals(published, manager.loadArticle(LAKE, "guide"));
+                    assertDoesNotThrow(() -> writer.submit(unpublish).get(30, TimeUnit.SECONDS));
+                    assertEquals(
+                        published.revisionToken(),
+                        manager.getArticleContent(LAKE, "guide").revisionToken());
+                    assertEquals(List.of(published.article()), manager.listArticles(LAKE));
+                    return null;
+                  }));
+    } finally {
+      writer.shutdownNow();
+    }
+    assertTrue(as("viewer", () -> manager.listArticles(LAKE)).isEmpty());
+  }
+
+  @TestTemplate
+  void authorizedReadsRejectAnOrdinaryTransaction() throws Exception {
+    as(
+        "writer",
+        () -> {
+          SqlSessions.getSqlSession();
+          try {
+            assertThrows(IllegalStateException.class, () -> manager.loadArticle(LAKE, "guide"));
+            assertThrows(
+                IllegalStateException.class, () -> manager.getArticleContent(LAKE, "guide"));
+            assertThrows(IllegalStateException.class, () -> manager.listArticles(LAKE));
+            assertTrue(SqlSessions.hasActiveSession());
+          } finally {
+            SqlSessions.closeSqlSession();
+          }
+          return null;
+        });
+  }
+
+  @TestTemplate
   void contentVisibilityUsesTheSameSnapshotAsTheBody() throws Exception {
     var draft =
         as("writer", () -> manager.createArticle(LAKE, article("draft", ArticleStatus.DRAFT)));
@@ -601,6 +675,44 @@ class TestArticleAuthorization extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void createChecksDomainPermissionBeforeTermApproval() throws Exception {
+    insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    role(
+        "salesReader",
+        SecurableObjects.parse(
+            "Sales", MetadataObject.Type.DOMAIN, List.of(Privileges.allow("USE_DOMAIN"))));
+    user("author", "create", "salesReader");
+    var glossary = new GlossaryManager(ids::incrementAndGet, true);
+    as(
+        "lakeOwner",
+        () ->
+            glossary.createTerm(
+                LAKE, TermSpec.builder("Old").withStatus(GlossaryTerm.Status.DEPRECATED).build()));
+    var request =
+        ArticleCreate.builder()
+            .withTitle("Guide")
+            .withName("guide")
+            .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+            .addTerms("Old")
+            .addDomains("Sales")
+            .build();
+    as(
+        "author",
+        () -> assertThrows(ForbiddenException.class, () -> manager.createArticle(LAKE, request)));
+    as(
+        "lakeOwner",
+        () ->
+            assertThrows(
+                UnapprovedTermException.class, () -> manager.createArticle(LAKE, request)));
+    as(
+        "lakeOwner",
+        () ->
+            assertThrows(
+                NoSuchKnowledgeBaseArticleException.class,
+                () -> manager.loadArticle(LAKE, "guide")));
+  }
+
+  @TestTemplate
   void hiddenTermBindingsAreFilteredBeforePagingAndStatusConflicts() throws Exception {
     var glossary = new GlossaryManager(ids::incrementAndGet, true);
     as("writer2", () -> glossary.createTerm(LAKE, TermSpec.builder("First").build()));
@@ -770,6 +882,33 @@ class TestArticleAuthorization extends TestJDBCBackend {
           assertEquals(Set.of(retail), renamed.article().domainIds());
           return null;
         });
+  }
+
+  @TestTemplate
+  void retainingAManagedDomainWithUseDeniedIsANoOp() throws Exception {
+    insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    role(
+        "salesSteward",
+        SecurableObjects.parse(
+            "Sales",
+            MetadataObject.Type.DOMAIN,
+            List.of(Privileges.allow("MANAGE_DOMAIN"), Privileges.deny("USE_DOMAIN"))));
+    user("steward", "create", "salesSteward");
+    as(
+        "steward",
+        () -> {
+          manager.createArticle(LAKE, article("guide", ArticleStatus.PUBLISHED));
+          var added = manager.alterArticle(LAKE, "guide", null, domains("Sales"));
+          var retained = manager.alterArticle(LAKE, "guide", null, domains("Sales"));
+          assertEquals(added.revisionToken(), retained.revisionToken());
+          assertTrue(added.article().domains().isEmpty());
+          assertTrue(retained.article().domains().isEmpty());
+          assertTrue(retained.article().domainIds().isEmpty());
+          return null;
+        });
+    assertEquals(
+        List.of("Sales"),
+        as("lakeOwner", () -> manager.loadArticle(LAKE, "guide")).article().domains());
   }
 
   @TestTemplate

@@ -88,8 +88,8 @@ final class GlossaryBindingAccess {
     return forSnapshot(metalake, scopes);
   }
 
-  /** Uses the page's relational snapshot for canonical target and ancestor IDs. */
-  static GlossaryBindingAccess forBindingPage(String metalake, boolean enabled, long metalakeId) {
+  /** Uses the binding read snapshot for canonical target and ancestor IDs. */
+  static GlossaryBindingAccess forBindingList(String metalake, boolean enabled, long metalakeId) {
     if (!enabled) {
       return UNRESTRICTED;
     }
@@ -171,7 +171,7 @@ final class GlossaryBindingAccess {
     };
   }
 
-  private static MetadataObject normalizeTarget(MetadataObject target) {
+  static MetadataObject normalizeTarget(MetadataObject target) {
     if (target.type() == MetadataObject.Type.COLUMN) {
       return MetadataObjects.parse(target.parent(), MetadataObject.Type.TABLE);
     }

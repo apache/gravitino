@@ -181,6 +181,16 @@ public class GlossaryTermMetaSQLProviderFactory {
     return getProvider().idsByKeys(metalakeId, keys);
   }
 
+  /** Delegates {@link GlossaryTermMetaBaseSQLProvider#listLookupCandidates}. */
+  public static String listLookupCandidates() {
+    return getProvider().listLookupCandidates();
+  }
+
+  /** Delegates {@link GlossaryTermMetaBaseSQLProvider#listLookupEndpoints}. */
+  public static String listLookupEndpoints() {
+    return getProvider().listLookupEndpoints();
+  }
+
   private static GlossaryTermMetaBaseSQLProvider getProvider() {
     String databaseId =
         SqlSessionFactoryHelper.getInstance()
