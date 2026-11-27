@@ -319,6 +319,11 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public long getSemanticModelId(NameIdentifier identifier) {
+    return SemanticModelMetaService.getInstance().getSemanticModelIdByIdentifier(identifier);
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType)
       throws NoSuchEntityException, IOException {
