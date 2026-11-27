@@ -103,7 +103,9 @@ public final class SqlSessions {
   }
 
   /**
-   * Registers work that runs when this thread's SQL session is actually closed.
+   * Registers a process-wide listener that runs on the closing thread whenever any thread closes
+   * its outermost SQL session. It stays registered until removed with {@link
+   * #removeClosedListener}.
    *
    * <p>The listener runs after the commit, rollback, or close, including when the session count was
    * already wrong and had to be reset. An inner close only decrements the count and does not run
