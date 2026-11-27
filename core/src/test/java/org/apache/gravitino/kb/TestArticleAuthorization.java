@@ -969,6 +969,70 @@ class TestArticleAuthorization extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void assetBindingsRespectInheritedSchemaGrantsAndDenies() throws Exception {
+    installAssetCatalog();
+    String previousSeparator = env.config().get(Configs.SCHEMA_SEPARATOR);
+    try {
+      Mockito.when(env.config().get(Configs.SCHEMA_SEPARATOR)).thenReturn("/");
+      createAndInsertCatalog(LAKE, "warehouse");
+      createAndInsertSchema(LAKE, "warehouse", "sales/retail");
+      createAndInsertTableEntity(Namespace.of(LAKE, "warehouse", "sales/retail"), "orders");
+      var table =
+          ArticleObjectIdentifier.of(
+              MetadataObject.Type.TABLE, List.of("warehouse", "sales/retail"), "orders");
+      role("useCatalog", Privileges.allow("USE_CATALOG"));
+      role("useSchema", Privileges.allow("USE_SCHEMA"));
+      role("readTables", Privileges.allow("SELECT_TABLE"));
+      role(
+          "readSales",
+          SecurableObjects.parse(
+              "warehouse.sales",
+              MetadataObject.Type.SCHEMA,
+              List.of(Privileges.allow("SELECT_TABLE"))));
+      role(
+          "denySales",
+          SecurableObjects.parse(
+              "warehouse.sales",
+              MetadataObject.Type.SCHEMA,
+              List.of(Privileges.deny("SELECT_TABLE"))));
+      user("salesReader", "view", "useCatalog", "useSchema", "readSales");
+      user("otherReader", "view", "useCatalog", "useSchema", "readTables", "denySales");
+      as(
+          "lakeOwner",
+          () ->
+              manager.createArticle(
+                  LAKE,
+                  ArticleCreate.builder()
+                      .withTitle("Guide")
+                      .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+                      .addObjects(table)
+                      .build()));
+      as(
+          "salesReader",
+          () -> {
+            assertEquals(
+                "guide",
+                manager.listArticlesForObject(LAKE, table, false, 1, 0).articles().get(0).name());
+            assertEquals(List.of(table), manager.listAssetBindings(LAKE, "guide", 1, 0).objects());
+            return null;
+          });
+      as(
+          "otherReader",
+          () -> {
+            assertThrows(
+                NoSuchMetadataObjectException.class,
+                () -> manager.listArticlesForObject(LAKE, table, false, 1, 0));
+            var page = manager.listAssetBindings(LAKE, "guide", 1, 0);
+            assertTrue(page.objects().isEmpty());
+            assertFalse(page.hasMore());
+            return null;
+          });
+    } finally {
+      Mockito.when(env.config().get(Configs.SCHEMA_SEPARATOR)).thenReturn(previousSeparator);
+    }
+  }
+
+  @TestTemplate
   void columnUsesTableReadPermissionAndChecksTheCurrentTableId() throws Exception {
     installAssetCatalog();
     createAndInsertCatalog(LAKE, "warehouse");
