@@ -36,6 +36,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -68,7 +69,9 @@ import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainManager;
 import org.apache.gravitino.dto.glossary.TermDTO;
+import org.apache.gravitino.dto.glossary.TermMatchDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.LookupTooBroadException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -234,6 +237,197 @@ class TestGlossaryDomains extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testExactLookupIntersectsBrowseFilters() throws Exception {
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    as(
+        "lakeOwner",
+        () -> {
+          manager.createTerm(
+              LAKE,
+              TermSpec.builder("Active Customer")
+                  .withSynonyms("active user")
+                  .withDomains("Retail", "Finance")
+                  .build());
+          manager.createTerm(
+              LAKE,
+              TermSpec.builder("Retired Customer")
+                  .withSynonyms("active user")
+                  .withStatus(GlossaryTerm.Status.DEPRECATED)
+                  .build());
+          manager.createTerm(
+              LAKE,
+              TermSpec.builder("Private")
+                  .withStatus(GlossaryTerm.Status.DRAFT)
+                  .withSynonyms("active user")
+                  .build());
+          manager.createTerm(
+              LAKE,
+              TermSpec.builder("Hidden domain")
+                  .withSynonyms("active user")
+                  .withDomains("HiddenSub")
+                  .build());
+          return null;
+        });
+    List<String> words = List.of("  ACTIVE   user ", "Active Customer");
+    as(
+        "viewer",
+        () -> {
+          TermDTO[] scoped =
+              views.listTerms(LAKE, "Sales", "CuSt", GlossaryTerm.Status.APPROVED, words, true);
+          assertEquals(1, scoped.length);
+          TermDTO term = scoped[0];
+          assertEquals("Active Customer", term.getName());
+          assertEquals(words, term.getMatchedBy().stream().map(TermMatchDTO::getWord).toList());
+          assertEquals(
+              List.of(TermMatch.Field.SYNONYM, TermMatch.Field.NAME),
+              term.getMatchedBy().stream().map(TermMatchDTO::getField).toList());
+          assertArrayEquals(new String[] {"Retail"}, term.getDomains());
+          GlossaryTermViews restricted =
+              new GlossaryTermViews(
+                  manager.withTermVisibility(t -> Arrays.asList(t.domains()).contains("Finance")));
+          assertArrayEquals(
+              new String[] {"Active Customer"},
+              restricted.listTermNames(LAKE, null, null, null, words));
+          assertEquals(List.of(), term.getBindings());
+          assertEquals(Boolean.FALSE, term.getBindingsTruncated());
+          assertArrayEquals(
+              new String[] {"Active Customer", "Retired Customer", "Hidden domain"},
+              views.listTermNames(LAKE, null, null, null, words));
+          assertEquals(
+              0,
+              views.listTerms(
+                      LAKE,
+                      null,
+                      null,
+                      GlossaryTerm.Status.APPROVED,
+                      List.of("Retired Customer", "customers"),
+                      false)
+                  .length);
+          TermDTO detail =
+              views
+                  .listTerms(
+                      LAKE, null, null, null, Collections.nCopies(20, "Active Customer"), false)[0];
+          assertNull(detail.getBindings());
+          assertNull(detail.getBindingsTruncated());
+          assertNull(views.listTerms(LAKE, null, "Active", null)[0].getMatchedBy());
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  views.listTermNames(
+                      LAKE, null, null, null, Collections.nCopies(21, "Active Customer")));
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> views.listTerms(LAKE, null, null, null, List.of("\u00a0"), false));
+          return null;
+        });
+    assertArrayEquals(
+        new String[] {"Finance", "Retail"},
+        as("lakeOwner", () -> manager.getTerm(LAKE, "Active Customer")).domains());
+  }
+
+  @TestTemplate
+  void testLiteralFragmentsAndSelectiveHydration() throws Exception {
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    GlossaryTermEntity needle = create("Discount%_!\\fee");
+    create("Discount");
+    for (int i = 0; i < 12; i++) create("Other" + i);
+    as(
+        "lakeOwner",
+        () ->
+            manager.createTerm(
+                LAKE, TermSpec.builder("Draft%").withStatus(GlossaryTerm.Status.DRAFT).build()));
+    List<Long> loaded = new ArrayList<>();
+    try (MockedStatic<SqlSessions> ignored =
+        observeMapper(
+            GlossaryTermMetaMapper.class,
+            call -> {
+              if (call.getMethod().getName().equals("selectTermSnapshotsByIds"))
+                loaded.addAll(call.<List<Long>>getArgument(2));
+              assertFalse(call.getMethod().getName().equals("snapshot"));
+            })) {
+      as(
+          "viewer",
+          () -> {
+            String[] all = views.listTermNames(LAKE, null, null, null);
+            assertEquals(14, all.length);
+            assertFalse(Arrays.asList(all).contains("Draft%"));
+            for (String literal : List.of("%", "_", "!", "\\")) {
+              assertArrayEquals(
+                  new String[] {"Discount%_!\\fee"},
+                  views.listTermNames(LAKE, null, literal, GlossaryTerm.Status.APPROVED));
+            }
+            assertEquals(List.of(), loaded);
+            assertEquals(
+                "Discount%_!\\fee",
+                views.listTerms(LAKE, null, "%", GlossaryTerm.Status.APPROVED)[0].getName());
+            assertEquals(List.of(needle.id()), loaded);
+            return null;
+          });
+    }
+  }
+
+  @TestTemplate
+  void testUnicodeNameFragmentsPreserveLiteralSpacing() throws Exception {
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    String name = "CAFÉ  İstanbul";
+    create(name);
+    create("Cafe İstanbul");
+    as(
+        "viewer",
+        () -> {
+          assertArrayEquals(new String[] {name}, views.listTermNames(LAKE, null, "fé", null));
+          assertArrayEquals(
+              new String[] {name},
+              Arrays.stream(views.listTerms(LAKE, null, "é  i\u0307", null, List.of(name), false))
+                  .map(TermDTO::getName)
+                  .toArray(String[]::new));
+          assertEquals(0, views.listTermNames(LAKE, null, "é i\u0307", null).length);
+          assertEquals(0, views.listTermNames(LAKE, null, "E  İ", null).length);
+          return null;
+        });
+  }
+
+  @TestTemplate
+  void testLookupRelationProjectionExhaustsSharedBudgetWithoutBindings() throws Exception {
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    as(
+        "lakeOwner",
+        () -> {
+          for (int i = 0; i < 101; i++) {
+            manager.createTerm(LAKE, TermSpec.builder("Term" + i).withSynonyms("shared").build());
+          }
+          return null;
+        });
+    // 101 roots with 5,050 symmetric edges project 10,100 relation endpoints.
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
+        Statement insert = session.getConnection().createStatement()) {
+      assertEquals(
+          5050,
+          insert.executeUpdate(
+              "INSERT INTO glossary_term_rel "
+                  + "(metalake_id, from_term_id, to_term_id, rel_type, deleted_at) "
+                  + "SELECT a.metalake_id, a.term_id, b.term_id, 'RELATED', 0 FROM glossary_term_meta a "
+                  + "JOIN glossary_term_meta b ON a.metalake_id=b.metalake_id AND a.term_id < b.term_id "
+                  + "WHERE a.deleted_at=0 AND b.deleted_at=0"));
+      session.commit(true);
+    }
+    assertEquals(
+        101,
+        as("viewer", () -> views.listTermNames(LAKE, null, null, null, List.of("shared"))).length);
+    LookupTooBroadException error =
+        assertThrows(
+            LookupTooBroadException.class,
+            () ->
+                as(
+                    "viewer",
+                    () -> views.listTerms(LAKE, null, null, null, List.of("shared"), false)));
+    assertEquals(
+        "Glossary lookup is too broad. Omit embedded bindings or narrow the query.",
+        error.getMessage());
+  }
+
+  @TestTemplate
   void testStatusFilterSkipsOwnershipChecksForExcludedDrafts() throws Exception {
     GlossaryTermViews views = new GlossaryTermViews(manager);
     GlossaryTerm.Status approved = GlossaryTerm.Status.APPROVED;
@@ -255,6 +449,9 @@ class TestGlossaryDomains extends TestJDBCBackend {
         () -> {
           assertArrayEquals(new String[] {"Root"}, views.listTermNames(LAKE, null, null, approved));
           assertEquals("Root", views.listTerms(LAKE, null, null, approved)[0].getName());
+          assertArrayEquals(
+              new String[0],
+              views.listTerms(LAKE, null, null, approved, List.of("Root"), false)[0].getNarrower());
           assertThrows(NoSuchTermException.class, () -> views.getTerm(LAKE, "Draft", approved));
           assertEquals(0, views.getTerm(LAKE, "Root", approved).getNarrower().length);
           assertEquals(
@@ -265,6 +462,14 @@ class TestGlossaryDomains extends TestJDBCBackend {
         });
     Mockito.verify(observed, Mockito.never())
         .isGlossaryTermOwner(Mockito.any(), Mockito.eq(LAKE), Mockito.anyLong(), Mockito.any());
+    assertArrayEquals(
+        new String[] {"Draft"},
+        as("lakeOwner", () -> views.listTerms(LAKE, null, null, null, List.of("Root"), false))[0]
+            .getNarrower());
+    assertArrayEquals(
+        new String[0],
+        as("viewer", () -> views.listTerms(LAKE, null, null, null, List.of("Root"), false))[0]
+            .getNarrower());
     assertEquals("Draft", as("writer", () -> views.getTerm(LAKE, "Draft", null)).getName());
     Mockito.verify(observed)
         .isGlossaryTermOwner(Mockito.any(), Mockito.eq(LAKE), Mockito.anyLong(), Mockito.any());
@@ -277,6 +482,7 @@ class TestGlossaryDomains extends TestJDBCBackend {
     as(
         "lakeOwner",
         () -> views.createTerm(LAKE, TermSpec.builder("Child").withBroader("Parent").build()));
+    long childId = as("lakeOwner", () -> manager.getTerm(LAKE, "Child")).id();
     List<Long> loaded = new ArrayList<>();
     try (MockedStatic<SqlSessions> ignored =
         observeMapper(
@@ -290,10 +496,11 @@ class TestGlossaryDomains extends TestJDBCBackend {
       TermDTO child =
           Arrays.stream(all).filter(t -> t.getName().equals("Child")).findFirst().orElseThrow();
       assertArrayEquals(new String[] {"Parent"}, child.getBroader());
-      assertEquals(List.of(), loaded);
+      assertEquals(List.of(parent.id(), childId), loaded);
+      loaded.clear();
       TermDTO[] onlyChild = as("lakeOwner", () -> views.listTerms(LAKE, null, "Child", null));
       assertArrayEquals(new String[] {"Parent"}, onlyChild[0].getBroader());
-      assertEquals(List.of(parent.id()), loaded);
+      assertEquals(List.of(childId, parent.id()), loaded);
     }
   }
 
