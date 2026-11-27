@@ -81,6 +81,7 @@ import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.utils.TableLoadScope;
 
 /**
  * Relational catalog is a catalog implementation that supports relational database like metadata
@@ -263,6 +264,36 @@ class RelationalCatalog extends BaseSchemaCatalog
     TableResponse resp =
         restClient.get(
             formatTableRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
+            TableResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tableErrorHandler());
+    resp.validate();
+
+    return RelationalTable.from(fullNamespace, resp.getTable(), restClient);
+  }
+
+  /**
+   * Loads stored table metadata without asking the catalog to open the dataset.
+   *
+   * <p>Standalone Lance REST uses this when it only needs format and ownership. The Gravitino
+   * server applies {@link TableLoadScope} for that request. A normal {@link #loadTable} still
+   * refreshes the schema and rejects an {@code hdfs} or {@code viewfs} dataset open.
+   *
+   * @param ident the table identifier, in {@code schema.table} form
+   * @return the stored table
+   * @throws NoSuchTableException if the table does not exist
+   */
+  @Override
+  public Table loadStoredTable(NameIdentifier ident) throws NoSuchTableException {
+    checkTableNameIdentifier(ident);
+
+    Namespace fullNamespace = getEntityFullNamespace(ident.namespace());
+    Map<String, String> queryParams = Maps.newHashMap();
+    queryParams.put(TableLoadScope.METADATA_ONLY_PARAM, "true");
+    TableResponse resp =
+        restClient.get(
+            formatTableRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
+            queryParams,
             TableResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tableErrorHandler());

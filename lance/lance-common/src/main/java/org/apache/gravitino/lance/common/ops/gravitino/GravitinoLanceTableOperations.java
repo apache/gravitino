@@ -49,7 +49,9 @@ import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.utils.TableLoadScope;
 import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
@@ -278,7 +280,9 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
     Table t;
     try {
-      t = loadAndValidateLanceTable(catalog, tableIdentifier, tableId);
+      // Read stored metadata only. A declared, empty, or version-checked hdfs table would
+      // otherwise fail while opening the dataset and could not be removed from the catalog.
+      t = loadStoredLanceTable(catalog, tableIdentifier, tableId);
     } catch (NoSuchTableException e) {
       throw new TableNotFoundException(
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
@@ -323,11 +327,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     try {
       return LancePropertiesUtils.isLanceTableFormat(
-          namespaceWrapper
-              .asTableCatalog(catalog)
-              .loadTable(tableIdentifier)
-              .properties()
-              .get(Table.PROPERTY_TABLE_FORMAT));
+          loadStoredTable(catalog, tableIdentifier).properties().get(Table.PROPERTY_TABLE_FORMAT));
     } catch (NoSuchTableException e) {
       return false;
     }
@@ -397,9 +397,29 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     return (GravitinoLanceTableAlterHandler<REQUEST, RESPONSE>) ALTER_HANDLERS.get(requestClass);
   }
 
+  private Table loadStoredLanceTable(
+      Catalog catalog, NameIdentifier tableIdentifier, String tableId) {
+    return validateLanceTable(loadStoredTable(catalog, tableIdentifier), tableId);
+  }
+
+  /**
+   * Loads stored metadata. The thread scope covers auxiliary mode, where this process and the
+   * catalog share {@link TableLoadScope}. Standalone mode sends {@code metadataOnly} through {@link
+   * TableCatalog#loadStoredTable(NameIdentifier)} because the REST process cannot share that flag
+   * with the Gravitino server.
+   */
+  private Table loadStoredTable(Catalog catalog, NameIdentifier tableIdentifier) {
+    TableCatalog tableCatalog = namespaceWrapper.asTableCatalog(catalog);
+    return TableLoadScope.call(() -> tableCatalog.loadStoredTable(tableIdentifier));
+  }
+
   private Table loadAndValidateLanceTable(
       Catalog catalog, NameIdentifier tableIdentifier, String tableId) {
     Table table = namespaceWrapper.asTableCatalog(catalog).loadTable(tableIdentifier);
+    return validateLanceTable(table, tableId);
+  }
+
+  private Table validateLanceTable(Table table, String tableId) {
     if (!LancePropertiesUtils.isLanceTableFormat(
         table.properties().get(Table.PROPERTY_TABLE_FORMAT))) {
       throw new InvalidInputException(

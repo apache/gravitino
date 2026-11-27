@@ -56,6 +56,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.exceptions.UnsupportedTableStorageException;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
@@ -325,6 +326,22 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   @Override
   public boolean dropTable(NameIdentifier ident) throws UnsupportedOperationException {
     return dropOrPurgeTable(ident, false /* purge */);
+  }
+
+  /**
+   * Returns whether the stored table row exists. A dataset that cannot be opened still counts as
+   * present, because existence is a metadata check.
+   *
+   * @param ident the table identifier
+   * @return true when the table row exists
+   */
+  @Override
+  public boolean tableExists(NameIdentifier ident) {
+    try {
+      return TableCatalog.super.tableExists(ident);
+    } catch (UnsupportedTableStorageException e) {
+      return true;
+    }
   }
 
   /**

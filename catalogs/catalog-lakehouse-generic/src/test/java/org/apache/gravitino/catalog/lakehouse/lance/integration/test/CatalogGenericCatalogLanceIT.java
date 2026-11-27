@@ -451,14 +451,14 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     // Now try to simulate the location of lance table does not exist.
     Map<String, String> newProperties = createProperties();
     newProperties.put("format", "lance");
-    // Use a wrong location to let the table creation fail
+    // Server-side Lance I/O does not support hdfs locations.
     newProperties.put("location", "hdfs://localhost:9000/wrong_location");
 
     String nameNew = GravitinoITUtils.genRandomName(TABLE_PREFIX);
     NameIdentifier newNameIdentifier = NameIdentifier.of(schemaName, nameNew);
     Exception e =
         Assertions.assertThrows(
-            Exception.class,
+            UnsupportedOperationException.class,
             () -> {
               catalog
                   .asTableCatalog()
@@ -472,7 +472,7 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
                       null);
             });
 
-    Assertions.assertTrue(e.getMessage().contains("Invalid user input"));
+    Assertions.assertTrue(e.getMessage().contains("does not support hdfs"));
 
     Assertions.assertThrows(
         RuntimeException.class, () -> catalog.asTableCatalog().loadTable(newNameIdentifier));

@@ -24,18 +24,22 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.AlterColumnsGravitinoLance;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.DropColumns;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.utils.TableLoadScope;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.lance.namespace.errors.InvalidInputException;
+import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterColumnsEntry;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableAlterColumnsResponse;
@@ -120,7 +124,7 @@ class TestGravitinoLanceTableOperations {
     }
     Mockito.when(table.properties()).thenReturn(properties);
     TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
-    Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class))).thenReturn(table);
+    Mockito.when(tableCatalog.loadStoredTable(Mockito.any(NameIdentifier.class))).thenReturn(table);
     Mockito.when(tableCatalog.dropTable(Mockito.any(NameIdentifier.class))).thenReturn(true);
 
     Assertions.assertEquals(
@@ -139,7 +143,7 @@ class TestGravitinoLanceTableOperations {
         .thenReturn(new HashMap<>(Map.of(Table.PROPERTY_TABLE_FORMAT, "lance")));
 
     TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
-    Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class)))
+    Mockito.when(tableCatalog.loadStoredTable(Mockito.any(NameIdentifier.class)))
         .thenReturn(managedTable);
 
     Catalog catalog = Mockito.mock(Catalog.class);
@@ -160,6 +164,73 @@ class TestGravitinoLanceTableOperations {
 
     // Verify dropTable was never called — the guard must reject before reaching the catalog layer.
     Mockito.verify(tableCatalog, Mockito.never()).dropTable(Mockito.any());
+  }
+
+  @Test
+  void testDeregisterReadsStoredMetadataWithoutOpeningDataset() {
+    Table table = externalLanceTable("hdfs://namenode:8020/lake/declared");
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(tableCatalog.loadStoredTable(Mockito.any(NameIdentifier.class)))
+        .thenAnswer(
+            invocation -> {
+              Assertions.assertTrue(TableLoadScope.isActive());
+              return table;
+            });
+    Mockito.when(tableCatalog.dropTable(Mockito.any(NameIdentifier.class))).thenReturn(true);
+
+    Assertions.assertEquals(
+        "hdfs://namenode:8020/lake/declared",
+        operations(tableCatalog).deregisterTable("catalog.schema.table", ".").getLocation());
+
+    Assertions.assertFalse(TableLoadScope.isActive());
+    Mockito.verify(tableCatalog).dropTable(NameIdentifier.of("schema", "table"));
+    Mockito.verify(tableCatalog, Mockito.never()).loadTable(Mockito.any(NameIdentifier.class));
+  }
+
+  @Test
+  void testTableExistsReadsStoredMetadataWithoutOpeningDataset() {
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(tableCatalog.loadStoredTable(Mockito.any(NameIdentifier.class)))
+        .thenAnswer(
+            invocation -> {
+              Assertions.assertTrue(TableLoadScope.isActive());
+              return externalLanceTable("/tmp/orders");
+            });
+
+    Assertions.assertTrue(operations(tableCatalog).tableExists("catalog.schema.table", "."));
+    Assertions.assertFalse(TableLoadScope.isActive());
+  }
+
+  @Test
+  void testTableExistsClearsStoredMetadataScopeWhenMissing() {
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(tableCatalog.loadStoredTable(Mockito.any(NameIdentifier.class)))
+        .thenAnswer(
+            invocation -> {
+              Assertions.assertTrue(TableLoadScope.isActive());
+              throw new NoSuchTableException("missing");
+            });
+
+    Assertions.assertFalse(operations(tableCatalog).tableExists("catalog.schema.table", "."));
+    Assertions.assertFalse(TableLoadScope.isActive());
+  }
+
+  @Test
+  void testDescribeDoesNotUseStoredMetadataScope() {
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class)))
+        .thenAnswer(
+            invocation -> {
+              Assertions.assertFalse(TableLoadScope.isActive());
+              throw new NoSuchTableException("missing");
+            });
+
+    Assertions.assertThrows(
+        TableNotFoundException.class,
+        () ->
+            operations(tableCatalog)
+                .describeTable("catalog.schema.table", ".", Optional.empty(), false, false));
+    Assertions.assertFalse(TableLoadScope.isActive());
   }
 
   @Test
@@ -221,12 +292,27 @@ class TestGravitinoLanceTableOperations {
     Mockito.verify(tableCatalog, Mockito.never()).alterTable(Mockito.any(), Mockito.any());
   }
 
+  private static Table externalLanceTable(String location) {
+    Table table = Mockito.mock(Table.class);
+    Mockito.when(table.properties())
+        .thenReturn(
+            Map.of(
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                Table.PROPERTY_EXTERNAL,
+                "true",
+                "location",
+                location));
+    return table;
+  }
+
   private static TableCatalog tableCatalogWithTable(String format) {
     Table table = Mockito.mock(Table.class);
     Mockito.when(table.properties())
         .thenReturn(Map.of(Table.PROPERTY_TABLE_FORMAT, format, Table.PROPERTY_EXTERNAL, "true"));
     TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
     Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class))).thenReturn(table);
+    Mockito.when(tableCatalog.loadStoredTable(Mockito.any(NameIdentifier.class))).thenReturn(table);
     return tableCatalog;
   }
 

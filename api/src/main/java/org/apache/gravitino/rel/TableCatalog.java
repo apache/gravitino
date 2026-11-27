@@ -64,6 +64,23 @@ public interface TableCatalog {
   Table loadTable(NameIdentifier ident) throws NoSuchTableException;
 
   /**
+   * Loads stored table metadata without opening the underlying dataset.
+   *
+   * <p>The default implementation delegates to {@link #loadTable(NameIdentifier)}. A client that
+   * talks to Gravitino over HTTP overrides this to request stored metadata from the server. Callers
+   * in the same process should also set {@code TableLoadScope} so a catalog that still uses {@link
+   * #loadTable(NameIdentifier)} can skip a dataset open.
+   *
+   * @param ident a table identifier
+   * @return the stored table metadata
+   * @throws NoSuchTableException if the table does not exist
+   * @throws NoSuchSchemaException if the containing schema does not exist
+   */
+  default Table loadStoredTable(NameIdentifier ident) throws NoSuchTableException {
+    return loadTable(ident);
+  }
+
+  /**
    * Load table metadata by {@link NameIdentifier} from the catalog with required privileges.
    *
    * <p>The default implementation throws {@link UnsupportedOperationException}: a catalog that

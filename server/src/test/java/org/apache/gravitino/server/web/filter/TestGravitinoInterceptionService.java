@@ -1469,7 +1469,13 @@ public class TestGravitinoInterceptionService {
       when(provider.getGravitinoAuthorizer()).thenReturn(mock(GravitinoAuthorizer.class));
       Method method =
           TableOperations.class.getMethod(
-              "loadTable", String.class, String.class, String.class, String.class, String.class);
+              "loadTable",
+              String.class,
+              String.class,
+              String.class,
+              String.class,
+              String.class,
+              boolean.class);
       for (String privileges :
           new String[] {
             "BOGUS",
@@ -1481,7 +1487,7 @@ public class TestGravitinoInterceptionService {
         MethodInvocation invocation = mock(MethodInvocation.class);
         when(invocation.getMethod()).thenReturn(method);
         when(invocation.getArguments())
-            .thenReturn(new Object[] {"metalake", "catalog", "schema", "table", privileges});
+            .thenReturn(new Object[] {"metalake", "catalog", "schema", "table", privileges, false});
         Response response =
             (Response)
                 new GravitinoInterceptionService()
@@ -2232,20 +2238,28 @@ public class TestGravitinoInterceptionService {
 
       Method method =
           TableOperations.class.getMethod(
-              "loadTable", String.class, String.class, String.class, String.class, String.class);
+              "loadTable",
+              String.class,
+              String.class,
+              String.class,
+              String.class,
+              String.class,
+              boolean.class);
       MethodInterceptor interceptor =
           new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
       MethodInvocation invocation = mock(MethodInvocation.class);
       when(invocation.getMethod()).thenReturn(method);
       when(invocation.getArguments())
           .thenReturn(
-              new Object[] {"testMetalake", "testCatalog", "testSchema", "missingTable", null});
+              new Object[] {
+                "testMetalake", "testCatalog", "testSchema", "missingTable", null, false
+              });
 
       when(invocation.proceed())
           .thenAnswer(
               ignored ->
                   operations.loadTable(
-                      "testMetalake", "testCatalog", "testSchema", "missingTable", null));
+                      "testMetalake", "testCatalog", "testSchema", "missingTable", null, false));
       Response response = (Response) interceptor.invoke(invocation);
 
       assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());

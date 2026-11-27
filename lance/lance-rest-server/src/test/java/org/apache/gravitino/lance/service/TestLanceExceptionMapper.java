@@ -62,7 +62,6 @@ import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.errors.NamespaceNotFoundException;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.errors.ThrottlingException;
-import org.lance.namespace.errors.UnsupportedOperationException;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.ErrorResponse;
 import org.mockito.Mockito;
@@ -190,6 +189,20 @@ public class TestLanceExceptionMapper extends JerseyTest {
       Assertions.assertEquals(406, response.getStatus());
       Assertions.assertEquals(
           ErrorCode.INVALID_INPUT.getCode(), response.readEntity(ErrorResponse.class).getCode());
+    }
+  }
+
+  /** Server-side HDFS rejection stays a 406 and keeps the caller-facing reason. */
+  @Test
+  public void testHdfsRejectionUsesUnsupportedResponse() {
+    UnsupportedOperationException failure =
+        new UnsupportedOperationException("Lance server-side I/O does not support hdfs locations.");
+    try (Response response = LanceExceptionMapper.toRESTResponse("orders", failure)) {
+      Assertions.assertEquals(406, response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(ErrorCode.UNSUPPORTED.getCode(), error.getCode());
+      Assertions.assertEquals(
+          "Lance server-side I/O does not support hdfs locations.", error.getError());
     }
   }
 
@@ -346,7 +359,7 @@ public class TestLanceExceptionMapper extends JerseyTest {
       Assertions.assertEquals("POST " + path, error.getInstance());
       Assertions.assertTrue(error.getError().contains(error.getInstance()));
       Assertions.assertInstanceOf(
-          UnsupportedOperationException.class,
+          org.lance.namespace.errors.UnsupportedOperationException.class,
           ErrorFactory.fromErrorCode(
               error.getCode(), error.getError(), error.getDetail(), error.getInstance()));
     }

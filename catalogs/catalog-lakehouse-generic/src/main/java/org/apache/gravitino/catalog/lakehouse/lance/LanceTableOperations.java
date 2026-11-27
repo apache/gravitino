@@ -27,12 +27,15 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -57,6 +60,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.exceptions.UnsupportedTableStorageException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
@@ -74,6 +78,7 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.TableLoadScope;
 import org.lance.Dataset;
 import org.lance.ReadOptions;
 import org.lance.WriteDatasetBuilder;
@@ -250,6 +255,16 @@ public class LanceTableOperations extends ManagedTableOperations {
       validateExistingDatasetLocation(ident, location, properties);
     }
 
+    // A new hdfs or viewfs dataset cannot be created. Reject that target before OVERWRITE purges
+    // the table that already exists, including one stored on s3 or the local filesystem.
+    boolean declaredOnly =
+        Optional.ofNullable(properties.get(LanceConstants.LANCE_TABLE_DECLARED))
+            .map(Boolean::parseBoolean)
+            .orElse(false);
+    if (!register && !declaredOnly) {
+      rejectUnsupportedDistributedFileSystem(location);
+    }
+
     // Handle OVERWRITE mode - drop existing table if present
     if (mode == CreationMode.OVERWRITE) {
       if (register) {
@@ -318,6 +333,12 @@ public class LanceTableOperations extends ManagedTableOperations {
                 + LANCE_ALLOW_EXTERNAL_TABLE_PURGE
                 + " to allow physical deletion of external data.");
       }
+      // Reject before metadata removal. A managed purge reaches dropTable, which deletes the
+      // dataset; an allowed external purge deletes the dataset after the metadata row is gone.
+      // A declared hdfs or viewfs table has no dataset to delete.
+      if (!isDeclaredDistributedLocation(table)) {
+        rejectUnsupportedDistributedFileSystem(table.properties().get(Table.PROPERTY_LOCATION));
+      }
 
       // NOTE: the two steps below (metadata removal and dataset deletion) are NOT atomic.
       // If the process crashes between them, the entity-store record will be gone but the
@@ -332,7 +353,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
       // If the table metadata is purged successfully, we can delete the Lance dataset.
       // Otherwise, we should not delete the dataset.
-      if (purged) {
+      if (purged && !isDeclaredDistributedLocation(table)) {
         dropLanceDataset(table);
       }
 
@@ -358,6 +379,10 @@ public class LanceTableOperations extends ManagedTableOperations {
       Table table = super.loadTable(ident);
       validateLanceTable(ident, table);
       boolean external = LancePropertiesUtils.isExternalTable(table.properties());
+      // A declared hdfs or viewfs table has no server-side dataset. Drop removes its metadata.
+      if (!external && !isDeclaredDistributedLocation(table)) {
+        rejectUnsupportedDistributedFileSystem(table.properties().get(Table.PROPERTY_LOCATION));
+      }
 
       // NOTE: the two steps below (metadata removal and dataset deletion) are NOT atomic.
       // If the process crashes between them, the entity-store record will be gone but the
@@ -370,7 +395,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
       // If the table metadata is dropped successfully, and the table is not external, we can
       // delete the Lance dataset. Otherwise, we should not delete the dataset.
-      if (dropped) {
+      if (dropped && !isDeclaredDistributedLocation(table)) {
         dropLanceDataset(table);
       }
 
@@ -378,7 +403,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     } catch (NoSuchTableException e) {
       return false;
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException | UnsupportedTableStorageException e) {
       throw e;
     } catch (OptimisticLockException e) {
       // The table metadata conflicted with a concurrent writer, e.g. a lock wait timeout, and was
@@ -393,6 +418,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     String location = table.properties().get(Table.PROPERTY_LOCATION);
     Map<String, String> resolvedStorageOptions =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
+    rejectUnsupportedDistributedFileSystem(location);
     try {
       Dataset.drop(location, resolvedStorageOptions);
       LOG.info("Deleted Lance dataset at location {}", location);
@@ -491,6 +517,8 @@ public class LanceTableOperations extends ManagedTableOperations {
             e, "Lance dataset already exists at location %s", location);
       }
       throw e;
+    } catch (UnsupportedTableStorageException e) {
+      throw e;
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to create Lance dataset at location " + location, e);
     }
@@ -501,6 +529,7 @@ public class LanceTableOperations extends ManagedTableOperations {
    * the blob columns, because blob v2 and legacy blob each require a different version.
    */
   Dataset createDataset(String location, Column[] columns, Map<String, String> storageOptions) {
+    rejectUnsupportedDistributedFileSystem(location);
     Schema schema = convertColumnsToArrowSchema(columns);
     WriteDatasetBuilder builder =
         Dataset.write()
@@ -526,6 +555,13 @@ public class LanceTableOperations extends ManagedTableOperations {
 
   private Table loadTableInternal(NameIdentifier ident, boolean forAlter) {
     Table table = super.loadTable(ident);
+    // Deregister and table-exists checks only need stored format and ownership. Skip the dataset
+    // open for hdfs and viewfs. Other schemes still refresh, so an s3 or file table keeps the
+    // schema repair it had before this scope existed.
+    if (TableLoadScope.isActive()
+        && isUnsupportedDistributedFileSystem(table.properties().get(Table.PROPERTY_LOCATION))) {
+      return table;
+    }
     // Spark staged create can write the actual schema only to the Lance dataset path. Refresh
     // Gravitino metadata when the stored table is declared-only, empty, or configured to track
     // Lance dataset versions.
@@ -564,6 +600,8 @@ public class LanceTableOperations extends ManagedTableOperations {
         return table;
       }
       columns = extractColumns(dataset.getSchema());
+    } catch (UnsupportedTableStorageException e) {
+      throw e;
     } catch (Exception e) {
       if (forAlter) {
         throw new IllegalStateException(
@@ -607,6 +645,11 @@ public class LanceTableOperations extends ManagedTableOperations {
     return Optional.ofNullable(properties.get(LanceConstants.LANCE_TABLE_DECLARED))
         .map(Boolean::parseBoolean)
         .orElse(false);
+  }
+
+  private boolean isDeclaredDistributedLocation(Table table) {
+    return isDeclaredOnly(table)
+        && isUnsupportedDistributedFileSystem(table.properties().get(Table.PROPERTY_LOCATION));
   }
 
   private boolean isDatasetVersionChanged(Table table, long datasetVersion) {
@@ -1013,6 +1056,7 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   Dataset openDataset(String location, Map<String, String> storageOptions) {
+    rejectUnsupportedDistributedFileSystem(location);
     // Do not pass an explicit allocator: OpenDatasetBuilder then sets selfManagedAllocator=true
     // so Dataset.close() will release the off-heap memory. Passing new RootAllocator() sets
     // selfManagedAllocator=false and leaks the allocator on every call.
@@ -1066,6 +1110,7 @@ public class LanceTableOperations extends ManagedTableOperations {
    * @param ident the table being registered, used only for the error message
    * @param location the caller-supplied dataset location
    * @param properties the table properties, used to resolve storage options
+   * @throws UnsupportedTableStorageException if the location scheme is hdfs or viewfs
    * @throws IllegalArgumentException if the SDK rejects the dataset location as invalid input
    * @throws RuntimeException if storage access or closing the validation dataset fails
    */
@@ -1080,6 +1125,8 @@ public class LanceTableOperations extends ManagedTableOperations {
     Dataset dataset;
     try {
       dataset = openDataset(location, storageOptions);
+    } catch (UnsupportedTableStorageException e) {
+      throw e;
     } catch (IllegalArgumentException e) {
       // Lance maps DatasetNotFound and InvalidInput to IllegalArgumentException, while storage
       // I/O errors use IOException. Preserve that distinction for the REST error mapper.
@@ -1095,5 +1142,66 @@ public class LanceTableOperations extends ManagedTableOperations {
       // Cleanup failures are server errors, even if close throws IllegalArgumentException.
       throw ExceptionMessages.wrap("Failed to close validated dataset for table " + ident, e);
     }
+  }
+
+  /**
+   * Rejects server-side dataset I/O for Hadoop distributed file systems.
+   *
+   * <p>lance-core opens storage through its own object store. It does not call Hadoop FileSystem on
+   * the calling thread, so wrapping {@code Dataset} in {@code UserGroupInformation.doAs} cannot
+   * select an HDFS user. {@code hdfs} and {@code viewfs} locations can still be stored as metadata.
+   *
+   * @param location the table location for this operation
+   * @throws UnsupportedOperationException if the location scheme is hdfs or viewfs
+   */
+  private static void rejectUnsupportedDistributedFileSystem(String location) {
+    String scheme = storageScheme(location);
+    if ("hdfs".equals(scheme) || "viewfs".equals(scheme)) {
+      throw new UnsupportedTableStorageException(
+          "Lance server-side I/O does not support "
+              + scheme
+              + " locations. The path can be stored as table metadata, but creating, opening,"
+              + " registering, or deleting the Lance dataset is not supported: "
+              + location);
+    }
+  }
+
+  private static boolean isUnsupportedDistributedFileSystem(String location) {
+    String scheme = storageScheme(location);
+    return "hdfs".equals(scheme) || "viewfs".equals(scheme);
+  }
+
+  private static String storageScheme(String location) {
+    if (StringUtils.isBlank(location)) {
+      return null;
+    }
+    String trimmed = location.trim();
+    try {
+      String scheme = new URI(trimmed).getScheme();
+      if (scheme != null) {
+        return scheme.toLowerCase(Locale.ROOT);
+      }
+    } catch (URISyntaxException ignored) {
+      // A path with a space is not a legal URI, but hdfs://nn/my table is still an HDFS location.
+      String scheme = schemeBeforeSeparator(trimmed);
+      if (scheme != null) {
+        return scheme;
+      }
+    }
+    return null;
+  }
+
+  private static String schemeBeforeSeparator(String location) {
+    int separator = location.indexOf("://");
+    if (separator <= 0) {
+      return null;
+    }
+    String scheme = location.substring(0, separator);
+    for (int i = 0; i < scheme.length(); i++) {
+      if (!Character.isLetter(scheme.charAt(i))) {
+        return null;
+      }
+    }
+    return scheme.toLowerCase(Locale.ROOT);
   }
 }
