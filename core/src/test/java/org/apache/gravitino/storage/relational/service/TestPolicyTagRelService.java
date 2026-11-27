@@ -46,10 +46,12 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.HiddenPolicyTag;
+import org.apache.gravitino.policy.PolicyEditAuthorization;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
@@ -68,6 +70,57 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
   private static final String METALAKE = "policy_tag_relation_metalake";
   private static final String FINANCE_SELECTOR = "{\"type\":\"TAG_VALUE\",\"value\":\"finance\"}";
   private static final String RISK_SELECTOR = "{\"type\":\"TAG_VALUE\",\"value\":\"risk\"}";
+
+  /** Rechecks the policy snapshot before committing an association change. */
+  @TestTemplate
+  public void testBindingRechecksAuthorizedPolicy() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    RelationEndpoints endpoints = createEndpoints(METALAKE, "domain", "retention");
+    PolicyEntity stale =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            endpoints.policy.namespace(),
+            endpoints.policy.name(),
+            AUDIT_INFO);
+    try (PolicyEditAuthorization scope = PolicyEditAuthorization.open()) {
+      PolicyEditAuthorization.record(stale);
+      Assertions.assertThrows(
+          OptimisticLockException.class,
+          () -> backend.updateEntityRelations(relationUpdate(endpoints, null, true)));
+    }
+    Assertions.assertNull(getRelation(endpoints));
+    try (PolicyEditAuthorization scope = PolicyEditAuthorization.open()) {
+      PolicyEditAuthorization.record(endpoints.policy);
+      backend.updateEntityRelations(relationUpdate(endpoints, null, true));
+    }
+    Assertions.assertNotNull(getRelation(endpoints));
+  }
+
+  /** Rejects a policy update authorized while unbound if a binding now exists. */
+  @TestTemplate
+  public void testUpdateRechecksUnboundPolicy() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    RelationEndpoints endpoints = createEndpoints(METALAKE, "domain", "retention");
+    backend.updateEntityRelations(relationUpdate(endpoints, null, true));
+    try (PolicyEditAuthorization scope = PolicyEditAuthorization.open()) {
+      PolicyEditAuthorization.record(endpoints.policy);
+      PolicyEditAuthorization.requireUnbound();
+      Assertions.assertThrows(
+          OptimisticLockException.class,
+          () ->
+              PolicyMetaService.getInstance()
+                  .updatePolicy(endpoints.policy.nameIdentifier(), entity -> endpoints.policy));
+    }
+    Assertions.assertNotNull(getRelation(endpoints));
+    backend.updateEntityRelations(relationUpdate(endpoints, null, false));
+    try (PolicyEditAuthorization scope = PolicyEditAuthorization.open()) {
+      PolicyEditAuthorization.record(endpoints.policy);
+      PolicyEditAuthorization.requireUnbound();
+      PolicyMetaService.getInstance()
+          .updatePolicy(endpoints.policy.nameIdentifier(), entity -> endpoints.policy);
+    }
+    Assertions.assertNull(getRelation(endpoints));
+  }
 
   /** Verifies selector constraints for direct storage callers and rolls back rejected updates. */
   @TestTemplate

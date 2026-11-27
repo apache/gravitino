@@ -40,12 +40,14 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.policy.HiddenPolicyTag;
+import org.apache.gravitino.policy.PolicyEditAuthorization;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHook;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
 import org.apache.gravitino.storage.IdGenerator;
@@ -185,6 +187,7 @@ public class PolicyMetaService {
           POConverters.updatePolicyPOWithVersion(oldPolicyPO, updatedPolicyEntity);
       SessionUtils.doMultipleWithCommit(
           () -> lockForUpdate(metalakeName, oldPolicyPO.getMetalakeId(), updatedPolicyEntity),
+          () -> checkAuthorizedUnboundPolicy(ident, oldPolicyPO),
           () -> beforeUpdate(updatedPolicyEntity),
           () -> updatePolicyRootWithVersion(ident, oldPolicyPO, newPolicyPO),
           () -> insertPolicyVersionIfAllocated(oldPolicyPO, newPolicyPO),
@@ -801,6 +804,37 @@ public class PolicyMetaService {
     PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
     if (hook != null) {
       hook.afterRemove(policyId);
+    }
+  }
+
+  private void checkAuthorizedUnboundPolicy(NameIdentifier ident, PolicyPO observed) {
+    if (!PolicyEditAuthorization.requiresUnbound(ident)) {
+      return;
+    }
+    NameIdentifier metalake = NameIdentifier.of(ident.namespace().level(0));
+    LiveEndpointService.lockLiveEndpoint(
+        metalake, Entity.EntityType.METALAKE, new NamespacedEntityId(observed.getMetalakeId()));
+    lockPolicies(List.of(observed));
+    SessionUtils.clearSessionCache();
+    List<RelationalEntity<?>> tags =
+        PolicyTagRelService.getInstance().listRelations(List.of(ident), Entity.EntityType.POLICY);
+    for (RelationalEntity<?> tag : tags) {
+      String name = tag.targetEntity().name();
+      boolean assigned = false;
+      if (HiddenPolicyTag.isReservedName(name)) {
+        try {
+          assigned =
+              !TagMetaService.getInstance()
+                  .listAssociatedMetadataObjectsForTag(
+                      NameIdentifierUtil.ofTag(metalake.name(), name))
+                  .isEmpty();
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      }
+      if (!HiddenPolicyTag.isReservedName(name) || assigned) {
+        throw ExceptionUtils.concurrentModification(Entity.EntityType.POLICY, ident);
+      }
     }
   }
 }

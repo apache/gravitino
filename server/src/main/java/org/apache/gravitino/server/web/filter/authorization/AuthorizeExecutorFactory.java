@@ -50,6 +50,14 @@ public class AuthorizeExecutorFactory {
           secondaryExpressionCondition);
       case ASSOCIATE_TAG -> new AssociateTagAuthorizationExecutor(
           expression, parameters, args, metadataContext, pathParams, entityType);
+      case BIND_TAG_POLICY -> new BindTagPolicyAuthorizationExecutor(
+          expression, metadataContext, pathParams, entityType, parameters, args, true);
+      case UNBIND_TAG_POLICY -> new BindTagPolicyAuthorizationExecutor(
+          expression, metadataContext, pathParams, entityType, parameters, args, false);
+      case CREATE_POLICY -> new CreatePolicyAuthorizationExecutor(
+          expression, metadataContext, pathParams, entityType, parameters, args);
+      case ALTER_POLICY -> new AlterPolicyAuthorizationExecutor(
+          expression, metadataContext, pathParams, entityType, parameters, args);
       case RUN_JOB -> new RunJobAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
       case LINEAGE -> new LineageAuthorizationExecutor(parameters, args, expression);

@@ -547,7 +547,8 @@ between a tag rule that allows and an RBAC grant that denies, and the deny wins.
 
 ## Administration
 
-Four write paths can change who has access. Their current authority requirements:
+Four write paths can change who has access. The general authority requirements are below.
+Access-control policies and access-carrying tags require the additional checks in [OQ-4](#oq-4--authority-to-confer-access-through-a-tag).
 
 | Operation                | Expression today                                                                | Scoping available                                                |
 | ------------------------ | ------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
@@ -728,7 +729,7 @@ Each is settled below. The alternatives are kept with the reason they were not t
 | OQ-1 | Where tags are evaluated                                | [Evaluation](#evaluation)                                     | Inside `authorize`, at the privilege leaf                |
 | OQ-2 | Composition when a tag allows and RBAC denies           | [below](#oq-2--composition-when-a-tag-allows-and-rbac-denies) | Deny wins                                                |
 | OQ-3 | What happens when a referenced role is deleted          | [below](#oq-3--deleting-a-referenced-role)                    | Refuse the deletion                                      |
-| OQ-4 | What authority conferring access through a tag requires | [below](#oq-4--authority-to-confer-access-through-a-tag)      | Grant authority on the object and an explicit tag grant to apply; metalake-level policy authority to bind or widen |
+| OQ-4 | What authority conferring access through a tag requires | [below](#oq-4--authority-to-confer-access-through-a-tag)      | Grant authority on the object and an explicit tag grant to apply; metalake-level grant authority to bind or widen |
 
 ### OQ-1 — where tags are evaluated
 
@@ -803,7 +804,8 @@ access on an object becomes authority over who else can reach it.
 |              | Option                                                                  | Behaviour                                                                                                                                                                                                                                                                                                           |
 | ------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Decided** | Require grant authority on the object, and an explicit `TAG::APPLY_TAG` | Applying an access-carrying tag also requires `MANAGE_GRANTS` on the object or an ancestor, or ownership of it — the same check `grantPrivilegeToRole` makes today. And a metalake-wide `APPLY_TAG` stops reaching a tag once it confers access, so grants issued when tags were descriptive do not silently widen. |
-| **Decided** | Require metalake-level policy authority to bind or widen an access policy | Covers the other two paths: `METALAKE::OWNER` or `METALAKE::CREATE_POLICY`. A policy-scoped `APPLY_POLICY` or `POLICY::OWNER` is not enough, because a policy carries no scope of its own and binding it reaches every object the tag already touches. Today a tag owner holding no policy privileges can bind one, and everything already carrying the tag gains the access at once. |
+| **Decided** | Require grant authority to create an access-control policy | Creating an access-control policy requires both `METALAKE::CREATE_POLICY` and `METALAKE::MANAGE_GRANTS`, unless the caller owns the metalake. Other policy types retain the existing creation rule. |
+| **Decided** | Require metalake-level grant authority to bind or widen an access policy | Binding requires tag ownership, `VIEW_TAG` or `APPLY_TAG`; policy ownership or `APPLY_POLICY`; and `METALAKE::MANAGE_GRANTS`, unless the caller owns the metalake. Widening a bound access policy retains the policy edit ownership check and additionally requires `METALAKE::MANAGE_GRANTS`, unless the caller owns the metalake. A policy can reach every object the tag already touches. |
 |              | Leave as is                                                             | Reading an object is enough to change who else can reach it.                                                                                                                                                                                                                                                        |
 |              | Require the applier to hold the privilege the tag confers               | SQL `GRANT` semantics. Gravitino's own grant path does not work this way — `MANAGE_GRANTS` lets an operator hand out privileges they do not hold — so tags would become stricter than roles.                                                                                                                        |
 |              | Require authority over every object the tag currently reaches           | A bind that is legal today becomes illegal tomorrow because someone applied the tag elsewhere, and the check costs an enumeration that grows with the tag's reach.                                                                                                                                                  |
@@ -813,9 +815,9 @@ reaches; policy authority scopes what it confers, and for an access-carrying pol
 metalake-wide by construction. Because the halves are independent, no scope has to be derived from
 the tag's current reach. Neither requirement adds a new privilege.
 
-Widening takes the same requirement as binding: the policy is already attached, so adding a
-privilege or a role to `content` confers access across everything the tag reaches with no further
-act by anyone. M2 covers all three paths.
+Widening and re-enabling require metalake-level grant authority in addition to edit ownership.
+The policy is already attached, so adding a privilege or a role to `content`, or re-enabling the
+policy, can confer access across everything the tag reaches. M2 covers all three paths.
 
 The cost is that an access policy cannot be delegated: a team owning a catalog cannot own the
 policies that confer access within it. Scoped tags are the delegation path — an access-carrying tag

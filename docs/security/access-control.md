@@ -253,21 +253,66 @@ object and its descendants.
 `APPLY_TAG`, `APPLY_POLICY`, and `USE_JOB_TEMPLATE` scope differently from every other privilege on
 this page. The object they bind to is the instrument the holder may use, not the object the operation
 acts on. Granting `APPLY_POLICY` on the policy `pii_masking` lets the holder associate that
-policy with tags, provided they also have `APPLY_TAG` on each tag. Granting it on the metalake
-covers any policy in that metalake.
+policy with tags, subject to the tag-side checks below. Granting it on the metalake covers any
+policy in that metalake.
 
 Assigning a tag to a metadata object requires `APPLY_TAG` on the tag and access to the object.
-For a tag bound to an access-control policy, adding or removing the tag instead requires an explicit
-`APPLY_TAG` grant on that tag and ownership or `MANAGE_GRANTS` on the object or an ancestor.
-Tag ownership or a metalake-level `APPLY_TAG` grant alone is not sufficient. The metalake owner
-can still assign or remove the tag.
-Associating a policy with a tag requires access to both: `APPLY_POLICY` on the policy and
-`APPLY_TAG` on the tag. For descriptive tags and policy association, ownership can satisfy the
-corresponding check.
+Associating a policy with a tag requires `APPLY_TAG` on the tag and `APPLY_POLICY` on the policy.
+Ownership can satisfy the corresponding check. The rules for access-control policies and tags are
+described below.
 
 Reading a tag requires `VIEW_TAG` or `APPLY_TAG`; reading a policy requires `VIEW_POLICY` or
-`APPLY_POLICY`. The view privileges do not allow tag assignment or policy-to-tag association.
-List results include only tags and policies the caller can read.
+`APPLY_POLICY`. List results include only tags and policies the caller can read.
+
+### Access-control policy and tag authorization
+
+The following expressions apply to access-control policies and tags bound to them, including
+disabled policies and nonmatching selectors. `||` means OR,
+and `&&` means AND. `ANY_VIEW_TAG`, `ANY_APPLY_TAG`, and `ANY_APPLY_POLICY` accept the named
+privilege on the relevant tag or policy, or on the metalake, subject to explicit denies.
+
+Creating an access-control policy requires:
+
+```text
+METALAKE::OWNER || (METALAKE::CREATE_POLICY && METALAKE::MANAGE_GRANTS)
+```
+
+Binding an access-control policy to a tag requires:
+
+```text
+METALAKE::OWNER || (
+  (TAG::OWNER || ANY_VIEW_TAG || ANY_APPLY_TAG)
+  && (POLICY::OWNER || ANY_APPLY_POLICY)
+  && METALAKE::MANAGE_GRANTS
+)
+```
+
+`VIEW_POLICY` alone does not satisfy the policy check. For other policy types and unbinding,
+`VIEW_TAG` alone does not satisfy the tag association check.
+
+Widening or re-enabling a bound access-control policy requires:
+
+```text
+METALAKE::OWNER || (POLICY::OWNER && METALAKE::MANAGE_GRANTS)
+```
+
+Widening adds a role or privilege to the policy. Other edits, including narrowing, require
+`METALAKE::OWNER || POLICY::OWNER`. The same ownership rule applies to disabling a policy and
+editing an unbound policy.
+
+Adding or removing a tag bound to an access-control policy on an object requires:
+
+```text
+METALAKE::OWNER || (
+  TAG::APPLY_TAG
+  && !(ANY(DENY_APPLY_TAG, METALAKE, TAG))
+  && CAN_OPERATE_METADATA_PRIVILEGE
+)
+```
+
+`TAG::APPLY_TAG` must be granted on the tag itself. `CAN_OPERATE_METADATA_PRIVILEGE` checks
+ownership or `MANAGE_GRANTS` on the object or an ancestor, including applicable traversal checks.
+A metalake-wide `APPLY_TAG` grant or tag ownership alone is not sufficient for this operation.
 
 ### Required Privileges
 
@@ -346,7 +391,7 @@ support is a missing source (`400`); no unsupported View lookup is attempted.
 | Group            | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                    |
 | Role             | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                   |
 | Tag              | `CREATE_TAG`            | `VIEW_TAG` or `APPLY_TAG`              | Owner           | Assign: `APPLY_TAG` and access to the object       |
-| Policy           | `CREATE_POLICY`         | `VIEW_POLICY` or `APPLY_POLICY`        | Owner           | Associate with tag: `APPLY_POLICY` and `APPLY_TAG` |
+| Policy           | `CREATE_POLICY`         | `VIEW_POLICY` or `APPLY_POLICY`        | Owner           | Associate with tag: see [access-control policy and tag authorization](#access-control-policy-and-tag-authorization) |
 | Job template     | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`        |
 | Job              |                         | Owner                                  | Owner           |                                                    |
 | Secret providers |                         | Owner or `VIEW_SECRET_PROVIDERS`       |                 |                                                    |

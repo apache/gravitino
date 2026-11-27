@@ -6808,6 +6808,127 @@ public class TestJcasbinAuthorizer {
         });
   }
 
+  @Test
+  void testAccessPolicyBindDenyOverridesManageGrants() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    RoleEntity allow =
+        mockRoleInStore(
+            993L,
+            "bindAllow",
+            ImmutableList.of(
+                buildSecurableObject(
+                    993L,
+                    MetadataObject.Type.METALAKE,
+                    METALAKE,
+                    Privilege.Name.MANAGE_GRANTS,
+                    "ALLOW")));
+    RoleEntity deny =
+        mockRoleInStore(
+            994L,
+            "bindDeny",
+            ImmutableList.of(
+                buildSecurableObject(
+                    994L,
+                    MetadataObject.Type.METALAKE,
+                    METALAKE,
+                    Privilege.Name.MANAGE_GRANTS,
+                    "DENY")));
+    mockDirectUserRoles(allow);
+    AuthorizationExpressionEvaluator evaluator =
+        new AuthorizationExpressionEvaluator(
+            AuthorizationExpressionConstants.ACCESS_POLICY_GRANT_AUTHORIZATION_EXPRESSION,
+            jcasbinAuthorizer);
+    Map<Entity.EntityType, NameIdentifier> metadata =
+        Map.of(Entity.EntityType.METALAKE, NameIdentifier.of(METALAKE));
+    assertTrue(evaluator.evaluate(metadata, new AuthorizationRequestContext()));
+    mockDirectUserRoles(allow, deny);
+    assertFalse(evaluator.evaluate(metadata, new AuthorizationRequestContext()));
+  }
+
+  @Test
+  void testAccessPolicyBindIgnoresTagAndPolicyOwnership() throws Throwable {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    MetadataObject metalake = MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE);
+    MetadataObject tag = MetadataObjects.of(null, "sensitive", MetadataObject.Type.TAG);
+    MetadataObject policy = MetadataObjects.of(null, "policy", MetadataObject.Type.POLICY);
+    AuthorizationExpressionEvaluator evaluator =
+        new AuthorizationExpressionEvaluator(
+            AuthorizationExpressionConstants.ACCESS_POLICY_GRANT_AUTHORIZATION_EXPRESSION,
+            jcasbinAuthorizer);
+    withMetadataIds(
+        Map.of(metalake, Optional.of(915L), tag, Optional.of(916L), policy, Optional.of(917L)),
+        () -> {
+          GravitinoCache<Long, Optional<OwnerInfo>> owners = getOwnerRelCache(jcasbinAuthorizer);
+          owners.put(916L, Optional.of(new OwnerInfo(USER_ID, "USER")));
+          owners.put(917L, Optional.of(new OwnerInfo(USER_ID, "USER")));
+          mockDirectUserRoles();
+          Map<Entity.EntityType, NameIdentifier> withOwnedObjects =
+              Map.of(
+                  Entity.EntityType.METALAKE, NameIdentifier.of(METALAKE),
+                  Entity.EntityType.TAG, NameIdentifierUtil.ofTag(METALAKE, "sensitive"),
+                  Entity.EntityType.POLICY, NameIdentifierUtil.ofPolicy(METALAKE, "policy"));
+          AuthorizationExpressionEvaluator ordinaryAssociation =
+              new AuthorizationExpressionEvaluator(
+                  "METALAKE::OWNER || ((TAG::OWNER || ANY_APPLY_TAG) && (POLICY::OWNER || ANY_APPLY_POLICY))",
+                  jcasbinAuthorizer);
+          assertTrue(
+              ordinaryAssociation.evaluate(withOwnedObjects, new AuthorizationRequestContext()));
+          assertFalse(evaluator.evaluate(withOwnedObjects, new AuthorizationRequestContext()));
+          owners.invalidate(916L);
+          assertFalse(
+              ordinaryAssociation.evaluate(withOwnedObjects, new AuthorizationRequestContext()));
+          owners.put(915L, Optional.of(new OwnerInfo(USER_ID, "USER")));
+          assertTrue(evaluator.evaluate(withOwnedObjects, new AuthorizationRequestContext()));
+        });
+  }
+
+  @Test
+  void testBoundAccessPolicyWideningAndEnableRequireEditAndPolicyAuthority() throws Throwable {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    MetadataObject metalake = MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE);
+    MetadataObject policy = MetadataObjects.of(null, "policy", MetadataObject.Type.POLICY);
+    withMetadataIds(
+        Map.of(metalake, Optional.of(918L), policy, Optional.of(919L)),
+        () -> {
+          RoleEntity manageGrants =
+              mockRoleInStore(
+                  920L,
+                  "grantManager",
+                  ImmutableList.of(
+                      buildSecurableObject(
+                          920L,
+                          MetadataObject.Type.METALAKE,
+                          METALAKE,
+                          Privilege.Name.MANAGE_GRANTS,
+                          "ALLOW")));
+          Map<Entity.EntityType, NameIdentifier> metadata =
+              Map.of(
+                  Entity.EntityType.METALAKE, NameIdentifier.of(METALAKE),
+                  Entity.EntityType.POLICY, NameIdentifierUtil.ofPolicy(METALAKE, "policy"));
+          AuthorizationExpressionEvaluator edit =
+              new AuthorizationExpressionEvaluator(
+                  "METALAKE::OWNER || POLICY::OWNER", jcasbinAuthorizer);
+          AuthorizationExpressionEvaluator widen =
+              new AuthorizationExpressionEvaluator(
+                  AuthorizationExpressionConstants.ACCESS_POLICY_GRANT_AUTHORIZATION_EXPRESSION,
+                  jcasbinAuthorizer);
+          GravitinoCache<Long, Optional<OwnerInfo>> owners = getOwnerRelCache(jcasbinAuthorizer);
+          mockDirectUserRoles(manageGrants);
+          assertFalse(edit.evaluate(metadata, new AuthorizationRequestContext()));
+          assertTrue(widen.evaluate(metadata, new AuthorizationRequestContext()));
+          owners.put(919L, Optional.of(new OwnerInfo(USER_ID, "USER")));
+          assertTrue(edit.evaluate(metadata, new AuthorizationRequestContext()));
+          assertTrue(widen.evaluate(metadata, new AuthorizationRequestContext()));
+          mockDirectUserRoles();
+          assertTrue(edit.evaluate(metadata, new AuthorizationRequestContext()));
+          assertFalse(widen.evaluate(metadata, new AuthorizationRequestContext()));
+          owners.invalidate(919L);
+          owners.put(918L, Optional.of(new OwnerInfo(USER_ID, "USER")));
+          assertTrue(edit.evaluate(metadata, new AuthorizationRequestContext()));
+          assertTrue(widen.evaluate(metadata, new AuthorizationRequestContext()));
+        });
+  }
+
   /** Tests {@link JcasbinAuthorizer#hasMetadataPrivilegePermission} hierarchy walk */
   @Test
   public void testHasMetadataPrivilegePermission() throws Exception {
