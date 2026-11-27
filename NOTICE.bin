@@ -94,9 +94,10 @@ under the following copyright.
 Copyright © 2023 Werner Randelshofer, Switzerland. MIT License.
 Copyright © 2024 Werner Randelshofer, Switzerland. MIT License.
 
-FastDoubleParser includes code derived from the following projects. Jackson 2.15.2
-includes fast_double_parser and fast_float under the Apache 2.0 License; newer
-bundled Jackson versions include them under the licenses listed below:
+FastDoubleParser includes code derived from the following projects. Older bundled
+Jackson versions, used by Paimon, include fast_double_parser and fast_float under
+the Apache 2.0 License; newer bundled Jackson versions include them under the
+licenses listed below:
 
   fast_double_parser, Copyright (c) 2022 Daniel Lemire. Boost Software License 1.0.
   <https://github.com/lemire/fast_double_parser>

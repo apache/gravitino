@@ -34,11 +34,6 @@ vulnerabilities:
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
   - id: CVE-2026-68494
     purls:
-      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.3
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
-  - id: CVE-2026-68494
-    purls:
       - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.12.7
       - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.14.2
       - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.14.3
@@ -49,21 +44,11 @@ vulnerabilities:
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
   - id: CVE-2026-89407
     purls:
-      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.3
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
-  - id: CVE-2026-89407
-    purls:
       - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.18.3
       - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.18.4.1
       - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.22.0
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  - id: CVE-2026-89425
-    purls:
-      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.3
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
   - id: CVE-2026-89425
     purls:
       - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.12.7
@@ -78,11 +63,6 @@ vulnerabilities:
   # com.fasterxml.jackson.core/jackson-databind
   - id: CVE-2026-54512
     purls:
-      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.3
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
-  - id: CVE-2026-54512
-    purls:
       - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.12.7.1
       - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.2
       - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.3
@@ -91,11 +71,6 @@ vulnerabilities:
       - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.18.4
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  - id: CVE-2026-54513
-    purls:
-      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.3
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
   - id: CVE-2026-54513
     purls:
       - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.12.7.1
@@ -108,11 +83,6 @@ vulnerabilities:
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
   - id: CVE-2026-68497
     purls:
-      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.3
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
-  - id: CVE-2026-68497
-    purls:
       - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.2
       - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.3
       - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.15.2
@@ -121,11 +91,6 @@ vulnerabilities:
       - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.22.0
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  - id: CVE-2026-91776
-    purls:
-      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.3
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
   - id: CVE-2026-91776
     purls:
       - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.12.7.1
@@ -137,11 +102,6 @@ vulnerabilities:
       - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.22.0
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  - id: CVE-2026-91777
-    purls:
-      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.3
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
   - id: CVE-2026-91777
     purls:
       - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.12.7.1

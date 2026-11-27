@@ -109,7 +109,7 @@ public class ObjectMapperProvider implements ContextResolver<ObjectMapper> {
 
     return builder
         .build()
-        .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+        .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
         .registerModule(new JavaTimeModule())
         .registerModule(new Jdk8Module());
   }

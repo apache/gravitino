@@ -54,7 +54,7 @@ public class TestDomainBackingTagSetRequest {
     String json =
         JsonUtils.objectMapper()
             .copy()
-            .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+            .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
             .writeValueAsString(removal);
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree("{\"backingTag\":null}"),

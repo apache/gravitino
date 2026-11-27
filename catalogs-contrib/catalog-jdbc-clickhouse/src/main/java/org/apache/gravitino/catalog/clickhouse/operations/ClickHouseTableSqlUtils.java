@@ -201,9 +201,7 @@ final class ClickHouseTableSqlUtils {
         settingsNode.isObject(), "Projection settings must be a JSON object");
 
     Map<String, String> settings = new TreeMap<>();
-    Iterator<Map.Entry<String, JsonNode>> fields = settingsNode.fields();
-    while (fields.hasNext()) {
-      Map.Entry<String, JsonNode> field = fields.next();
+    for (Map.Entry<String, JsonNode> field : settingsNode.properties()) {
       JsonNode value = field.getValue();
       Preconditions.checkArgument(
           PROJECTION_SETTING_NAME_PATTERN.matcher(field.getKey()).matches(),

@@ -655,10 +655,8 @@ public class JsonUtils {
     }
 
     JsonNode propertiesNode = node.get(property);
-    Iterator<Map.Entry<String, JsonNode>> fieldsIterator = propertiesNode.fields();
     Map<String, String> properties = Maps.newHashMap();
-    while (fieldsIterator.hasNext()) {
-      Map.Entry<String, JsonNode> field = fieldsIterator.next();
+    for (Map.Entry<String, JsonNode> field : propertiesNode.properties()) {
       properties.put(field.getKey(), field.getValue().asText());
     }
     return properties;
@@ -1468,8 +1466,8 @@ public class JsonUtils {
       ObjectNode objectNode = (ObjectNode) node;
       Map<String, StatisticValue<?>> map = Maps.newHashMap();
       objectNode
-          .fields()
-          .forEachRemaining(entry -> map.put(entry.getKey(), getStatisticValue(entry.getValue())));
+          .properties()
+          .forEach(entry -> map.put(entry.getKey(), getStatisticValue(entry.getValue())));
       return StatisticValues.objectValue(map);
     } else {
       throw new IllegalArgumentException(
@@ -1580,8 +1578,8 @@ public class JsonUtils {
         Map<String, String> props = new HashMap<>();
 
         node.get("properties")
-            .fields()
-            .forEachRemaining(entry -> props.put(entry.getKey(), entry.getValue().asText()));
+            .properties()
+            .forEach(entry -> props.put(entry.getKey(), entry.getValue().asText()));
 
         properties = props;
       }

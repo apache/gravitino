@@ -29,6 +29,9 @@ plugins {
 // Guava and Logback are excluded because they are provided by the Gravitino runtime classpath.
 
 dependencies {
+  // hadoop-yarn-common, pulled in by hadoop-mapreduce-client-core, brings Jackson 2.12.7. Keep the
+  // Jackson artifacts on the version of the catalog.
+  implementation(platform(libs.jackson.bom))
   // Only needed to compile HiveShimV2 against the shared HiveShim base class; compileOnly keeps
   // hive-metastore-common's own classes out of the shaded runtime jar produced by copyDepends.
   compileOnly(project(":catalogs:hive-metastore-common"))

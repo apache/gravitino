@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.List;
@@ -395,6 +396,51 @@ public class TestJsonUtils {
     Assertions.assertEquals(
         objectMapper.readValue(expected, ListPartitionDTO.class),
         objectMapper.readValue(jsonValue, ListPartitionDTO.class));
+  }
+
+  @Test
+  void testPartitionDTOSerdeWithProperties() throws JsonProcessingException {
+    Map<String, String> properties = Maps.newLinkedHashMap();
+    properties.put("location", "s3://bucket/p0");
+    properties.put("format", "parquet");
+    LiteralDTO dt =
+        LiteralDTO.builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
+    LiteralDTO country =
+        LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("us").build();
+    PartitionDTO[] partitions = {
+      IdentityPartitionDTO.builder()
+          .withName("dt=2008-08-08/country=us")
+          .withFieldNames(new String[][] {{"dt"}, {"country"}})
+          .withValues(new LiteralDTO[] {dt, country})
+          .withProperties(properties)
+          .build(),
+      ListPartitionDTO.builder()
+          .withName("p_us")
+          .withLists(new LiteralDTO[][] {{dt, country}})
+          .withProperties(properties)
+          .build(),
+      RangePartitionDTO.builder()
+          .withName("p_2008")
+          .withUpper(dt)
+          .withLower(LiteralDTO.NULL)
+          .withProperties(properties)
+          .build()
+    };
+
+    for (PartitionDTO partition : partitions) {
+      String json = objectMapper.writeValueAsString(partition);
+      PartitionDTO deserialized = objectMapper.readValue(json, PartitionDTO.class);
+      Assertions.assertEquals(partition, deserialized, json);
+      Assertions.assertEquals(properties, deserialized.properties(), json);
+    }
+
+    JsonNode node =
+        objectMapper.readTree(
+            "{\"type\":\"list\",\"name\":\"p_us\",\"lists\":[],"
+                + "\"properties\":{\"format\":\"orc\",\"owner\":\"etl\"}}");
+    PartitionDTO fromJson = objectMapper.treeToValue(node, PartitionDTO.class);
+    Assertions.assertEquals(
+        ImmutableMap.of("format", "orc", "owner", "etl"), fromJson.properties());
   }
 
   @Test

@@ -62,3 +62,4 @@ com.fasterxml.jackson.core:jackson-core:2.18.3=LICENSE.fastdoubleparser-1.0.90,L
 com.fasterxml.jackson.core:jackson-core:2.18.12=
 com.fasterxml.jackson.core:jackson-core:2.21.3=
 com.fasterxml.jackson.core:jackson-core:2.21.8=
+com.fasterxml.jackson.core:jackson-core:2.22.4=

@@ -69,9 +69,9 @@ lanceSparkBundleVersions.forEach { version ->
   }
 }
 
-// Keeps the Jackson line brought in by Arrow on its latest patch release. The BOM sits in a
-// dedicated configuration so that it only applies to this module and is not exported to the
-// modules that depend on it.
+// Keeps the Jackson artifacts brought in by Arrow on the Jackson version of the catalog. The BOM
+// sits in a dedicated configuration so that it only applies to this module and is not exported to
+// the modules that depend on it.
 val jacksonBom: Configuration by configurations.creating {
   isCanBeConsumed = false
   isCanBeResolved = false
@@ -85,7 +85,7 @@ listOf(
   configurations.named(it) { extendsFrom(jacksonBom) }
 }
 dependencies {
-  jacksonBom(platform(libs.jackson.bom.v218))
+  jacksonBom(platform(libs.jackson.bom))
   implementation(project(":api"))
   implementation(project(":common")) {
     exclude("*")

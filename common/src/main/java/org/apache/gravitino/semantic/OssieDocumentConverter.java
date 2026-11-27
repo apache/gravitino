@@ -146,7 +146,7 @@ public final class OssieDocumentConverter {
     if (semanticModel.comment() != null) {
       root.put("description", semanticModel.comment());
     }
-    definition.fields().forEachRemaining(entry -> root.set(entry.getKey(), entry.getValue()));
+    definition.properties().forEach(entry -> root.set(entry.getKey(), entry.getValue()));
     stashProperties(root, semanticModel.properties());
 
     // Validate the generated document through the same conversion path used for imports.
@@ -573,8 +573,8 @@ public final class OssieDocumentConverter {
     ObjectNode object = (ObjectNode) node;
     Map<String, Object> additionalProperties = new LinkedHashMap<>();
     object
-        .fields()
-        .forEachRemaining(
+        .properties()
+        .forEach(
             entry -> {
               if (!AI_CONTEXT_PROPERTIES.contains(entry.getKey())) {
                 additionalProperties.put(
@@ -798,8 +798,8 @@ public final class OssieDocumentConverter {
       validateObject(extension, path, CUSTOM_EXTENSION_PROPERTIES);
       ObjectNode propertyNode = parsePropertiesData(extension.get("data"), path + ".data");
       propertyNode
-          .fields()
-          .forEachRemaining(
+          .properties()
+          .forEach(
               entry -> {
                 if (!entry.getValue().isTextual()) {
                   throw invalid(
@@ -859,8 +859,8 @@ public final class OssieDocumentConverter {
 
   private static void validateObject(ObjectNode object, String path, Set<String> allowed) {
     object
-        .fields()
-        .forEachRemaining(
+        .properties()
+        .forEach(
             entry -> {
               if (!allowed.contains(entry.getKey())) {
                 throw invalid(

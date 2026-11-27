@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import javax.annotation.Nullable;
@@ -130,9 +129,7 @@ final class MaintenanceTriggerGate {
     }
     try {
       JsonNode root = JsonUtils.anyFieldMapper().readTree(metricsJson);
-      Iterator<Entry<String, JsonNode>> fields = root.fields();
-      while (fields.hasNext()) {
-        Entry<String, JsonNode> field = fields.next();
+      for (Entry<String, JsonNode> field : root.properties()) {
         JsonNode value = field.getValue();
         if (value == null || value.isNull() || !value.isNumber()) {
           continue;

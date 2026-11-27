@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
@@ -87,13 +88,23 @@ class TestRuntimeJarLegalFiles {
   }
 
   @Test
-  void testMissingBundledLicensesAreSupplemented() throws IOException {
+  void testJacksonCoreEmbeddedComponentLicensesAreBundled() throws IOException {
+    String prefix = dependencyPrefix("jackson-core-");
     try (JarFile jar = artifact()) {
-      for (String name : Arrays.asList("LICENSE.fastdoubleparser-0.9.0", "LICENSE.schubfach")) {
-        assertArrayEquals(
-            Files.readAllBytes(Paths.get(System.getProperty("legalTemplates"), name)),
-            readBytesBySuffix(jar, "/" + name),
-            name);
+      // jackson-core embeds FastDoubleParser and Schubfach under MIT terms. Their texts come either
+      // from the jackson-core jar itself or from a supplement in dependencies.txt, depending on the
+      // Jackson version, so only require that each one is shipped with the jackson-core documents.
+      for (String component : Arrays.asList("fastdoubleparser", "schubfach")) {
+        assertTrue(
+            jar.stream()
+                .map(JarEntry::getName)
+                .anyMatch(
+                    name ->
+                        name.startsWith(prefix)
+                            && name.substring(prefix.length())
+                                .toLowerCase(Locale.ROOT)
+                                .contains(component)),
+            "Missing the " + component + " license under " + prefix);
       }
     }
   }
@@ -126,14 +137,15 @@ class TestRuntimeJarLegalFiles {
     return new JarFile(System.getProperty("artifactPath"));
   }
 
-  private static byte[] readBytesBySuffix(JarFile jar, String suffix) throws IOException {
-    String path =
-        jar.stream()
-            .map(JarEntry::getName)
-            .filter(name -> name.endsWith(suffix))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("Missing legal document ending in " + suffix));
-    return readBytes(jar, path);
+  private static String dependencyPrefix(String jarNamePrefix) {
+    for (String path :
+        System.getProperty("dependencyJars").split(Pattern.quote(File.pathSeparator))) {
+      String name = new File(path).getName();
+      if (name.startsWith(jarNamePrefix)) {
+        return System.getProperty("dependencyPrefix." + name);
+      }
+    }
+    throw new AssertionError("No bundled dependency jar starts with " + jarNamePrefix);
   }
 
   private static String readEntry(JarFile jar, String path) throws IOException {

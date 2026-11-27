@@ -51,6 +51,10 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   isZip64 = true
   configurations = listOf(shadedDependencies)
   archiveClassifier.set("")
+  // jackson-core 2.18 and later ships multi-release classes for Java 21, which the ASM of the
+  // shadow plugin cannot read. They only specialize internal number parsing helpers; the JVM falls
+  // back to the base classes without them.
+  exclude("META-INF/versions/21/**")
 
   // Strip shaded slf4j-api brought in by :clients:client-java-runtime — Hadoop classpaths
   // usually ship slf4j 1.7.x, and bundling 2.x here breaks that binding at runtime.
