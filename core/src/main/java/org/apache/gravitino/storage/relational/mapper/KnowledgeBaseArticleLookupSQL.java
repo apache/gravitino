@@ -31,6 +31,7 @@ public final class KnowledgeBaseArticleLookupSQL {
   public static String joined(
       @Param("name") @Nullable String name,
       @Param("domains") @Nullable List<Long> domains,
+      @Param("includeTerms") boolean includeTerms,
       ProviderContext context) {
     String filter = name == null ? "" : "AND a.article_name=#{name}";
     if (domains != null) {
@@ -43,7 +44,7 @@ public final class KnowledgeBaseArticleLookupSQL {
                <foreach item="domain" collection="domains" open="(" separator="," close=")">#{domain}</foreach>)
           """;
     }
-    return lookup(filter, context);
+    return lookup(filter, includeTerms, context);
   }
 
   /** Returns the query for a batch of names in a metalake. */
@@ -53,10 +54,11 @@ public final class KnowledgeBaseArticleLookupSQL {
         AND a.article_name IN
         <foreach item="name" collection="names" open="(" separator="," close=")">#{name}</foreach>
         """,
+        true,
         context);
   }
 
-  private static String lookup(String names, ProviderContext context) {
+  private static String lookup(String names, boolean includeTerms, ProviderContext context) {
     // For named lookups, MySQL can otherwise scan every active relation in the metalake.
     boolean useArticleIndex = !names.isEmpty() && "mysql".equals(context.getDatabaseId());
     // Scope each relation branch before the union. MySQL 5.7 also supports this derived table.
@@ -82,7 +84,7 @@ public final class KnowledgeBaseArticleLookupSQL {
           SELECT a.article_id, a.metalake_id, b.target_type, b.target_id, NULL AS domain_id
           %2$s
           JOIN kb_article_relation_meta b %3$s ON b.metalake_id=a.metalake_id AND b.article_id=a.article_id
-              AND b.deleted_at=0
+              AND b.deleted_at=0 %5$s
           %1$s
           UNION ALL
           SELECT a.article_id, a.metalake_id, NULL, NULL, d.domain_id
@@ -98,6 +100,7 @@ public final class KnowledgeBaseArticleLookupSQL {
             scope,
             articles,
             useArticleIndex ? "FORCE INDEX (uk_kba_binding)" : "",
-            useArticleIndex ? "FORCE INDEX (uk_domain_member)" : "");
+            useArticleIndex ? "FORCE INDEX (uk_domain_member)" : "",
+            includeTerms ? "" : "AND b.target_type != 'GLOSSARY_TERM'");
   }
 }

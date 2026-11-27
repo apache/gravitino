@@ -67,6 +67,12 @@ import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTermException;
+import org.apache.gravitino.exceptions.UnapprovedTermException;
+import org.apache.gravitino.glossary.GlossaryManager;
+import org.apache.gravitino.glossary.GlossaryTerm;
+import org.apache.gravitino.glossary.TermChange;
+import org.apache.gravitino.glossary.TermSpec;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
@@ -900,6 +906,124 @@ class TestArticleAuthorization extends TestJDBCBackend {
         as("writer", () -> manager.createArticle(LAKE, article("retry", ArticleStatus.DRAFT)))
             .article()
             .name());
+  }
+
+  @TestTemplate
+  void createChecksDomainPermissionBeforeTermApproval() throws Exception {
+    insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    role(
+        "salesReader",
+        SecurableObjects.parse(
+            "Sales", MetadataObject.Type.DOMAIN, List.of(Privileges.allow("USE_DOMAIN"))));
+    user("author", "create", "salesReader");
+    var glossary = new GlossaryManager(ids::incrementAndGet, true);
+    as(
+        "lakeOwner",
+        () ->
+            glossary.createTerm(
+                LAKE, TermSpec.builder("Old").withStatus(GlossaryTerm.Status.DEPRECATED).build()));
+    var request =
+        ArticleCreate.builder()
+            .withTitle("Guide")
+            .withName("guide")
+            .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+            .addTerms("Old")
+            .addDomains("Sales")
+            .build();
+    as(
+        "author",
+        () -> assertThrows(ForbiddenException.class, () -> manager.createArticle(LAKE, request)));
+    as(
+        "lakeOwner",
+        () ->
+            assertThrows(
+                UnapprovedTermException.class, () -> manager.createArticle(LAKE, request)));
+    as(
+        "lakeOwner",
+        () ->
+            assertThrows(
+                NoSuchKnowledgeBaseArticleException.class,
+                () -> manager.loadArticle(LAKE, "guide")));
+  }
+
+  @TestTemplate
+  void hiddenTermBindingsAreFilteredBeforePagingAndStatusConflicts() throws Exception {
+    var glossary = new GlossaryManager(ids::incrementAndGet, true);
+    as("writer2", () -> glossary.createTerm(LAKE, TermSpec.builder("First").build()));
+    as("writer2", () -> glossary.createTerm(LAKE, TermSpec.builder("Second").build()));
+    as(
+        "writer",
+        () ->
+            manager.createArticle(
+                LAKE,
+                ArticleCreate.builder()
+                    .withTitle("Guide")
+                    .withName("guide")
+                    .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+                    .addTerms("First", "Second")
+                    .build()));
+    var token = as("viewer", () -> manager.loadArticle(LAKE, "guide")).revisionToken();
+    as(
+        "writer2",
+        () -> glossary.alterTerm(LAKE, "First", TermChange.setStatus(GlossaryTerm.Status.DRAFT)));
+    as(
+        "writer",
+        () -> {
+          var page = manager.listTermBindings(LAKE, "guide", 1, 0);
+          assertEquals("Second", page.terms().get(0).name());
+          assertFalse(page.hasMore());
+          var loaded = manager.loadArticle(LAKE, "guide", 1, 0);
+          assertEquals(1, loaded.article().bindings().size());
+          assertFalse(loaded.article().termsHasMore());
+          assertTrue(manager.listTermBindings(LAKE, "guide", 1, 1).terms().isEmpty());
+          assertThrows(
+              NoSuchTermException.class,
+              () ->
+                  manager.alterArticle(
+                      LAKE, "guide", token, KnowledgeBaseArticleChange.addTerms("First")));
+          assertThrows(
+              NoSuchTermException.class,
+              () ->
+                  manager.alterArticle(
+                      LAKE, "guide", "malformed", KnowledgeBaseArticleChange.addTerms("First")));
+          assertThrows(
+              NoSuchTermException.class,
+              () -> manager.listArticlesForTerm(LAKE, "First", true, 1, 0));
+          var summary = manager.listArticlesForTerm(LAKE, "Second", false, 10, 0).articles().get(0);
+          assertEquals("writer", summary.owner().name());
+          assertEquals("Second", summary.terms()[0].name());
+          assertEquals(1, summary.terms().length);
+          return null;
+        });
+    as(
+        "writer2",
+        () -> {
+          assertEquals(
+              ArticleTermBinding.Status.DRAFT,
+              manager.listTermBindings(LAKE, "guide", 1, 0).terms().get(0).status());
+          assertThrows(
+              UnapprovedTermException.class,
+              () ->
+                  manager.createArticle(
+                      LAKE,
+                      ArticleCreate.builder()
+                          .withTitle("Other")
+                          .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+                          .addTerms("First")
+                          .build()));
+          return null;
+        });
+    as(
+        "outsider",
+        () -> {
+          assertThrows(
+              NoSuchKnowledgeBaseArticleException.class,
+              () -> manager.listTermBindings(LAKE, "guide", 1, 0));
+          assertThrows(
+              NoSuchTermException.class,
+              () -> manager.listArticlesForTerm(LAKE, "Second", false, 1, 0));
+          return null;
+        });
   }
 
   @TestTemplate

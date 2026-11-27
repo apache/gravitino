@@ -44,7 +44,7 @@ import org.apache.gravitino.meta.AuditInfo;
  */
 @Getter
 @Accessors(fluent = true)
-@EqualsAndHashCode(exclude = {"auditInfo", "bodyUpdate", "domains"})
+@EqualsAndHashCode(exclude = {"auditInfo", "bodyUpdate", "domains", "terms", "termsHasMore"})
 public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, Auditable {
   /** Stable identity of a bound Term or asset. */
   public record Binding(String targetType, long targetId) {
@@ -104,6 +104,11 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
   /** Current Domain names visible to the caller in manager results. */
   private final List<String> domains;
 
+  /** Visible Term binding window in manager responses. */
+  private final List<ArticleTermBinding> terms;
+
+  private final boolean termsHasMore;
+
   private final Set<Binding> bindings;
   private final AuditInfo auditInfo;
 
@@ -122,6 +127,8 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
       long revision,
       Set<Long> domainIds,
       List<String> domains,
+      List<ArticleTermBinding> terms,
+      boolean termsHasMore,
       Set<Binding> bindings,
       AuditInfo auditInfo) {
     Preconditions.checkArgument(
@@ -145,6 +152,8 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
     this.revision = revision == 0 ? 1 : revision;
     this.domainIds = domainIds == null ? Set.of() : Set.copyOf(domainIds);
     this.domains = domains == null ? List.of() : List.copyOf(domains);
+    this.terms = terms == null ? List.of() : List.copyOf(terms);
+    this.termsHasMore = termsHasMore;
     this.bindings = bindings == null ? Set.of() : Set.copyOf(bindings);
     this.auditInfo = Preconditions.checkNotNull(auditInfo, "auditInfo");
   }

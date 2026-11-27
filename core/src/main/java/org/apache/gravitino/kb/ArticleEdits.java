@@ -86,8 +86,7 @@ final class ArticleEdits {
       Set<Long> domains,
       Supplier<ArticleBody> body) {
     Preconditions.checkArgument(
-        request.terms().isEmpty() && request.objects().isEmpty(),
-        "Initial Article relations require endpoint resolution");
+        request.objects().isEmpty(), "Initial Article relations require endpoint resolution");
     return KnowledgeBaseArticleEntity.builder()
         .withNamespace(Namespace.of(metalake))
         .withId(id)
@@ -129,8 +128,10 @@ final class ArticleEdits {
         properties.put(property.getProperty(), property.getValue());
       } else if (change instanceof KnowledgeBaseArticleChange.RemoveProperty property) {
         properties.remove(property.getProperty());
-      } else if (!(change instanceof KnowledgeBaseArticleChange.UpdateDomains)) {
-        // Domain replacements are resolved together before the Article is locked.
+      } else if (!(change instanceof KnowledgeBaseArticleChange.UpdateDomains)
+          && !(change instanceof KnowledgeBaseArticleChange.AddTerms)
+          && !(change instanceof KnowledgeBaseArticleChange.RemoveTerms)) {
+        // Membership and binding changes are handled against their locked endpoints.
         throw new IllegalArgumentException("Unsupported Article change: " + change);
       }
     }

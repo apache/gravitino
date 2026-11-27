@@ -27,9 +27,11 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import javax.annotation.Nullable;
@@ -44,6 +46,7 @@ import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.ExpectedRevision;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.MissingArticleScopeException;
@@ -126,6 +129,11 @@ public final class ArticleManager {
       name = ArticleEdits.generatedName(request.title(), 0);
     }
     ArticleDomains domains = new ArticleDomains(metalake, authorizationEnabled);
+    ArticleTerms terms = new ArticleTerms(metalake, authorizationEnabled);
+    Supplier<ArticleTerms.Plan> termPlan =
+        Suppliers.memoize(
+            () ->
+                terms.resolve(terms.lake(), List.of(new ArticleTerms.Edit(true, request.terms()))));
     Supplier<ArticleDomains.Replacement> plan =
         Suppliers.memoize(() -> domains.resolve(List.of(request.domains())));
     Supplier<ArticleBody> body = Suppliers.memoize(() -> edits.storedBody(request.body()));
@@ -140,8 +148,19 @@ public final class ArticleManager {
                   if (authorizationEnabled) {
                     ArticleAccess.forRequest(metalake).requireCreate();
                   }
+                  Collection<ArticleTerms.CheckedEdit> checkedTerms = List.of();
+                  if (!request.terms().isEmpty()) {
+                    long lake = terms.lake();
+                    ArticleTerms.Plan resolved = termPlan.get();
+                    articles.lockTermTargets(lake, resolved.targets());
+                    checkedTerms = terms.check(lake, resolved);
+                  }
                   Set<Long> initial = domains.check(plan.get(), Set.of(), true);
-                  return edits.create(metalake, articleId, ident.name(), request, initial, body);
+                  return edits
+                      .create(metalake, articleId, ident.name(), request, initial, body)
+                      .toBuilder()
+                      .withBindings(ArticleTerms.apply(checkedTerms, Set.of()))
+                      .build();
                 },
                 expectedMetalakeId,
                 (before, created) -> {
@@ -156,7 +175,8 @@ public final class ArticleManager {
                   policy.onChange(before, created);
                 },
                 TargetNameConflict::new,
-                domains::visible));
+                article ->
+                    terms.visible(domains.visible(article), ArticleListFilter.DEFAULT_LIMIT, 0)));
       } catch (TargetNameConflict conflict) {
         if (allocateInCallerTransaction) {
           throw new OptimisticLockException(
@@ -179,17 +199,37 @@ public final class ArticleManager {
 
   /** Reads one Article and its token from a single database snapshot. */
   public Result loadArticle(String metalake, String name) {
+    return loadArticle(metalake, name, ArticleListFilter.DEFAULT_LIMIT, 0);
+  }
+
+  /**
+   * Loads Article metadata and the requested Term binding preview from the same snapshot.
+   *
+   * @param metalake the Article's metalake
+   * @param name the Article name
+   * @param limit the maximum number of readable Terms in the preview
+   * @param offset the number of readable Terms to skip
+   * @return the Article and its editing token
+   */
+  public Result loadArticle(String metalake, String name, int limit, int offset) {
+    ArticleTerms.checkPage(limit, offset);
     NameIdentifier ident = ident(metalake, name);
+    ArticleTerms terms = new ArticleTerms(metalake, authorizationEnabled);
     ScopedArticle state =
         readArticle(
             ident,
-            () -> articles.getScoped(ident),
+            () -> articles.getForPreview(ident),
             (access, current) ->
                 access.requireRead(ident, current.article().id(), current.article().status()),
             current ->
                 new ScopedArticle(
                     current.metalakeId(),
-                    new ArticleDomains(metalake, authorizationEnabled).visible(current.article())));
+                    terms.preview(
+                        current.metalakeId(),
+                        new ArticleDomains(metalake, authorizationEnabled)
+                            .visible(current.article()),
+                        limit,
+                        offset)));
     return Result.from(state);
   }
 
@@ -221,8 +261,9 @@ public final class ArticleManager {
     Namespace namespace = Namespace.of(metalake);
     return SqlSessions.readSnapshotOrJoin(
         () -> {
+          long lake;
           try {
-            MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+            lake = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
           } catch (NoSuchEntityException missing) {
             throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
           }
@@ -232,12 +273,74 @@ public final class ArticleManager {
           }
           ArticleDomains domains = new ArticleDomains(metalake, authorizationEnabled);
           List<KnowledgeBaseArticleEntity> candidates =
-              domain == null
-                  ? articles.list(namespace)
-                  : articles.listByDomains(namespace, domains.scope(domain));
+              articles.listForPreview(namespace, domain == null ? null : domains.scope(domain));
+          ArticleTerms terms = new ArticleTerms(metalake, authorizationEnabled);
           List<KnowledgeBaseArticleEntity> visible =
               access == null ? candidates : access.visibleArticles(candidates);
-          return visible.stream().map(domains::visible).toList();
+          return visible.stream()
+              .map(domains::visible)
+              .map(article -> terms.preview(lake, article, ArticleListFilter.DEFAULT_LIMIT, 0))
+              .toList();
+        });
+  }
+
+  /**
+   * Lists live, readable Term bindings in stable ID order.
+   *
+   * @param metalake the Article's metalake
+   * @param name the Article name
+   * @param limit the maximum number of readable Terms to return
+   * @param offset the number of readable Terms to skip
+   * @return the binding page
+   */
+  public TermBindingPage listTermBindings(String metalake, String name, int limit, int offset) {
+    ArticleTerms.checkPage(limit, offset);
+    NameIdentifier ident = ident(metalake, name);
+    return readArticle(
+        ident,
+        () -> {
+          var row =
+              SessionUtils.getWithoutCommitFresh(
+                  KnowledgeBaseArticleMapper.class, mapper -> mapper.ids(metalake, ident.name()));
+          if (row == null) {
+            throw new NoSuchKnowledgeBaseArticleException("Article %s does not exist", ident);
+          }
+          return row;
+        },
+        (access, row) ->
+            access.requireRead(ident, row.getArticleId(), ArticleStatus.valueOf(row.getStatus())),
+        row ->
+            new ArticleTerms(metalake, authorizationEnabled)
+                .page(row.getMetalakeId(), row.getArticleId(), limit, offset));
+  }
+
+  /**
+   * Lists Articles directly bound to a readable Term in title and name order.
+   *
+   * @param metalake the Term's metalake
+   * @param term the Term name
+   * @param includeDeprecated whether to include deprecated Articles alongside published ones
+   * @param limit the maximum number of Articles to return
+   * @param offset the number of matching Articles to skip
+   * @return the Article summary page
+   */
+  public ArticlePage listArticlesForTerm(
+      String metalake, String term, boolean includeDeprecated, int limit, int offset) {
+    ArticleTerms.checkPage(limit, offset);
+    return SqlSessions.readSnapshotOrJoin(
+        () -> {
+          var terms = new ArticleTerms(metalake, authorizationEnabled);
+          long lake;
+          try {
+            lake = terms.lake();
+          } catch (NoSuchEntityException missing) {
+            throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
+          }
+          long target = terms.readableTarget(lake, term);
+          if (authorizationEnabled && !ArticleAccess.forRequest(metalake).canView()) {
+            return ArticlePage.of(List.of(), false);
+          }
+          return terms.articles(lake, target, includeDeprecated, limit, offset);
         });
   }
 
@@ -257,22 +360,30 @@ public final class ArticleManager {
             .map(KnowledgeBaseArticleChange.UpdateDomains.class::cast)
             .map(change -> List.of(change.getNewDomains()))
             .toList();
+    ArticleTerms terms = new ArticleTerms(metalake, authorizationEnabled);
+    List<ArticleTerms.Edit> termEdits = ArticleTerms.edits(changes);
+    ArticleTerms.Plan termPlan;
     ArticleDomains.Replacement plan;
     Long originalId;
-    if (replacements.isEmpty()) {
+    if (replacements.isEmpty() && termEdits.isEmpty()) {
+      termPlan = null;
       plan = null;
       originalId = null;
     } else {
-      KnowledgeBaseArticleEntity observed = loadStored(ident, () -> articles.get(ident));
-      requireEdit(metalake, observed);
-      originalId = observed.id();
-      plan = domains.resolve(replacements);
-      domains.check(plan, observed.domainIds(), false);
+      ScopedArticle observed = loadStored(ident, () -> articles.getForPreview(ident));
+      requireEdit(metalake, observed.article());
+      originalId = observed.article().id();
+      termPlan = termEdits.isEmpty() ? null : terms.resolve(observed.metalakeId(), termEdits);
+      plan = replacements.isEmpty() ? null : domains.resolve(replacements);
+      if (plan != null) {
+        domains.check(plan, observed.article().domainIds(), false);
+      }
     }
     return Result.from(
         articles.editScoped(
             ident,
             plan == null ? null : plan.named().keySet(),
+            termPlan == null ? Set.of() : termPlan.targets(),
             state -> {
               KnowledgeBaseArticleEntity before = state.article();
               requireEdit(metalake, before);
@@ -283,6 +394,10 @@ public final class ArticleManager {
                   plan == null
                       ? before.domainIds()
                       : domains.check(plan, before.domainIds(), false);
+              var checkedTerms =
+                  termPlan == null
+                      ? List.<ArticleTerms.CheckedEdit>of()
+                      : terms.check(state.metalakeId(), termPlan);
               if (expectedRevision != null
                   && !decode(expectedRevision)
                       .equals(
@@ -290,10 +405,15 @@ public final class ArticleManager {
                               state.metalakeId(), before.id(), before.revision()))) {
                 throw new ArticleRevisionConflictException("Article %s has changed", ident);
               }
-              return edits.apply(before, desired, changes);
+              var after = edits.apply(before, desired, changes);
+              return termPlan == null
+                  ? after
+                  : after.toBuilder()
+                      .withBindings(ArticleTerms.apply(checkedTerms, before.bindings()))
+                      .build();
             },
             policy,
-            domains::visible,
+            article -> terms.visible(domains.visible(article), ArticleListFilter.DEFAULT_LIMIT, 0),
             missing ->
                 new NoSuchKnowledgeBaseArticleException(
                     missing, "Article %s does not exist", ident)));
@@ -342,11 +462,11 @@ public final class ArticleManager {
     }
   }
 
-  private <T> T readArticle(
+  private <T, R> R readArticle(
       NameIdentifier ident,
       Supplier<T> fetch,
       BiConsumer<ArticleAccess, T> checkVisibility,
-      UnaryOperator<T> project) {
+      Function<T, R> project) {
     return SqlSessions.readSnapshotOrJoin(
         () -> {
           if (!authorizationEnabled) {

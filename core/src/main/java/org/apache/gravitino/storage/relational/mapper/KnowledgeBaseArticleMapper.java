@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
+import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
 import org.apache.gravitino.storage.relational.po.KnowledgeBaseArticlePO;
 import org.apache.ibatis.annotations.Arg;
 import org.apache.ibatis.annotations.ConstructorArgs;
@@ -90,12 +91,61 @@ public interface KnowledgeBaseArticleMapper {
   @Nullable
   KnowledgeBaseArticlePO ids(@Param("metalake") String metalake, @Param("name") String name);
 
+  /** Reads live Term identities, names and statuses for a bounded batch of binding targets. */
+  @Select(
+      """
+      <script>
+      SELECT term_id AS termId, name, name_key AS nameKey, status FROM glossary_term_meta
+      WHERE metalake_id=#{lake} AND deleted_at=0 AND term_id IN
+      <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
+      </script>
+      """)
+  List<GlossaryTermPO> termTargets(@Param("lake") long lake, @Param("ids") List<Long> ids);
+
+  /** Scans live directly bound Terms in stable ID order without loading their definitions. */
+  @Select(
+      """
+      <script>
+      SELECT t.term_id AS termId, t.name, t.status FROM kb_article_relation_meta r
+      JOIN glossary_term_meta t ON t.term_id=r.target_id AND t.metalake_id=r.metalake_id AND t.deleted_at=0
+      WHERE r.metalake_id=#{lake} AND r.article_id=#{article} AND r.target_type='GLOSSARY_TERM'
+        AND r.deleted_at=0
+      <if test='after != null'>AND r.target_id &gt; #{after}</if>
+      ORDER BY r.target_id LIMIT #{limit}
+      </script>
+      """)
+  List<GlossaryTermPO> boundTerms(
+      @Param("lake") long lake,
+      @Param("article") long article,
+      @Param("after") @Nullable Long after,
+      @Param("limit") int limit);
+
+  /** Selects the readable Article status window for a live, authorized Term. */
+  @Select(
+      """
+      <script>
+      SELECT a.article_id AS articleId, a.article_name AS articleName, a.title, a.status, a.audit_info AS auditInfo
+      FROM kb_article_relation_meta r
+      JOIN kb_article_meta a ON a.article_id=r.article_id AND a.metalake_id=r.metalake_id AND a.deleted_at=0
+      WHERE r.metalake_id=#{lake} AND r.target_id=#{term} AND r.target_type='GLOSSARY_TERM' AND r.deleted_at=0
+        AND (a.status='PUBLISHED' <if test='deprecated'>OR a.status='DEPRECATED'</if>)
+      ORDER BY a.title, a.article_name LIMIT #{limit} OFFSET #{offset}
+      </script>
+      """)
+  List<KnowledgeBaseArticlePO> articlesForTerm(
+      @Param("lake") long lake,
+      @Param("term") long term,
+      @Param("deprecated") boolean deprecated,
+      @Param("limit") int limit,
+      @Param("offset") int offset);
+
   /** Reads metadata and relations together in a caller's transaction. */
   @SelectProvider(type = KnowledgeBaseArticleLookupSQL.class, method = "joined")
   List<KnowledgeBaseArticlePO> joined(
       @Param("metalake") String metalake,
       @Param("name") @Nullable String name,
-      @Param("domains") @Nullable List<Long> domains);
+      @Param("domains") @Nullable List<Long> domains,
+      @Param("includeTerms") boolean includeTerms);
 
   /** Reads metadata and relations for a batch of Articles from the same snapshot. */
   @SelectProvider(type = KnowledgeBaseArticleLookupSQL.class, method = "joinedBatch")
