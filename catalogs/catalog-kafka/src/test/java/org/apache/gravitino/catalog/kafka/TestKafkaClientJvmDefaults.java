@@ -21,8 +21,6 @@ package org.apache.gravitino.catalog.kafka;
 import static org.apache.gravitino.Catalog.Type.MESSAGING;
 import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
-import static org.apache.gravitino.catalog.kafka.KafkaCatalogOperations.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY;
-import static org.apache.gravitino.catalog.kafka.KafkaCatalogOperations.OAUTHBEARER_ALLOWED_URLS_PROPERTY;
 import static org.apache.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
 
 import com.google.common.collect.ImmutableMap;
@@ -41,6 +39,8 @@ import org.apache.gravitino.integration.test.util.JwksMockServerHelper;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.config.internals.BrokerSecurityConfigs;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,7 +56,8 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestKafkaClientJvmDefaults {
 
   private static final String[] PROPERTIES = {
-    AUTOMATIC_CONFIG_PROVIDERS_PROPERTY, OAUTHBEARER_ALLOWED_URLS_PROPERTY
+    AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY,
+    BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG
   };
   private static final String PACKAGE = "org.apache.kafka.common.security.oauthbearer.";
   private static final String HANDLER = PACKAGE + "OAuthBearerLoginCallbackHandler";
@@ -91,31 +92,39 @@ public class TestKafkaClientJvmDefaults {
   public void testDefaultsAreSetWhenAbsent() {
     KafkaCatalogOperations.applyClientJvmDefaults();
 
-    Assertions.assertEquals("none", System.getProperty(AUTOMATIC_CONFIG_PROVIDERS_PROPERTY));
-    Assertions.assertEquals("", System.getProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY));
+    Assertions.assertEquals(
+        "none", System.getProperty(AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY));
+    Assertions.assertEquals(
+        "", System.getProperty(BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG));
   }
 
   @Test
   public void testConfiguredValuesAreKept() {
-    System.setProperty(AUTOMATIC_CONFIG_PROVIDERS_PROPERTY, "file");
-    System.setProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY, "https://idp.example.com/token");
+    System.setProperty(AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY, "file");
+    System.setProperty(
+        BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG,
+        "https://idp.example.com/token");
 
     KafkaCatalogOperations.applyClientJvmDefaults();
 
-    Assertions.assertEquals("file", System.getProperty(AUTOMATIC_CONFIG_PROVIDERS_PROPERTY));
     Assertions.assertEquals(
-        "https://idp.example.com/token", System.getProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY));
+        "file", System.getProperty(AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY));
+    Assertions.assertEquals(
+        "https://idp.example.com/token",
+        System.getProperty(BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG));
   }
 
   @Test
   public void testEmptyConfiguredValueIsKept() {
     // The default of this property is "none", so overwriting the empty value would be visible.
-    System.setProperty(AUTOMATIC_CONFIG_PROVIDERS_PROPERTY, "");
+    System.setProperty(AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY, "");
 
     KafkaCatalogOperations.applyClientJvmDefaults();
 
-    Assertions.assertEquals("", System.getProperty(AUTOMATIC_CONFIG_PROVIDERS_PROPERTY));
-    Assertions.assertEquals("", System.getProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY));
+    Assertions.assertEquals(
+        "", System.getProperty(AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY));
+    Assertions.assertEquals(
+        "", System.getProperty(BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG));
   }
 
   @Test
@@ -157,7 +166,7 @@ public class TestKafkaClientJvmDefaults {
     try (JwksMockServerHelper idp = JwksMockServerHelper.create("kafka-test-key")) {
       AtomicInteger tokenRequests = countTokenRequests(idp);
       String tokenUrl = idp.baseUri() + "/token";
-      System.setProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY, tokenUrl);
+      System.setProperty(BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG, tokenUrl);
 
       for (String handler : HANDLERS) {
         int before = tokenRequests.get();
@@ -182,7 +191,7 @@ public class TestKafkaClientJvmDefaults {
       String[] allowLists = {tokenUrl + "," + otherUrl, otherUrl + "," + tokenUrl};
 
       for (String allowList : allowLists) {
-        System.setProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY, allowList);
+        System.setProperty(BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG, allowList);
         for (String handler : HANDLERS) {
           int before = tokenRequests.get();
           Assertions.assertDoesNotThrow(

@@ -83,8 +83,10 @@ import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.ConfigResource;
+import org.apache.kafka.common.config.internals.BrokerSecurityConfigs;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
 import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
@@ -104,17 +106,11 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   // named by "config.providers". Those providers read the Gravitino server's own environment
   // variables and files, so they must not be selectable through catalog properties.
   @VisibleForTesting static final String CONFIG_PROVIDERS_KEY = "config.providers";
-  // JVM system properties of the Kafka client. The client reads them each time it is created, and a
+  // The Kafka client reads the JVM system properties
+  // AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY
+  // and BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG each time it is created, and a
   // catalog property cannot change them. An operator sets them with -D in JAVA_OPTS,
   // JAVA_TOOL_OPTIONS or JDK_JAVA_OPTIONS, and Gravitino only fills in the ones that are absent.
-  @VisibleForTesting
-  static final String AUTOMATIC_CONFIG_PROVIDERS_PROPERTY =
-      "org.apache.kafka.automatic.config.providers";
-
-  @VisibleForTesting
-  static final String OAUTHBEARER_ALLOWED_URLS_PROPERTY =
-      "org.apache.kafka.sasl.oauthbearer.allowed.urls";
-
   private final EntityStore store;
   private final IdGenerator idGenerator;
   @VisibleForTesting NameIdentifier defaultSchemaIdent;
@@ -671,8 +667,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
    */
   @VisibleForTesting
   static void applyClientJvmDefaults() {
-    System.getProperties().putIfAbsent(AUTOMATIC_CONFIG_PROVIDERS_PROPERTY, "none");
-    System.getProperties().putIfAbsent(OAUTHBEARER_ALLOWED_URLS_PROPERTY, "");
+    System.getProperties().putIfAbsent(AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY, "none");
+    System.getProperties()
+        .putIfAbsent(BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG, "");
   }
 
   /**
