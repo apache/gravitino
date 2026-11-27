@@ -110,15 +110,6 @@ function addDirToClasspath(){
 # Rotate a launch script's .out file before the process starts, so the file does not grow across
 # restarts. The previous files are kept as <file>.1 (newest) to <file>.N (oldest), where N is
 # GRAVITINO_OUT_FILE_KEEP (default 5). Set it to 0 to keep no previous file.
-# Sets a default for the JVM system property $1 by prepending -D$1=$2 to JAVA_TOOL_OPTIONS, which
-# the JVM reads before every other source. Any value an operator sets for the same property wins,
-# in JAVA_TOOL_OPTIONS (it comes later), JDK_JAVA_OPTIONS (including @argfiles), the command line
-# (JAVA_OPTS) or _JAVA_OPTIONS. The launcher does not need to parse those variables, so quoting and
-# @argfile syntax cannot make the default replace a configured value.
-function add_default_jvm_system_property() {
-  export JAVA_TOOL_OPTIONS="-D$1=$2${JAVA_TOOL_OPTIONS:+ ${JAVA_TOOL_OPTIONS}}"
-}
-
 function rotate_out_file() {
   local out_file="$1"
   local keep="${GRAVITINO_OUT_FILE_KEEP:-5}"

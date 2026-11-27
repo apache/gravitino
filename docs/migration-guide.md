@@ -133,12 +133,11 @@ and shutdown steps in [Upgrade Gravitino](./how-to-upgrade.md) before applying t
     `CatalogChange.setSecretReference` (REST update type `setSecretReference`) with an external
     secret that holds the whole property value. Use the locator recorded during the inventory.
     Neither `setSecretBinding` nor `setSecretReference` is available in the 1.3 client or REST API.
-- The server start script `bin/gravitino.sh` sets an empty
-  `org.apache.kafka.sasl.oauthbearer.allowed.urls` as a default. A value set in `JAVA_OPTS`,
-  `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS` or `_JAVA_OPTIONS` replaces it. This affects only Kafka
-  catalogs whose `sasl.login.callback.handler.class` is Kafka's
-  `org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler` or its legacy
-  subclass `org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerLoginCallbackHandler`.
+- The Kafka catalog sets an empty `org.apache.kafka.sasl.oauthbearer.allowed.urls` in the server JVM
+  as a default, unless the property is already set with `-D` in `JAVA_OPTS`, `JAVA_TOOL_OPTIONS` or
+  `JDK_JAVA_OPTIONS`. This affects only Kafka catalogs whose `sasl.login.callback.handler.class` is
+  Kafka's `org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler` or its
+  legacy subclass `org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerLoginCallbackHandler`.
   Both fetch a token from `sasl.oauthbearer.token.endpoint.url`. These catalogs fail to connect
   after the upgrade until the token endpoint URL is added to the list, for example
   `-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp.example.com/oauth2/token`. Catalogs

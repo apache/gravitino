@@ -104,6 +104,16 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   // named by "config.providers". Those providers read the Gravitino server's own environment
   // variables and files, so they must not be selectable through catalog properties.
   @VisibleForTesting static final String CONFIG_PROVIDERS_KEY = "config.providers";
+  // JVM system properties of the Kafka client. The client reads them each time it is created, and a
+  // catalog property cannot change them. An operator sets them with -D in JAVA_OPTS,
+  // JAVA_TOOL_OPTIONS or JDK_JAVA_OPTIONS, and Gravitino only fills in the ones that are absent.
+  @VisibleForTesting
+  static final String AUTOMATIC_CONFIG_PROVIDERS_PROPERTY =
+      "org.apache.kafka.automatic.config.providers";
+
+  @VisibleForTesting
+  static final String OAUTHBEARER_ALLOWED_URLS_PROPERTY =
+      "org.apache.kafka.sasl.oauthbearer.allowed.urls";
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
@@ -127,6 +137,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
+    applyClientJvmDefaults();
     this.propertiesMetadata = propertiesMetadata;
     Preconditions.checkArgument(
         config.containsKey(KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS),
@@ -645,6 +656,23 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     } catch (IOException ioe) {
       throw ExceptionMessages.wrap("Failed to create default schema for Kafka catalog", ioe);
     }
+  }
+
+  /**
+   * Sets secure defaults for the Kafka client JVM properties that the operator has not set.
+   *
+   * <p>An empty {@code org.apache.kafka.sasl.oauthbearer.allowed.urls} stops Kafka's OAUTHBEARER
+   * login callback handler from fetching a token from any {@code
+   * sasl.oauthbearer.token.endpoint.url}, such as a {@code file://} URL. A catalog that uses the
+   * handler needs the operator to list its token endpoint. {@code
+   * org.apache.kafka.automatic.config.providers=none} loads no config provider without explicit
+   * configuration. The defaults live in the server JVM only, so processes that the server starts do
+   * not inherit them.
+   */
+  @VisibleForTesting
+  static void applyClientJvmDefaults() {
+    System.getProperties().putIfAbsent(AUTOMATIC_CONFIG_PROVIDERS_PROPERTY, "none");
+    System.getProperties().putIfAbsent(OAUTHBEARER_ALLOWED_URLS_PROPERTY, "");
   }
 
   /**
