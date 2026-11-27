@@ -59,6 +59,10 @@ by the experimental Iceberg REST service. Compatible readers enforce those restr
 stable service does not load the experimental provider by default. Access-control policy
 enforcement remains separate.
 
+An access control policy can name only roles that exist in its metalake; creating or updating one
+that names a missing role fails. While a policy names a role, that role cannot be deleted. Remove it
+from the policy first.
+
 ### Read-Restriction Expressions
 
 Row-filter and column-mask expressions use `restricted-sql-v1`. A complete definition declares

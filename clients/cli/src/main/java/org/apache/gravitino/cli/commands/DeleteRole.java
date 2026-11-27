@@ -26,6 +26,7 @@ import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 
@@ -62,11 +63,17 @@ public class DeleteRole extends Command {
     }
     List<String> failedRoles = Lists.newArrayList();
     List<String> successRoles = Lists.newArrayList();
+    List<String> inUseErrors = Lists.newArrayList();
 
     try {
       GravitinoClient client = buildClient(metalake);
       for (String role : roles) {
-        (client.deleteRole(role) ? successRoles : failedRoles).add(role);
+        try {
+          (client.deleteRole(role) ? successRoles : failedRoles).add(role);
+        } catch (InUseException err) {
+          // An access control policy still names this role; try the rest and report it after.
+          inUseErrors.add(err.getMessage());
+        }
       }
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
@@ -76,6 +83,15 @@ public class DeleteRole extends Command {
       exitWithError(exp.getMessage());
     }
 
+    if (!successRoles.isEmpty() || !failedRoles.isEmpty()) {
+      printDeletions(successRoles, failedRoles);
+    }
+    if (!inUseErrors.isEmpty()) {
+      exitWithError(String.join(System.lineSeparator(), inUseErrors));
+    }
+  }
+
+  private void printDeletions(List<String> successRoles, List<String> failedRoles) {
     if (failedRoles.isEmpty()) {
       printInformation(COMMA_JOINER.join(successRoles) + " deleted.");
     } else {

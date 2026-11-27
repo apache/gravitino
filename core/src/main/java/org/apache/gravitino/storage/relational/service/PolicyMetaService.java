@@ -41,6 +41,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -142,6 +143,7 @@ public class PolicyMetaService {
 
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForPolicyCreate(metalakePO),
+          () -> lockNamedRoles(metalakePO.getMetalakeId(), policyEntity),
           () -> insertPolicyWithoutCommit(policyEntity, policyPO, overwritten));
     } catch (UncheckedIOException e) {
       throw e.getCause();
@@ -182,6 +184,7 @@ public class PolicyMetaService {
       PolicyPO newPolicyPO =
           POConverters.updatePolicyPOWithVersion(oldPolicyPO, updatedPolicyEntity);
       SessionUtils.doMultipleWithCommit(
+          () -> lockForUpdate(metalakeName, oldPolicyPO.getMetalakeId(), updatedPolicyEntity),
           () -> beforeUpdate(updatedPolicyEntity),
           () -> updatePolicyRootWithVersion(ident, oldPolicyPO, newPolicyPO),
           () -> insertPolicyVersionIfAllocated(oldPolicyPO, newPolicyPO),
@@ -384,6 +387,37 @@ public class PolicyMetaService {
                     mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
         null,
         current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
+  }
+
+  /**
+   * Takes the locks an update needs before it writes the policy row: the metalake row in share
+   * mode, then the roles the updated content names, the order role and metalake deletion use. An
+   * update that names no roles takes neither, so it doesn't wait on edits to other policies in the
+   * metalake; H2 takes the share lock exclusively.
+   */
+  private void lockForUpdate(String metalakeName, Long metalakeId, PolicyEntity policyEntity) {
+    if (POConverters.policyRoleNames(policyEntity).isEmpty()) {
+      return;
+    }
+    LiveEndpointService.lockLiveEndpoint(
+        NameIdentifier.of(metalakeName),
+        Entity.EntityType.METALAKE,
+        new NamespacedEntityId(metalakeId));
+    lockNamedRoles(metalakeId, policyEntity);
+  }
+
+  /**
+   * Requires the roles the policy content names to exist, and holds them until commit so none can
+   * be deleted while this write is in flight. Runs after the metalake lock and before the policy
+   * row is written; see {@link RoleMetaService#lockRolesNamedByPolicy}.
+   */
+  private void lockNamedRoles(Long metalakeId, PolicyEntity policyEntity) {
+    Set<String> roleNames = POConverters.policyRoleNames(policyEntity);
+    if (roleNames.isEmpty()) {
+      return;
+    }
+    RoleMetaService.getInstance()
+        .lockRolesNamedByPolicy(metalakeId, policyEntity.nameIdentifier(), roleNames);
   }
 
   /**

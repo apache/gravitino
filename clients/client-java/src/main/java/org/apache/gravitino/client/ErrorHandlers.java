@@ -984,6 +984,9 @@ public class ErrorHandlers {
         case ErrorConstants.NOT_IN_USE_CODE:
           throw new MetalakeNotInUseException(errorMessage);
 
+        case ErrorConstants.IN_USE_CODE:
+          throw new InUseException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -1206,6 +1209,10 @@ public class ErrorHandlers {
 
       switch (errorResponse.getCode()) {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          // An access control policy naming a role that does not exist.
+          if (errorResponse.getType().equals(IllegalRoleException.class.getSimpleName())) {
+            throw new IllegalRoleException(errorMessage);
+          }
           throw new IllegalArgumentException(errorMessage);
 
         case ErrorConstants.NOT_FOUND_CODE:

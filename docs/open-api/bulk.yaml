@@ -238,7 +238,7 @@ paths:
         - access control
       summary: Remove roles in bulk
       operationId: bulkRemoveRoles
-      description: Removes roles in best-effort mode. Failed items are returned in the top-level errors array. Role names in the same request must be unique. The maximum request size is controlled by `gravitino.server.bulk.maxItems`, which defaults to 100.
+      description: Removes roles in best-effort mode. Failed items are returned in the top-level errors array. A role that an access control policy names is not removed; its error has code 1010 (`InUseException`). Role names in the same request must be unique. The maximum request size is controlled by `gravitino.server.bulk.maxItems`, which defaults to 100.
       requestBody:
         content:
           application/json:

@@ -88,6 +88,31 @@ final class TransactionLockWaits {
   }
 
   /**
+   * Runs {@code holder} in a transaction on the calling thread, then runs {@code contender} in its
+   * own transaction on another thread while the holder is still open. The holder is rolled back
+   * only after the contender has finished, so a contender that waits on the holder times out.
+   *
+   * @param holder the work whose transaction stays open
+   * @param contender the work that must not wait for the holder
+   * @return the contender's failure, or null if its transaction committed
+   * @throws Exception if the contender waits on the holder, or the holder fails
+   */
+  Throwable whileTransactionOpen(Executable holder, Executable contender) throws Exception {
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    SessionUtils.beginTransaction();
+    try {
+      prepareTransaction();
+      Assertions.assertDoesNotThrow(holder);
+      return submitTransaction(executor, new CompletableFuture<>(), contender)
+          .get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    } finally {
+      SessionUtils.rollbackTransaction();
+      executor.shutdownNow();
+      Assertions.assertTrue(executor.awaitTermination(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+    }
+  }
+
+  /**
    * Runs {@code operation} in its own transaction on {@code executor}.
    *
    * @param executor the executor that runs the transaction
