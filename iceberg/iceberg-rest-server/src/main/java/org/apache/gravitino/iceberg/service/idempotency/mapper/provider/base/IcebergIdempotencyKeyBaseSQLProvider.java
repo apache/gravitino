@@ -35,8 +35,8 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
   public String insert(@Param("po") IcebergIdempotencyKeyPO po) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (idempotency_key, http_method, request_uri, generation, audit_info, created_at, expires_at)"
-        + " VALUES (#{po.idempotencyKey}, #{po.httpMethod}, #{po.requestUri}, #{po.generation},"
+        + " (idempotency_key, http_method, request_uri, audit_info, created_at, expires_at)"
+        + " VALUES (#{po.idempotencyKey}, #{po.httpMethod}, #{po.requestUri},"
         + " #{po.auditInfo}, #{po.createdAt}, #{po.expiresAt})";
   }
 
@@ -49,21 +49,10 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
   public String replaceExpired(@Param("po") IcebergIdempotencyKeyPO po) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET http_method = #{po.httpMethod}, request_uri = #{po.requestUri}, generation = #{po.generation},"
+        + " SET http_method = #{po.httpMethod}, request_uri = #{po.requestUri},"
         + " http_status = NULL, response_summary = NULL, audit_info = #{po.auditInfo},"
         + " created_at = #{po.createdAt}, expires_at = #{po.expiresAt}"
         + " WHERE idempotency_key = #{po.idempotencyKey} AND expires_at <= #{po.createdAt}";
-  }
-
-  /**
-   * Returns the counter advance statement.
-   *
-   * @param stripe counter selected by the key's final byte
-   * @return SQL statement
-   */
-  public String advanceGeneration(@Param("stripe") int stripe) {
-    return "INSERT INTO iceberg_idempotency_generation_meta (stripe, generation) VALUES (#{stripe}, 1)"
-        + " ON DUPLICATE KEY UPDATE generation = generation + 1";
   }
 
   /**
@@ -76,7 +65,7 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
   public String selectRecord(
       @Param("idempotencyKey") String idempotencyKey, @Param("nowMs") long nowMs) {
     return "SELECT idempotency_key AS idempotencyKey, http_method AS httpMethod, request_uri AS requestUri,"
-        + " generation, http_status AS httpStatus, response_summary AS responseSummary,"
+        + " http_status AS httpStatus, response_summary AS responseSummary,"
         + " audit_info AS auditInfo, created_at AS createdAt, expires_at AS expiresAt FROM "
         + TABLE_NAME
         + " WHERE idempotency_key = #{idempotencyKey}"
@@ -84,10 +73,9 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
   }
 
   /**
-   * Returns a finalization guarded by the reservation's claim and expiry.
+   * Returns a finalization guarded by expiry for an unfinalized reservation.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation fencing token
    * @param httpStatus response status
    * @param responseSummary serialized response body, or null for an empty body
    * @param nowMs current time in unix epoch milliseconds
@@ -95,29 +83,26 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
    */
   public String finalizeRecord(
       @Param("idempotencyKey") String idempotencyKey,
-      @Param("claim") long claim,
       @Param("httpStatus") int httpStatus,
       @Param("responseSummary") String responseSummary,
       @Param("nowMs") long nowMs) {
     return "UPDATE "
         + TABLE_NAME
         + " SET http_status = #{httpStatus}, response_summary = #{responseSummary}"
-        + " WHERE idempotency_key = #{idempotencyKey} AND generation = #{claim}"
+        + " WHERE idempotency_key = #{idempotencyKey}"
         + " AND http_status IS NULL AND expires_at > #{nowMs}";
   }
 
   /**
-   * Returns a release guarded by the reservation's claim. Finalized responses are retained.
+   * Returns a release of an unfinalized reservation. Finalized responses are retained.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation fencing token
    * @return SQL statement
    */
-  public String deleteReservation(
-      @Param("idempotencyKey") String idempotencyKey, @Param("claim") long claim) {
+  public String deleteReservation(@Param("idempotencyKey") String idempotencyKey) {
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE idempotency_key = #{idempotencyKey} AND generation = #{claim} AND http_status IS NULL";
+        + " WHERE idempotency_key = #{idempotencyKey} AND http_status IS NULL";
   }
 
   /**

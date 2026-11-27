@@ -861,17 +861,6 @@ public class TestSQLScripts extends TestJDBCBackend {
 
   private void assertIdempotencySchema(String source) throws SQLException {
     Map<String, Set<String>> columns = readSchemaColumns();
-    String counterTable =
-        columns.keySet().stream()
-            .filter(name -> name.equalsIgnoreCase("iceberg_idempotency_generation_meta"))
-            .findFirst()
-            .orElseThrow(
-                () -> new AssertionFailedError("Missing idempotency counters after " + source));
-    Assertions.assertEquals(
-        Set.of("stripe", "generation"),
-        Set.copyOf(
-            columns.get(counterTable).stream().map(name -> name.toLowerCase(Locale.ROOT)).toList()),
-        "Idempotency counter columns after " + source);
     String table =
         columns.keySet().stream()
             .filter(name -> name.equalsIgnoreCase("iceberg_idempotency_meta"))
@@ -883,7 +872,6 @@ public class TestSQLScripts extends TestJDBCBackend {
             "idempotency_key",
             "http_method",
             "request_uri",
-            "generation",
             "http_status",
             "response_summary",
             "audit_info",

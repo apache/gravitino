@@ -26,8 +26,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 import javax.annotation.Nullable;
@@ -43,11 +43,10 @@ import org.slf4j.LoggerFactory;
  * node that restarted, finds no record and re-executes the mutation. Its size bound can also evict
  * a record before its reuse window elapses, including an in-flight reservation. A retry can then
  * reserve the same key and run the mutation concurrently with the original request. At-most-once
- * execution therefore depends on the reservation remaining cached; claim fencing prevents stale
- * writes to a replacement record but cannot prevent duplicate mutations after eviction. Size the
- * cache for all keys within the reuse window, including in-flight requests. Production deployments
- * that need durable deduplication or run more than one replica should use a shared, durable store
- * instead.
+ * execution therefore depends on the reservation remaining cached. Hard-deleted or evicted keys are
+ * treated as never seen; size the cache and reuse window so that does not overlap live work.
+ * Production deployments that need durable deduplication or run more than one replica should use a
+ * shared, durable store instead.
  *
  * <p>Each record's own {@code expiresAtMs} decides whether it still counts, so a record past its
  * deadline reads as absent whether or not the cache has reclaimed it yet. Caffeine's expiry only
@@ -61,7 +60,6 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
   /** Evictions between two warnings, so an undersized cache is visible without flooding the log. */
   private static final long EVICTION_LOG_INTERVAL = 1000;
 
-  private final AtomicLong generations = new AtomicLong();
   private final AtomicLong sizeEvictions = new AtomicLong();
   private final LongSupplier clock;
 
@@ -124,23 +122,25 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
   }
 
   @Override
-  public OptionalLong reserve(String idempotencyKey, String operationBinding, long expiresAtMs) {
+  public boolean reserve(String idempotencyKey, String operationBinding, long expiresAtMs) {
     String key = IdempotencyKeys.canonicalize(idempotencyKey);
     IdempotencyRecord reserved =
-        IdempotencyRecord.reserved(
-            key, operationBinding, generations.incrementAndGet(), clock.getAsLong(), expiresAtMs);
+        IdempotencyRecord.reserved(key, operationBinding, clock.getAsLong(), expiresAtMs);
     // A record past its deadline is treated as absent rather than waiting for the cache to reclaim
     // it, so behavior turns on the record's own expiry instead of when maintenance happens to run.
-    IdempotencyRecord actual =
-        cache
-            .asMap()
-            .compute(
-                key,
-                (cacheKey, existing) ->
-                    existing == null || isExpired(existing) ? reserved : existing);
-    return actual.claim() == reserved.claim()
-        ? OptionalLong.of(reserved.claim())
-        : OptionalLong.empty();
+    AtomicBoolean acquired = new AtomicBoolean();
+    cache
+        .asMap()
+        .compute(
+            key,
+            (cacheKey, existing) -> {
+              if (existing == null || isExpired(existing)) {
+                acquired.set(true);
+                return reserved;
+              }
+              return existing;
+            });
+    return acquired.get();
   }
 
   @Override
@@ -152,29 +152,27 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
 
   @Override
   public void finalizeRecord(
-      String idempotencyKey, long claim, int httpStatus, @Nullable String responseSummary) {
-    // computeIfPresent, so a record purged while the mutation was running is not resurrected. The
-    // claim check leaves a record reserved by someone else untouched.
+      String idempotencyKey, int httpStatus, @Nullable String responseSummary) {
+    // computeIfPresent, so a record purged while the mutation was running is not resurrected.
     cache
         .asMap()
         .computeIfPresent(
             IdempotencyKeys.canonicalize(idempotencyKey),
             (key, record) ->
-                record.claim() == claim && !isExpired(record)
+                !record.isFinalized() && !isExpired(record)
                     ? record.withResponse(httpStatus, responseSummary)
                     : record);
   }
 
   @Override
-  public void release(String idempotencyKey, long claim) {
+  public void release(String idempotencyKey) {
     // Returning null removes the entry. A finalized record is left alone so that a late release
-    // cannot drop a response another request may still replay, and so is a record whose claim has
-    // moved on, so a caller that lost its reservation cannot free a key someone else is executing.
+    // cannot drop a response another request may still replay.
     cache
         .asMap()
         .computeIfPresent(
             IdempotencyKeys.canonicalize(idempotencyKey),
-            (key, record) -> record.isFinalized() || record.claim() != claim ? record : null);
+            (key, record) -> record.isFinalized() ? record : null);
   }
 
   @Override
