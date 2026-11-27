@@ -31,30 +31,37 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /**
  * A cacheable write inside an outer SQL transaction must stay invisible to other sessions until
@@ -335,6 +342,73 @@ public class TestRelationalEntityStoreUncommittedCache {
   }
 
   @Test
+  void testReadInsideNewBackingTagCheckDoesNotPublishTheTag() throws Exception {
+    NameIdentifier tagIdent = NameIdentifierUtil.ofTag(METALAKE, "MarketsTag");
+    DomainEntity domain =
+        DomainEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("Markets")
+            .withNamespace(NamespaceUtil.ofDomain(METALAKE))
+            .withComment("")
+            .withStatus(Domain.Status.DRAFT)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(tagIdent.name())
+            .withNamespace(NamespaceUtil.ofTag(METALAKE))
+            .withAllowedValues(new String[0])
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            store.insertDomainWithNewBackingTag(
+                domain,
+                tag,
+                state -> {
+                  try {
+                    store.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
+                    store.batchGet(List.of(tagIdent), Entity.EntityType.TAG, TagEntity.class);
+                  } catch (IOException e) {
+                    throw new IllegalStateException(e);
+                  }
+                  Assertions.assertFalse(cache.contains(tagIdent, Entity.EntityType.TAG));
+                  throw new IllegalArgumentException("rejected");
+                }));
+
+    Assertions.assertFalse(cache.contains(tagIdent, Entity.EntityType.TAG));
+    Assertions.assertFalse(peerCanRead(tagIdent, Entity.EntityType.TAG, TagEntity.class));
+  }
+
+  @Test
+  void testDeferredReleaseOutOfMemoryStillCommits() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "oom_after_commit");
+    AtomicReference<Throwable> recorded = new AtomicReference<>();
+    SqlSessions.setCloseFailureRecorder(recorded::set);
+    EntityCache throwing = Mockito.spy(cache);
+    Mockito.doThrow(new OutOfMemoryError("metaspace"))
+        .when(throwing)
+        .invalidate(Mockito.any(), Mockito.any());
+    try {
+      SessionUtils.beginTransaction();
+      store.put(policy(ident), false);
+      FieldUtils.writeField(store, "cache", throwing, true);
+      SessionUtils.commitTransaction();
+    } finally {
+      FieldUtils.writeField(store, "cache", cache, true);
+      SqlSessions.setCloseFailureRecorder(null);
+      rollbackIfOpen();
+    }
+
+    Assertions.assertInstanceOf(OutOfMemoryError.class, recorded.get());
+    Assertions.assertEquals("metaspace", recorded.get().getMessage());
+    Assertions.assertTrue(peerCanRead(ident));
+  }
+
+  @Test
   void testDeadOwnerReleasesTheBlockOnTheNextRead() throws Exception {
     NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "dead_owner");
     store.put(policy(ident), false);
@@ -387,10 +461,15 @@ public class TestRelationalEntityStoreUncommittedCache {
   }
 
   private boolean peerCanRead(NameIdentifier ident) throws Exception {
+    return peerCanRead(ident, Entity.EntityType.POLICY, PolicyEntity.class);
+  }
+
+  private <E extends Entity & HasIdentifier> boolean peerCanRead(
+      NameIdentifier ident, Entity.EntityType type, Class<E> entityClass) throws Exception {
     return peer.submit(
             () -> {
               try {
-                store.get(ident, Entity.EntityType.POLICY, PolicyEntity.class);
+                store.get(ident, type, entityClass);
                 return true;
               } catch (NoSuchEntityException expected) {
                 return false;

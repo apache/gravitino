@@ -24,6 +24,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.TransactionIsolationLevel;
 import org.slf4j.Logger;
@@ -43,6 +45,9 @@ public final class SqlSessions {
   // Run after the session is actually closed. An inner close only decrements the count.
   private static final CopyOnWriteArrayList<Runnable> CLOSED_LISTENERS =
       new CopyOnWriteArrayList<>();
+
+  // A failure already caught after the session closed. The server installs its health check here.
+  private static volatile Consumer<Throwable> closeFailureRecorder = failure -> {};
 
   private SqlSessions() {}
 
@@ -117,6 +122,32 @@ public final class SqlSessions {
    */
   public static void removeClosedListener(Runnable listener) {
     CLOSED_LISTENERS.remove(listener);
+  }
+
+  /**
+   * Installs the recorder for a failure already caught after the SQL session closed. The server
+   * points this at its health check. A null recorder drops the failure.
+   *
+   * @param recorder the recorder, or null to drop the failure
+   */
+  public static void setCloseFailureRecorder(@Nullable Consumer<Throwable> recorder) {
+    closeFailureRecorder = recorder == null ? failure -> {} : recorder;
+  }
+
+  /**
+   * Passes a failure caught after the session closed to the recorder installed by {@link
+   * #setCloseFailureRecorder}. A recorder that throws is ignored, so a successful commit stays
+   * successful.
+   *
+   * @param failure the consumed failure, or null
+   */
+  public static void recordCloseFailure(@Nullable Throwable failure) {
+    try {
+      closeFailureRecorder.accept(failure);
+    } catch (RuntimeException | Error ignored) {
+      // The caller already consumed this failure. Recording it must not replace a successful
+      // commit.
+    }
   }
 
   /**
@@ -212,6 +243,7 @@ public final class SqlSessions {
       try {
         listener.run();
       } catch (RuntimeException | Error e) {
+        recordCloseFailure(e);
         LOG.warn("Failed to finish work deferred until the outermost SQL session closed", e);
       }
     }

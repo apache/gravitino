@@ -155,6 +155,7 @@ public class RequestContextFilter implements Filter {
           }
         }
       } catch (RuntimeException | Error e) {
+        ServerHealth.getInstance().recordFailure(e);
         LOG.warn("Failed to roll back an SQL session left open by the request", e);
       } finally {
         RequestContext.clear();

@@ -1121,6 +1121,7 @@ public class RelationalEntityStore
       try {
         endPendingWrite(pending.ident, pending.entityType);
       } catch (RuntimeException | Error e) {
+        SqlSessions.recordCloseFailure(e);
         LOGGER.warn(
             "Failed to release a cache block deferred until the SQL session closed for {} {}",
             pending.entityType,

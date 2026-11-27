@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -74,6 +75,30 @@ public class TestRequestContextFilter {
     }
 
     Assertions.assertEquals(Boolean.TRUE, sawOpenSession.get());
+    Assertions.assertNull(RequestContext.getRemoteAddress());
+  }
+
+  @Test
+  public void testRequestEndRollbackOutOfMemoryIsRecorded() throws Exception {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    when(req.getHeader("X-Forwarded-For")).thenReturn(null);
+    when(req.getRemoteAddr()).thenReturn("192.168.1.1");
+    try (MockedStatic<SqlSessions> sessions = mockStatic(SqlSessions.class)) {
+      sessions.when(SqlSessions::hasActiveSession).thenReturn(true);
+      sessions
+          .when(SqlSessions::rollbackAndCloseSqlSession)
+          .thenThrow(new OutOfMemoryError("metaspace"));
+      filter.doFilter(req, resp, (request, response) -> {});
+    } finally {
+      Field outOfMemory = ServerHealth.class.getDeclaredField("outOfMemory");
+      outOfMemory.setAccessible(true);
+      try {
+        Assertions.assertTrue(ServerHealth.getInstance().hasOutOfMemoryError());
+      } finally {
+        outOfMemory.setBoolean(ServerHealth.getInstance(), false);
+      }
+    }
     Assertions.assertNull(RequestContext.getRemoteAddress());
   }
 

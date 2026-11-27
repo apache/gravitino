@@ -41,6 +41,7 @@ import javax.servlet.Servlet;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.server.authentication.AuthenticationFilter;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
@@ -100,6 +101,9 @@ public class JettyServer {
 
   public synchronized void initialize(
       JettyServerConfig serverConfig, String serverName, boolean shouldEnableUI) {
+    // Session-close cleanup runs in core, which cannot see this server's health state. Point the
+    // close-failure recorder at it before any request can commit.
+    SqlSessions.setCloseFailureRecorder(ServerHealth.getInstance()::recordFailure);
     this.serverConfig = serverConfig;
     this.serverName = serverName;
 
