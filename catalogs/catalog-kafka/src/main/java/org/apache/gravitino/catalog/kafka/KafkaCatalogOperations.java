@@ -106,11 +106,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   // named by "config.providers". Those providers read the Gravitino server's own environment
   // variables and files, so they must not be selectable through catalog properties.
   @VisibleForTesting static final String CONFIG_PROVIDERS_KEY = "config.providers";
-  // The Kafka client reads the JVM system properties
-  // AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY
-  // and BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG each time it is created, and a
-  // catalog property cannot change them. An operator sets them with -D in JAVA_OPTS,
-  // JAVA_TOOL_OPTIONS or JDK_JAVA_OPTIONS, and Gravitino only fills in the ones that are absent.
+
   private final EntityStore store;
   private final IdGenerator idGenerator;
   @VisibleForTesting NameIdentifier defaultSchemaIdent;
@@ -656,6 +652,11 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
   /**
    * Sets secure defaults for the Kafka client JVM properties that the operator has not set.
+   *
+   * <p>The Kafka client reads these JVM system properties each time it is created, and a catalog
+   * property cannot change them. An operator sets them with {@code -D} in {@code JAVA_OPTS}, {@code
+   * JAVA_TOOL_OPTIONS} or {@code JDK_JAVA_OPTIONS}, and the JVM has merged them into system
+   * properties before this method runs, so it only fills in the ones that are absent.
    *
    * <p>An empty {@code org.apache.kafka.sasl.oauthbearer.allowed.urls} stops Kafka's OAUTHBEARER
    * login callback handler from fetching a token from any {@code
