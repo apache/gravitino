@@ -329,6 +329,7 @@ class TestOssieOntologyDocuments {
         version: 0.3.0.dev0
         name: Sales
         ontology:
+          - {concept: EmailAddress, type: ValueType, extends: [String]}
           - concept: Customer
             type: EntityType
             identify_by: [%s]
@@ -337,15 +338,17 @@ class TestOssieOntologyDocuments {
                 roles: [{concept: Integer}]
                 verbalizes: [id]
               - name: email
-                roles: [{concept: String}]
+                roles: [{concept: EmailAddress}]
                 verbalizes: [email]
         """;
     OntologyMappingDefinition referent =
-        customerMapping(
+        mappingFor(
+            "Customer",
             Map.of(
                 "referentMappings",
                 List.of(Map.of("relationship", "Customer.id", "expression", "customers.id"))));
-    OntologyMappingDefinition expression = customerMapping(Map.of("expression", "customers.id"));
+    OntologyMappingDefinition expression =
+        mappingFor("Customer", Map.of("expression", "customers.id"));
     OntologyReferences simple =
         OntologyReferences.of(
             OssieOntologyDocuments.importOntology(OssieDocument.yaml(ontology.formatted("id")))
@@ -357,6 +360,7 @@ class TestOssieOntologyDocuments {
         OntologyReferences.of(
             OssieOntologyDocuments.importOntology(OssieDocument.yaml(ontology.formatted("email")))
                 .definition());
+    changed.validateMapping(mappingFor("Customer", Map.of("expression", "customers.email")));
     IllegalOntologyMappingException wrongReferent =
         Assertions.assertThrows(
             IllegalOntologyMappingException.class, () -> changed.validateMapping(referent));
@@ -378,7 +382,8 @@ class TestOssieOntologyDocuments {
             .getMessage()
             .contains("$.conceptMappings[0].objectMappings[0].expression"));
     compound.validateMapping(
-        customerMapping(
+        mappingFor(
+            "Customer",
             Map.of(
                 "referentMappings",
                 List.of(
@@ -386,11 +391,69 @@ class TestOssieOntologyDocuments {
                     Map.of("relationship", "email", "expression", "customers.email")))));
   }
 
-  private static OntologyMappingDefinition customerMapping(Map<String, ?> objectMapping) {
+  @Test
+  void testExpressionOnlyEntityMappingsRequireASimpleIdentifier() {
+    String ontology =
+        """
+        version: 0.3.0.dev0
+        name: Billing
+        ontology:
+          - concept: Order
+            type: EntityType
+            identify_by: [%s]
+            relationships:
+              - {name: store_code, roles: [{concept: String}], verbalizes: [store]}
+              - {name: order_no, roles: [{concept: Integer}], verbalizes: [number]}
+          - concept: Invoice
+            type: EntityType
+            identify_by: [order]
+            relationships:
+              - {name: order, roles: [{concept: Order}], verbalizes: [order]}
+          - {concept: Unidentified, type: EntityType}
+        """;
+    OntologyReferences compoundOrder =
+        OntologyReferences.of(
+            OssieOntologyDocuments.importOntology(
+                    OssieDocument.yaml(ontology.formatted("store_code, order_no")))
+                .definition());
+    Map<String, String> orderNumber = Map.of("expression", "sales.order_no");
+    for (String entity : List.of("Invoice", "Unidentified", "Any")) {
+      IllegalOntologyMappingException error =
+          Assertions.assertThrows(
+              IllegalOntologyMappingException.class,
+              () -> compoundOrder.validateMapping(mappingFor(entity, orderNumber)),
+              entity);
+      Assertions.assertTrue(
+          error.getMessage().contains("$.conceptMappings[0].objectMappings[0].expression"));
+      Assertions.assertTrue(error.getMessage().contains("'" + entity + "'"));
+    }
+
+    List<Map<String, String>> orderIdentifiers =
+        List.of(
+            Map.of("relationship", "store_code", "expression", "sales.store_code"),
+            Map.of("relationship", "order_no", "expression", "sales.order_no"));
+    Map<String, Object> orderReferent =
+        Map.of("relationship", "order", "referentMappings", orderIdentifiers);
+    compoundOrder.validateMapping(
+        mappingFor("Invoice", Map.of("referentMappings", List.of(orderReferent))));
+
+    OntologyReferences simpleOrder =
+        OntologyReferences.of(
+            OssieOntologyDocuments.importOntology(
+                    OssieDocument.yaml(ontology.formatted("order_no")))
+                .definition());
+    simpleOrder.validateMapping(mappingFor("Order", orderNumber));
+    Assertions.assertThrows(
+        IllegalOntologyMappingException.class,
+        () -> simpleOrder.validateMapping(mappingFor("Invoice", orderNumber)));
+  }
+
+  private static OntologyMappingDefinition mappingFor(
+      String concept, Map<String, ?> objectMapping) {
     return OntologyMappingDefinition.of(
         Map.of(
             "conceptMappings",
-            List.of(Map.of("concept", "Customer", "objectMappings", List.of(objectMapping)))));
+            List.of(Map.of("concept", concept, "objectMappings", List.of(objectMapping)))));
   }
 
   private static OssieDocument withVersion(OssieDocument document, String version) {

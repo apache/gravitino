@@ -246,17 +246,34 @@ public final class OntologyReferences {
 
   private void checkObjectReference(JsonNode node, @Nullable String concept, String path) {
     JsonNode referents = node.path("referentMappings");
-    Concept target = concepts.get(concept);
     if (node.has("expression")
         && referents.isEmpty()
-        && target != null
-        && target.identifiers.size() > 1
-        && "EntityType".equals(target.node.path("type").asText())) {
+        && concept != null
+        && !canMapByExpression(concept)) {
       throw new IllegalOntologyMappingException(
-          "%s.expression: concept '%s' has a compound identifier and requires referent mappings",
+          "%s.expression: an expression-only mapping for '%s' requires exactly one identifying relationship to a value type",
           path, concept);
     }
     checkReferents(referents, concept, path + ".referentMappings");
+  }
+
+  private boolean canMapByExpression(String name) {
+    if (isValueType(name)) {
+      return true;
+    }
+    Concept entity = concepts.get(name);
+    return entity != null
+        && entity.identifiers.size() == 1
+        && isValueType(lastRole(entity.identifiers.iterator().next()));
+  }
+
+  private boolean isValueType(@Nullable String name) {
+    if (BUILT_INS.contains(name)) {
+      // Any is Ossie's only built-in entity type.
+      return !"Any".equals(name);
+    }
+    Concept concept = concepts.get(name);
+    return concept != null && "ValueType".equals(concept.node.path("type").asText());
   }
 
   private void checkReferents(JsonNode nodes, @Nullable String concept, String path) {
