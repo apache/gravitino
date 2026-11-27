@@ -179,12 +179,13 @@ tasks {
   // under libs/. Gradle dependency changes need no shell edits; the process does not load every
   // jar under libs/.
   val writeEnvSh by registering {
-    dependsOn(copyDepends, "jar", "copyLibs")
+    dependsOn(copyDepends, jar, "copyLibs")
     val envSh = rootProject.file("distribution/package/optimizer/env.sh")
+    val moduleJar = jar.flatMap { it.archiveFile }
     outputs.file(envSh)
     doLast {
       val rootLibJarNames = rootPackageLibJarNames(rootProject)
-      val moduleJarName = tasks.named<Jar>("jar").get().archiveFile.get().asFile.name
+      val moduleJarName = moduleJar.get().asFile.name
       val needed =
         configurations.runtimeClasspath.get().files.mapTo(sortedSetOf()) { it.name }.also {
           it.add(moduleJarName)
