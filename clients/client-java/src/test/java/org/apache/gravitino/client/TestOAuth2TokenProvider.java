@@ -44,6 +44,8 @@ import org.mockserver.integration.ClientAndServer;
 import org.mockserver.matchers.Times;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
+import org.mockserver.model.Parameter;
+import org.mockserver.model.ParameterBody;
 
 @SuppressWarnings("JavaUtilDate")
 public class TestOAuth2TokenProvider {
@@ -153,6 +155,205 @@ public class TestOAuth2TokenProvider {
     Assertions.assertEquals(
         AuthConstants.AUTHORIZATION_BEARER_HEADER + accessToken,
         new String(provider.getTokenData(), StandardCharsets.UTF_8));
+  }
+
+  @Test
+  public void testAuthenticationPasswordGrant() throws Exception {
+    ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
+    String accessToken = "access-token";
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse(accessToken, "2", "bearer", 1, "test", null);
+    HttpResponse mockResponse =
+        HttpResponse.response()
+            .withStatusCode(HttpStatus.SC_OK)
+            .withBody(objectMapper.writeValueAsString(response));
+
+    mockServer.clear(HttpRequest.request().withMethod("POST").withPath("/oauth/token"));
+
+    // The password is the last part of the credential, so it may contain ':' and leading or
+    // trailing whitespace, and must be sent to the token endpoint verbatim.
+    mockServer
+        .when(
+            HttpRequest.request()
+                .withMethod("POST")
+                .withPath("/oauth/token")
+                .withBody(
+                    ParameterBody.params(
+                        Parameter.param("grant_type", "password"),
+                        Parameter.param("client_id", "client-id"),
+                        Parameter.param("client_secret", "client-secret"),
+                        Parameter.param("username", "usera"),
+                        Parameter.param("password", " pass:word "),
+                        Parameter.param("scope", "test"))),
+            // build() requests the token once, and getAccessToken() requests it again because
+            // "access-token" is not a JWT and therefore has no expiry.
+            Times.exactly(2))
+        .respond(mockResponse);
+
+    OAuth2TokenProvider provider =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withCredential("password:client-id:client-secret:usera: pass:word ")
+            .withPath("oauth/token")
+            .withScope("test")
+            .build();
+
+    Assertions.assertEquals(accessToken, provider.getAccessToken());
+  }
+
+  @Test
+  public void testAuthenticationPasswordGrantWithClientSecretBasic() throws Exception {
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse("access-token", "refresh-token", "bearer", 3600, "test", null);
+    String respJson = ObjectMapperProvider.objectMapper().writeValueAsString(response);
+
+    String basicAuth =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString("client-id:client-secret".getBytes(StandardCharsets.UTF_8));
+
+    HttpRequest tokenRequest = HttpRequest.request().withMethod("POST").withPath("/oauth/token");
+    mockServer.clear(tokenRequest);
+
+    mockServer
+        .when(
+            HttpRequest.request()
+                .withMethod("POST")
+                .withPath("/oauth/token")
+                .withHeader("Authorization", basicAuth)
+                .withBody(
+                    ParameterBody.params(
+                        Parameter.param("grant_type", "password"),
+                        Parameter.param("username", "usera"),
+                        Parameter.param("password", "pass"),
+                        Parameter.param("scope", "test"))),
+            Times.exactly(2))
+        .respond(HttpResponse.response().withStatusCode(HttpStatus.SC_OK).withBody(respJson));
+
+    OAuth2TokenProvider provider =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withCredential("password:client-id:client-secret:usera:pass")
+            .withPath("oauth/token")
+            .withScope("test")
+            .withClientAuthenticationMethod(OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+            .build();
+
+    Assertions.assertEquals("access-token", provider.getAccessToken());
+
+    HttpRequest[] recordedRequests = mockServer.retrieveRecordedRequests(tokenRequest);
+    Assertions.assertEquals(2, recordedRequests.length);
+    for (HttpRequest recordedRequest : recordedRequests) {
+      Assertions.assertEquals(basicAuth, recordedRequest.getFirstHeader("Authorization"));
+      String requestBody = recordedRequest.getBodyAsString();
+      Assertions.assertFalse(requestBody.contains("client_id"));
+      Assertions.assertFalse(requestBody.contains("client_secret"));
+    }
+  }
+
+  @Test
+  public void testAuthenticationPasswordGrantWithEmptyClientId() throws Exception {
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse("access-token", "refresh-token", "bearer", 3600, "test", null);
+    String respJson = ObjectMapperProvider.objectMapper().writeValueAsString(response);
+
+    HttpRequest tokenRequest = HttpRequest.request().withMethod("POST").withPath("/oauth/token");
+    mockServer.clear(tokenRequest);
+
+    mockServer
+        .when(
+            HttpRequest.request()
+                .withMethod("POST")
+                .withPath("/oauth/token")
+                .withBody(
+                    ParameterBody.params(
+                        Parameter.param("grant_type", "password"),
+                        Parameter.param("client_secret", "client-secret"),
+                        Parameter.param("username", "usera"),
+                        Parameter.param("password", "pass"),
+                        Parameter.param("scope", "test"))),
+            Times.exactly(2))
+        .respond(HttpResponse.response().withStatusCode(HttpStatus.SC_OK).withBody(respJson));
+
+    OAuth2TokenProvider provider =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withCredential("password::client-secret:usera:pass")
+            .withPath("oauth/token")
+            .withScope("test")
+            .build();
+
+    Assertions.assertEquals("access-token", provider.getAccessToken());
+
+    HttpRequest[] recordedRequests = mockServer.retrieveRecordedRequests(tokenRequest);
+    Assertions.assertEquals(2, recordedRequests.length);
+    for (HttpRequest recordedRequest : recordedRequests) {
+      Assertions.assertFalse(recordedRequest.getBodyAsString().contains("client_id"));
+    }
+  }
+
+  @Test
+  public void testInvalidPasswordGrantCredential() {
+    DefaultOAuth2TokenProvider.Builder builder =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withPath("oauth/token")
+            .withScope("test");
+
+    // The credential must have the password:<client_id>:<client_secret>:<username>:<password>
+    // form.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> builder.withCredential("password:client-id:client-secret:username").build());
+    // The username and password are mandatory for the password grant.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> builder.withCredential("password:client-id:client-secret::password").build());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> builder.withCredential("password:client-id:client-secret:usera:").build());
+    // An empty client secret is rejected rather than sent as an empty form value.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> builder.withCredential("password:client-id::usera:password").build());
+  }
+
+  @Test
+  public void testLegacyCredentialWithColonInSecret() throws Exception {
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse("access-token", "refresh-token", "bearer", 3600, "test", null);
+    String respJson = ObjectMapperProvider.objectMapper().writeValueAsString(response);
+    HttpResponse mockResponse =
+        HttpResponse.response().withStatusCode(HttpStatus.SC_OK).withBody(respJson);
+
+    mockServer.clear(HttpRequest.request().withMethod("POST").withPath("/oauth/token"));
+
+    // Credentials that were valid before the password grant was added must keep their meaning: the
+    // whole remainder after the first ':' is the client secret. In particular, a client secret
+    // with two ':' must not be reinterpreted as a password grant credential.
+    mockServer
+        .when(
+            HttpRequest.request()
+                .withMethod("POST")
+                .withPath("/oauth/token")
+                .withBody(
+                    ParameterBody.params(
+                        Parameter.param("grant_type", "client_credentials"),
+                        Parameter.param("client_id", "client-id"),
+                        Parameter.param("client_secret", "se:cr:et"),
+                        Parameter.param("scope", "test"))),
+            Times.exactly(2))
+        .respond(mockResponse);
+
+    OAuth2TokenProvider provider =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withCredential("client-id:se:cr:et")
+            .withPath("oauth/token")
+            .withScope("test")
+            .build();
+
+    Assertions.assertEquals("access-token", provider.getAccessToken());
   }
 
   @Test

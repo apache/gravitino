@@ -104,6 +104,18 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
     /**
      * Sets the credential for the HTTP token requests.
      *
+     * <p>The credential can be one of the following:
+     *
+     * <ul>
+     *   <li>{@code client_secret}, which requests the token with the {@code client_credentials}
+     *       grant;
+     *   <li>{@code client_id:client_secret}, which requests the token with the {@code
+     *       client_credentials} grant;
+     *   <li>{@code password:client_id:client_secret:username:password}, which requests the token
+     *       with the {@code password} grant. The password is passed verbatim and may contain ':'
+     *       and leading or trailing whitespace.
+     * </ul>
+     *
      * @param credential The credential for the HTTP token requests.
      * @return This Builder instance for method chaining.
      */
