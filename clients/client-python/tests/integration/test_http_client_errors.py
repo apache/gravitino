@@ -15,14 +15,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 import threading
 import traceback
 import unittest
 from concurrent.futures import ProcessPoolExecutor
+from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from multiprocessing import get_context
 from unittest.mock import patch
 
+from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
 from gravitino.exceptions.base import HTTPResponseException, UnauthorizedException
 from gravitino.exceptions.handlers.oauth_error_handler import OAUTH_ERROR_HANDLER
 from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
@@ -38,6 +41,19 @@ def _request_status(origin, endpoint):
 
 
 class _ErrorServer(BaseHTTPRequestHandler):
+    def do_POST(self):  # pylint: disable=invalid-name
+        """Serve an opaque token or an empty service-unavailable response."""
+        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+        token = self.server.oauth_token
+        self.send_response(200 if token else 503)
+        self.end_headers()
+        if token:
+            self.wfile.write(
+                json.dumps(
+                    {"access_token": token, "token_type": "bearer", "expires_in": 60}
+                ).encode()
+            )
+
     def do_GET(self):  # pylint: disable=invalid-name
         """Serve deliberately malformed responses and valid domain errors."""
         if self.path == "/success":
@@ -135,3 +151,39 @@ class TestHTTPClientErrors(unittest.TestCase):
             with self.subTest(endpoint=endpoint):
                 with self.assertRaises(UnauthorizedException):
                     self.client.get(endpoint, error_handler=handler)
+
+    def test_oauth_provider_preserves_http_failure_and_recovers(self):
+        # pylint: disable=protected-access
+        credential, path = "client:private-secret", "private-token?secret=value"
+        self.server.oauth_token = None
+        with self.assertRaises(HTTPResponseException) as acquisition:
+            DefaultOAuth2TokenProvider(self.origin, credential, "test", path)
+
+        self.server.oauth_token = "initial"
+        provider = DefaultOAuth2TokenProvider(self.origin, credential, "test", path)
+        self.addCleanup(provider.close)
+        self.assertEqual(b"Bearer initial", provider.get_token_data())
+        provider._token = replace(provider._token, renew_at=0)
+        cached = provider._token
+        self.server.oauth_token = None
+        with self.assertRaises(HTTPResponseException) as renewal:
+            provider.get_token_data()
+        self.assertIs(cached, provider._token)
+
+        for error in (acquisition.exception, renewal.exception):
+            self.assertIs(type(error), HTTPResponseException)
+            self.assertEqual(503, error.status_code)
+            self.assertEqual("POST", error.request_method)
+            self.assertEqual(self.origin, error.endpoint)
+            self.assertEqual(
+                f"HTTP 503 for POST {self.origin}: OAuth2 token acquisition failed",
+                str(error),
+            )
+            self.assertIsNone(error.__context__)
+            self.assertIsNone(error.__cause__)
+            diagnostic = "".join(traceback.format_exception(error))
+            self.assertNotIn("private-", diagnostic)
+            self.assertNotIn("secret=value", diagnostic)
+
+        self.server.oauth_token = "recovered"
+        self.assertEqual(b"Bearer recovered", provider.get_token_data())

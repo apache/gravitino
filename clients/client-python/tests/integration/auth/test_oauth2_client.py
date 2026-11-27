@@ -20,6 +20,9 @@ import subprocess
 import logging
 import unittest
 import sys
+import time
+from dataclasses import replace
+from unittest.mock import patch
 import requests
 from jwcrypto import jwk
 
@@ -171,3 +174,33 @@ class TestOAuth2(IntegrationTestEnv, TestCommonAuth):
 
     def tearDown(self):
         self.clean_test_data()
+
+    def test_token_reuse_and_renewal(self):
+        # Inspect only the provider boundary while keeping both real servers active.
+        # pylint: disable=protected-access
+        provider = DefaultOAuth2TokenProvider(
+            self.oauth2_server_uri, "test:test", "test", "oauth2/token"
+        )
+        client = GravitinoAdminClient(
+            uri="http://localhost:8090", auth_data_provider=provider
+        )
+        try:
+            with patch.object(
+                provider._client, "post_form", wraps=provider._client.post_form
+            ) as fetch:
+                first = provider.get_token_data()
+                self.assertEqual(first, provider.get_token_data())
+                fetch.assert_not_called()
+
+                # Exercise the real acquisition path without changing either server's clock.
+                provider._token = replace(
+                    provider._token, renew_at=time.monotonic() - 1
+                )
+                renewed = provider.get_token_data()
+                self.assertTrue(renewed.startswith(b"Bearer "))
+                self.assertEqual(1, fetch.call_count)
+                metalake = client.load_metalake(self.metalake_name)
+                self.assertEqual(self.metalake_name, metalake.name())
+                self.assertEqual(1, fetch.call_count)
+        finally:
+            client.close()

@@ -24,16 +24,33 @@ from gravitino.auth.auth_constants import AuthConstants
 from gravitino.exceptions.base import IllegalArgumentException
 
 
+def _optional_string(value: object) -> Optional[str]:
+    return value if isinstance(value, str) else None
+
+
+def _optional_integer(value: object) -> Optional[int]:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
 @dataclass
 class OAuth2TokenResponse(BaseResponse):
-    _access_token: str = field(metadata=config(field_name="access_token"))
+    _access_token: Optional[str] = field(
+        repr=False,
+        metadata=config(field_name="access_token", decoder=_optional_string),
+    )
     _issue_token_type: Optional[str] = field(
         metadata=config(field_name="issued_token_type")
     )
-    _token_type: str = field(metadata=config(field_name="token_type"))
-    _expires_in: int = field(metadata=config(field_name="expires_in"))
+    _token_type: Optional[str] = field(
+        metadata=config(field_name="token_type", decoder=_optional_string)
+    )
+    _expires_in: Optional[int] = field(
+        metadata=config(field_name="expires_in", decoder=_optional_integer)
+    )
     _scope: str = field(metadata=config(field_name="scope"))
-    _refresh_token: Optional[str] = field(metadata=config(field_name="refresh_token"))
+    _refresh_token: Optional[str] = field(
+        repr=False, metadata=config(field_name="refresh_token")
+    )
 
     def validate(self):
         """Validates the response.
@@ -41,16 +58,21 @@ class OAuth2TokenResponse(BaseResponse):
         Raise:
             IllegalArgumentException If the response is invalid, this exception is thrown.
         """
-        if self._access_token is None:
-            raise IllegalArgumentException("Invalid access token: None")
+        if not self._access_token or not self._access_token.strip():
+            raise IllegalArgumentException("Invalid access token")
 
         if (
-            AuthConstants.AUTHORIZATION_BEARER_HEADER.strip().lower()
+            self._token_type is None
+            or AuthConstants.AUTHORIZATION_BEARER_HEADER.strip().lower()
             != self._token_type.lower()
         ):
-            raise IllegalArgumentException(
-                f'Unsupported token type: {self._token_type} (must be "bearer")'
-            )
+            raise IllegalArgumentException('Invalid token type (must be "bearer")')
 
     def access_token(self) -> str:
+        if self._access_token is None:
+            raise IllegalArgumentException("Invalid access token")
         return self._access_token
+
+    def expires_in(self) -> Optional[int]:
+        """Return the response lifetime in seconds, or None for unusable metadata."""
+        return self._expires_in
