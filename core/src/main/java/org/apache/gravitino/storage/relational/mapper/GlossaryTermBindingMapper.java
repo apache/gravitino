@@ -132,4 +132,35 @@ public interface GlossaryTermBindingMapper {
   /** Deletes one selected retired row. */
   @DeleteProvider(type = GlossaryTermBindingSQLProviderFactory.class, method = "purge")
   int purge(@Param("row") GlossaryTermBindingPO row);
+
+  /**
+   * Identifies roots with live bindings before expanding a multi-term preview.
+   *
+   * @param metalakeId the metalake ID
+   * @param termIds the IDs of visible terms
+   * @return IDs with at least one binding candidate in this snapshot
+   */
+  @SelectProvider(
+      type = GlossaryTermBindingSQLProviderFactory.class,
+      method = "listTermsWithBindings")
+  List<Long> listTermsWithBindings(
+      @Param("metalakeId") long metalakeId, @Param("termIds") Collection<Long> termIds);
+
+  /**
+   * Fetches binding candidates for a lookup preview in stable term and target order.
+   *
+   * @param metalakeId the metalake ID
+   * @param termIds the root term IDs
+   * @param after exclusive target cursor for a single term, or null for a first page
+   * @param limit the maximum number of candidates to return
+   * @return live candidates in target order
+   */
+  @SelectProvider(
+      type = GlossaryTermBindingSQLProviderFactory.class,
+      method = "listBindingCandidates")
+  List<GlossaryTermBindingPO> listBindingCandidates(
+      @Param("metalakeId") long metalakeId,
+      @Param("termIds") Collection<Long> termIds,
+      @Param("after") @Nullable GlossaryTermBindingPO after,
+      @Param("limit") int limit);
 }

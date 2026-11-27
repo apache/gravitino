@@ -133,6 +133,27 @@ class TestArticleAssetBindings extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void nestedSchemaBindingsReturnLogicalNames() throws Exception {
+    createAndInsertMakeLake(LAKE);
+    createAndInsertCatalog(LAKE, "cat");
+    createAndInsertSchema(LAKE, "cat", "sales:retail");
+    createAndInsertTableEntity(Namespace.of(LAKE, "cat", "sales:retail"), "orders");
+    var schema =
+        ArticleObjectIdentifier.of(MetadataObject.Type.SCHEMA, List.of("cat"), "sales:retail");
+    var table =
+        ArticleObjectIdentifier.of(
+            MetadataObject.Type.TABLE, List.of("cat", "sales:retail"), "orders");
+    var created = articles.createArticle(LAKE, request("guide").addObjects(schema, table).build());
+    assertEquals(Set.of(schema, table), Set.copyOf(created.article().objects()));
+    var page = articles.listAssetBindings(LAKE, "guide", 2, 0);
+    assertEquals(created.article().objects(), page.objects());
+    for (var object : page.objects()) {
+      var reverse = articles.listArticlesForObject(LAKE, object, false, 1, 0);
+      assertEquals("guide", reverse.articles().get(0).name());
+    }
+  }
+
+  @TestTemplate
   void columnFollowsTableRenameAndNeverRebindsToReplacement() throws Exception {
     createAndInsertMakeLake(LAKE);
     createAndInsertCatalog(LAKE, "cat");

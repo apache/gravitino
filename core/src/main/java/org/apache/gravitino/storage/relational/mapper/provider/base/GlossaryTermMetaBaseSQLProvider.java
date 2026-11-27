@@ -26,6 +26,7 @@ import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
+import org.apache.gravitino.storage.relational.utils.SqlLikePattern;
 import org.apache.ibatis.annotations.Param;
 
 /** Portable SQL for glossary definitions and synonyms on H2, MySQL and PostgreSQL. */
@@ -253,6 +254,49 @@ public class GlossaryTermMetaBaseSQLProvider {
         + GlossaryTermMetaMapper.TABLE_NAME
         + " WHERE metalake_id=#{metalakeId} AND deleted_at=0 AND term_id != #{excludedTermId} AND "
         + sourceRefPredicate();
+  }
+
+  /** Selects only the identity, name and status needed to authorize list results. */
+  public String listLookupCandidates() {
+    return """
+        <script>
+        SELECT t.term_id AS termId, t.name, t.status FROM %s t
+        WHERE t.metalake_id=#{metalakeId} AND t.deleted_at=0
+        <if test="after != null">AND t.term_id &gt; #{after}</if>
+        <if test="status != null">AND t.status=#{status}</if>
+        <if test="pattern != null">AND t.name_key LIKE #{pattern} %s</if>
+        <if test="!wordKeys.isEmpty()">AND (t.name_key IN
+          <foreach collection="wordKeys" item="k" open="(" separator="," close=")">#{k}</foreach>
+          OR t.term_id IN (SELECT s.term_id FROM %s s
+            WHERE s.metalake_id=#{metalakeId} AND s.deleted_at=0 AND s.synonym_key IN
+            <foreach collection="wordKeys" item="k" open="(" separator="," close=")">#{k}</foreach>))
+        </if>
+        <if test="domainIds != null">AND EXISTS (SELECT 1 FROM %s m
+          WHERE m.metalake_id=t.metalake_id AND m.member_type='GLOSSARY_TERM'
+          AND m.member_id=t.term_id AND m.deleted_at=0 AND m.domain_id IN
+          <foreach collection="domainIds" item="id" open="(" separator="," close=")">#{id}</foreach>)
+        </if>
+        ORDER BY t.term_id
+        <if test="limit != null">LIMIT #{limit}</if>
+        </script>
+        """
+        .formatted(
+            GlossaryTermMetaMapper.TABLE_NAME,
+            SqlLikePattern.ESCAPE_CLAUSE,
+            GlossaryTermMetaMapper.SYNONYM_TABLE_NAME,
+            DomainMemberMapper.TABLE_NAME);
+  }
+
+  /** Reads the names and visibility fields of live relation endpoints. */
+  public String listLookupEndpoints() {
+    return """
+        <script>
+        SELECT term_id AS termId, name, status FROM %s
+        WHERE metalake_id=#{metalakeId} AND deleted_at=0 AND term_id IN
+        <foreach collection="endpointIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </script>
+        """
+        .formatted(GlossaryTermMetaMapper.TABLE_NAME);
   }
 
   /** Compares source references with the same semantics as the unique index. */
