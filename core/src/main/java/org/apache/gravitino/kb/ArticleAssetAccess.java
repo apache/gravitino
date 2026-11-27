@@ -28,11 +28,14 @@ import java.util.Optional;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege.Name;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /** Applies the ordinary asset load privileges to IDs observed in the binding operation. */
@@ -58,6 +61,21 @@ final class ArticleAssetAccess {
     scopes.add(MetadataObjects.of(names.subList(0, 1), MetadataObject.Type.CATALOG));
     if (names.size() >= 2) {
       scopes.add(MetadataObjects.of(names.subList(0, 2), MetadataObject.Type.SCHEMA));
+      // JCasbin also evaluates ownership, grants and denies on logical ancestor schemas.
+      String catalog = names.get(0);
+      var ancestors =
+          HierarchicalSchemaUtil.getAncestorNames(
+                  names.get(1), HierarchicalSchemaUtil.schemaSeparator())
+              .stream()
+              .map(name -> NameIdentifier.of(metalake, catalog, name))
+              .toList();
+      if (!ancestors.isEmpty()) {
+        for (var ancestor : SchemaMetaService.getInstance().batchGetSchemaByIdentifier(ancestors)) {
+          observed.put(
+              MetadataObjects.of(List.of(catalog, ancestor.name()), MetadataObject.Type.SCHEMA),
+              ancestor.id());
+        }
+      }
     }
     if (names.size() >= 3) {
       MetadataObject.Type leaf =

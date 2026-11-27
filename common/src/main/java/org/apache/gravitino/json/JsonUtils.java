@@ -27,6 +27,7 @@ import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -1009,6 +1010,18 @@ public class JsonUtils {
   }
 
   // Nested classes for custom serialization and deserialization
+
+  /** Reads a JSON string without coercing numbers or booleans into names. */
+  public static class StrictStringDeserializer extends JsonDeserializer<String> {
+    @Override
+    public String deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      if (!parser.hasToken(JsonToken.VALUE_STRING)) {
+        return context.reportInputMismatch(String.class, "Value must be a string");
+      }
+      return parser.getText();
+    }
+  }
 
   /** Custom JSON serializer for Gravitino Type objects. */
   public static class TypeSerializer extends JsonSerializer<Type> {

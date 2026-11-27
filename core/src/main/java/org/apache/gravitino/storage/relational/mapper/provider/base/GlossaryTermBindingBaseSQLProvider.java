@@ -23,6 +23,7 @@ import java.util.Collection;
 import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermBindingMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
@@ -116,14 +117,11 @@ public class GlossaryTermBindingBaseSQLProvider {
         + "</foreach> ORDER BY b.term_id, b.target_type, b.target_id</script>";
   }
 
-  /** Lists live bindings of a term in keyset order on (target_type, target_id). */
+  /** Lists live bindings of a term ordered by target type and ID. */
   public String listByTerm(
       @Param("metalakeId") long metalakeId,
       @Param("termId") long termId,
-      @Param("targetTypes") @Nullable Collection<String> targetTypes,
-      @Param("afterType") @Nullable String afterType,
-      @Param("afterId") long afterId,
-      @Param("limit") int limit) {
+      @Param("targetTypes") @Nullable Collection<String> targetTypes) {
     StringBuilder sql =
         new StringBuilder("<script>SELECT ")
             .append(SELECT_COLUMNS)
@@ -136,11 +134,7 @@ public class GlossaryTermBindingBaseSQLProvider {
           .append(
               "<foreach collection='targetTypes' item='t' open='(' separator=',' close=')'>#{t}</foreach>");
     }
-    if (afterType != null) {
-      sql.append(
-          " AND (b.target_type > #{afterType} OR (b.target_type=#{afterType} AND b.target_id > #{afterId}))");
-    }
-    sql.append(" ORDER BY b.target_type, b.target_id LIMIT #{limit}</script>");
+    sql.append(" ORDER BY b.target_type, b.target_id</script>");
     return sql.toString();
   }
 
@@ -276,5 +270,37 @@ public class GlossaryTermBindingBaseSQLProvider {
         + TABLE
         + " WHERE term_id=#{row.termId} AND target_type=#{row.targetType}"
         + " AND target_id=#{row.targetId} AND deleted_at=#{row.deletedAt} AND deleted_at>0";
+  }
+
+  /** Identifies roots with live bindings before expanding a multi-term preview. */
+  public String listTermsWithBindings() {
+    return """
+        <script>
+        SELECT t.term_id FROM %s t
+        WHERE t.metalake_id=#{metalakeId} AND t.deleted_at=0 AND t.term_id IN
+        <foreach collection="termIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        AND EXISTS (SELECT 1 FROM %s b WHERE b.term_id=t.term_id
+          AND b.metalake_id=t.metalake_id AND b.deleted_at=0)
+        ORDER BY t.term_id
+        </script>
+        """
+        .formatted(GlossaryTermMetaMapper.TABLE_NAME, TABLE);
+  }
+
+  /** Fetches binding candidates for a lookup preview in stable term and target order. */
+  public String listBindingCandidates() {
+    return """
+        <script>
+        SELECT term_id AS termId, target_type AS targetType, target_id AS targetId FROM %s
+        WHERE metalake_id=#{metalakeId} AND deleted_at=0 AND term_id IN
+        <foreach collection="termIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        <if test="after != null">
+          AND (target_type &gt; #{after.targetType}
+            OR (target_type=#{after.targetType} AND target_id &gt; #{after.targetId}))
+        </if>
+        ORDER BY term_id, target_type, target_id LIMIT #{limit}
+        </script>
+        """
+        .formatted(TABLE);
   }
 }

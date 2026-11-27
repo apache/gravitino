@@ -69,83 +69,89 @@ You could start Gravitino MCP server by Docker image, `docker run -p 8000:8000 -
 
 Gravitino MCP server supports the following tools, and you could export tool by tag.
 
-| Tool name                           | Description                                                                    | Tag             |
-|-------------------------------------|--------------------------------------------------------------------------------|-----------------|
-| `list_metalakes`                    | Retrieve the metalakes the caller can access.                                  | `metalake`      |
-| `get_list_of_catalogs`              | Retrieve a list of all catalogs in the system.                                 | `catalog`       |
-| `create_catalog`                    | Create a new catalog.                                                          | `catalog`       |
-| `alter_catalog`                     | Alter an existing catalog.                                                     | `catalog`       |
-| `drop_catalog`                      | Drop a catalog.                                                                | `catalog`       |
-| `set_catalog_in_use`                | Enable or disable a catalog.                                                   | `catalog`       |
-| `get_list_of_schemas`               | Retrieve a list of schemas belonging to a specific catalog.                    | `schema`        |
-| `create_schema`                     | Create a new schema.                                                           | `schema`        |
-| `alter_schema`                      | Alter an existing schema.                                                      | `schema`        |
-| `drop_schema`                       | Drop a schema.                                                                 | `schema`        |
-| `get_list_of_tables`                | Retrieve a list of tables within a specific catalog and schema.                | `table`         |
-| `get_table_metadata_details`        | Retrieve comprehensive metadata details for a specific table.                  | `table`         |
-| `create_table`                      | Create a new table.                                                            | `table`         |
-| `alter_table`                       | Alter an existing table.                                                       | `table`         |
-| `drop_table`                        | Drop a table.                                                                  | `table`         |
-| `list_of_models`                    | Retrieve a list of models within a specific catalog and schema.                | `model`         |
-| `load_model`                        | Retrieve comprehensive metadata details for a specific model.                  | `model`         |
-| `list_model_versions`               | Retrieve a list of versions for a specific model.                              | `model`         |
-| `load_model_version`                | Retrieve comprehensive metadata details for a specific model version.          | `model`         |
-| `load_model_version_by_alias`       | Retrieve comprehensive metadata details for a specific model version by alias. | `model`         |
-| `register_model`                    | Register a new model.                                                          | `model`         |
-| `delete_model`                      | Delete a model.                                                                | `model`         |
-| `link_model_version`                | Link a new version to a model.                                                 | `model`         |
-| `delete_model_version`              | Delete a model version.                                                        | `model`         |
-| `delete_model_version_by_alias`     | Delete a model version by one of its aliases.                                  | `model`         |
-| `alter_model`                       | Alter an existing model.                                                       | `model`         |
-| `alter_model_version`               | Alter a model version.                                                         | `model`         |
-| `alter_model_version_by_alias`      | Alter a model version by one of its aliases.                                   | `model`         |
-| `metadata_type_to_fullname_formats` | Retrieve the metadata type to fullname formats mapping.                        | `metadata`      |
-| `list_of_topics`                    | Retrieve a list of topics within a specific catalog and schema.                | `topic`         |
-| `load_topic`                        | Retrieve comprehensive metadata details for a specific topic.                  | `topic`         |
-| `create_topic`                      | Create a new topic.                                                            | `topic`         |
-| `alter_topic`                       | Alter an existing topic.                                                       | `topic`         |
-| `delete_topic`                      | Delete a topic.                                                                | `topic`         |
-| `list_of_filesets`                  | Retrieve a list of filesets within a specific catalog and schema.              | `fileset`       |
-| `load_fileset`                      | Retrieve comprehensive metadata details for a specific fileset.                | `fileset`       |
-| `list_files_in_fileset`             | Retrieve a list of files within a specific fileset.                            | `fileset`       |
-| `create_fileset`                    | Create a new fileset.                                                          | `fileset`       |
-| `alter_fileset`                     | Alter an existing fileset.                                                     | `fileset`       |
-| `drop_fileset`                      | Drop a fileset.                                                                | `fileset`       |
-| `list_of_jobs`                      | Retrieve a list of jobs                                                        | `job`           |
-| `get_job_by_id`                     | Retrieve a job by its ID.                                                      | `job`           |
-| `list_of_job_templates`             | Retrieve a list of job templates.                                              | `job`           |
-| `get_job_template_by_name`          | Retrieve a job template by its name.                                           | `job`           |
-| `run_job`                           | Run a job with the specified parameters.                                       | `job`           |
-| `cancel_job`                        | Cancel a running job by its ID.                                                | `job`           |
-| `get_tag_by_name`                   | Retrieve a tag by its name.                                                    | `tag`           |
-| `list_of_tags`                      | Retrieve a list of tags.                                                       | `tag`           |
-| `list_tags_for_metadata`            | Retrieve a list of tags associated with a specific metadata item.              | `tag`           |
-| `list_metadata_by_tag`              | Retrieve a list of metadata items associated with a specific tag.              | `tag`           |
-| `associate_tag_with_metadata`       | Associate tags with a specific metadata item.                                  | `tag`           |
-| `disassociate_tag_from_metadata`    | Disassociate tags from a specific metadata item.                               | `tag`           |
-| `create_tag`                        | Create a new tag.                                                              | `tag`           |
-| `alter_tag`                         | Alter an existing tag.                                                         | `tag`           |
-| `delete_tag`                        | Delete a tag.                                                                  | `tag`           |
-| `list_statistics_for_metadata`      | Retrieve a list of statistics associated with a specific metadata item.        | `statistics`    |
-| `list_statistics_for_partition`     | Retrieve a list of statistics associated with a specific partition.            | `statistics`    |
-| `get_list_of_policies`              | Retrieve a list of policies in the system.                                     | `policy`        |
-| `get_policy_detail_information`     | Retrieve detailed information for a specific policy by policy name.            | `policy`        |
-| `list_policies_for_tag`             | List policies directly associated with a tag, including selectors.             | `policy`, `tag` |
-| `associate_policy_with_tag`         | Associate a policy with a tag and selector.                                    | `policy`, `tag` |
-| `disassociate_policy_from_tag`      | Remove a direct policy association from a tag.                                 | `policy`, `tag` |
-| `list_tags_for_policy`              | List tags directly associated with a policy, including selectors.              | `policy`, `tag` |
-| `list_of_partitions`                | Retrieve partitions for a table. Only for catalogs with a partition API.       | `partition`     |
-| `get_partition`                     | Retrieve a partition's metadata. Only for catalogs with a partition API.       | `partition`     |
-| `list_of_views`                     | Retrieve a list of views for a schema. Only for catalogs supporting views.     | `view`          |
-| `load_view`                         | Retrieve a view's metadata. Only for catalogs supporting views.                | `view`          |
+| Tool name                           | Description                                                                    | Tag              |
+|-------------------------------------|--------------------------------------------------------------------------------|------------------|
+| `list_metalakes`                    | Retrieve the metalakes the caller can access.                                  | `metalake`       |
+| `get_list_of_catalogs`              | Retrieve a list of all catalogs in the system.                                 | `catalog`        |
+| `create_catalog`                    | Create a new catalog.                                                          | `catalog`        |
+| `alter_catalog`                     | Alter an existing catalog.                                                     | `catalog`        |
+| `drop_catalog`                      | Drop a catalog.                                                                | `catalog`        |
+| `set_catalog_in_use`                | Enable or disable a catalog.                                                   | `catalog`        |
+| `get_list_of_schemas`               | Retrieve a list of schemas belonging to a specific catalog.                    | `schema`         |
+| `create_schema`                     | Create a new schema.                                                           | `schema`         |
+| `alter_schema`                      | Alter an existing schema.                                                      | `schema`         |
+| `drop_schema`                       | Drop a schema.                                                                 | `schema`         |
+| `get_list_of_tables`                | Retrieve a list of tables within a specific catalog and schema.                | `table`          |
+| `get_table_metadata_details`        | Retrieve comprehensive metadata details for a specific table.                  | `table`          |
+| `create_table`                      | Create a new table.                                                            | `table`          |
+| `alter_table`                       | Alter an existing table.                                                       | `table`          |
+| `drop_table`                        | Drop a table.                                                                  | `table`          |
+| `list_of_models`                    | Retrieve a list of models within a specific catalog and schema.                | `model`          |
+| `load_model`                        | Retrieve comprehensive metadata details for a specific model.                  | `model`          |
+| `list_model_versions`               | Retrieve a list of versions for a specific model.                              | `model`          |
+| `load_model_version`                | Retrieve comprehensive metadata details for a specific model version.          | `model`          |
+| `load_model_version_by_alias`       | Retrieve comprehensive metadata details for a specific model version by alias. | `model`          |
+| `register_model`                    | Register a new model.                                                          | `model`          |
+| `delete_model`                      | Delete a model.                                                                | `model`          |
+| `link_model_version`                | Link a new version to a model.                                                 | `model`          |
+| `delete_model_version`              | Delete a model version.                                                        | `model`          |
+| `delete_model_version_by_alias`     | Delete a model version by one of its aliases.                                  | `model`          |
+| `alter_model`                       | Alter an existing model.                                                       | `model`          |
+| `alter_model_version`               | Alter a model version.                                                         | `model`          |
+| `alter_model_version_by_alias`      | Alter a model version by one of its aliases.                                   | `model`          |
+| `metadata_type_to_fullname_formats` | Retrieve the metadata type to fullname formats mapping.                        | `metadata`       |
+| `list_of_topics`                    | Retrieve a list of topics within a specific catalog and schema.                | `topic`          |
+| `load_topic`                        | Retrieve comprehensive metadata details for a specific topic.                  | `topic`          |
+| `create_topic`                      | Create a new topic.                                                            | `topic`          |
+| `alter_topic`                       | Alter an existing topic.                                                       | `topic`          |
+| `delete_topic`                      | Delete a topic.                                                                | `topic`          |
+| `list_of_filesets`                  | Retrieve a list of filesets within a specific catalog and schema.              | `fileset`        |
+| `load_fileset`                      | Retrieve comprehensive metadata details for a specific fileset.                | `fileset`        |
+| `list_files_in_fileset`             | Retrieve a list of files within a specific fileset.                            | `fileset`        |
+| `create_fileset`                    | Create a new fileset.                                                          | `fileset`        |
+| `alter_fileset`                     | Alter an existing fileset.                                                     | `fileset`        |
+| `drop_fileset`                      | Drop a fileset.                                                                | `fileset`        |
+| `list_of_jobs`                      | Retrieve a list of jobs                                                        | `job`            |
+| `get_job_by_id`                     | Retrieve a job by its ID.                                                      | `job`            |
+| `list_of_job_templates`             | Retrieve a list of job templates.                                              | `job`            |
+| `get_job_template_by_name`          | Retrieve a job template by its name.                                           | `job`            |
+| `run_job`                           | Run a job with the specified parameters.                                       | `job`            |
+| `cancel_job`                        | Cancel a running job by its ID.                                                | `job`            |
+| `get_tag_by_name`                   | Retrieve a tag by its name.                                                    | `tag`            |
+| `list_of_tags`                      | Retrieve a list of tags.                                                       | `tag`            |
+| `list_tags_for_metadata`            | Retrieve a list of tags associated with a specific metadata item.              | `tag`            |
+| `list_metadata_by_tag`              | Retrieve a list of metadata items associated with a specific tag.              | `tag`            |
+| `associate_tag_with_metadata`       | Associate tags with a specific metadata item.                                  | `tag`            |
+| `disassociate_tag_from_metadata`    | Disassociate tags from a specific metadata item.                               | `tag`            |
+| `create_tag`                        | Create a new tag.                                                              | `tag`            |
+| `alter_tag`                         | Alter an existing tag.                                                         | `tag`            |
+| `delete_tag`                        | Delete a tag.                                                                  | `tag`            |
+| `list_statistics_for_metadata`      | Retrieve a list of statistics associated with a specific metadata item.        | `statistics`     |
+| `list_statistics_for_partition`     | Retrieve a list of statistics associated with a specific partition.            | `statistics`     |
+| `get_list_of_policies`              | Retrieve a list of policies in the system.                                     | `policy`         |
+| `get_policy_detail_information`     | Retrieve detailed information for a specific policy by policy name.            | `policy`         |
+| `list_policies_for_tag`             | List policies directly associated with a tag, including selectors.             | `policy`, `tag`  |
+| `associate_policy_with_tag`         | Associate a policy with a tag and selector.                                    | `policy`, `tag`  |
+| `disassociate_policy_from_tag`      | Remove a direct policy association from a tag.                                 | `policy`, `tag`  |
+| `list_tags_for_policy`              | List tags directly associated with a policy, including selectors.              | `policy`, `tag`  |
+| `list_of_partitions`                | Retrieve partitions for a table. Only for catalogs with a partition API.       | `partition`      |
+| `get_partition`                     | Retrieve a partition's metadata. Only for catalogs with a partition API.       | `partition`      |
+| `list_of_views`                     | Retrieve a list of views for a schema. Only for catalogs supporting views.     | `view`           |
+| `load_view`                         | Retrieve a view's metadata. Only for catalogs supporting views.                | `view`           |
 | `list_of_semantic_models`           | List the Semantic Models the caller can access in a schema.                    | `semantic_model` |
-| `list_metrics`                      | List visible metric identifiers across Semantic Models in a schema.           | `semantic_model` |
-| `list_metric_infos`                 | List complete visible metrics across Semantic Models in a schema.             | `semantic_model` |
+| `list_metrics`                      | List visible metric identifiers across Semantic Models in a schema.            | `semantic_model` |
+| `list_metric_infos`                 | List complete visible metrics across Semantic Models in a schema.              | `semantic_model` |
 | `list_semantic_model_datasets`      | List visible datasets directly associated with a source table or view.         | `semantic_model` |
 | `load_semantic_model`               | Load a Semantic Model's metadata and definition.                               | `semantic_model` |
 | `create_semantic_model`             | Create a Semantic Model from a native REST definition.                         | `semantic_model` |
-| `alter_semantic_model`              | Apply Semantic Model updates atomically.                                      | `semantic_model` |
-| `drop_semantic_model`               | Drop a Semantic Model's metadata.                                             | `semantic_model` |
+| `alter_semantic_model`              | Apply Semantic Model updates atomically.                                       | `semantic_model` |
+| `drop_semantic_model`               | Drop a Semantic Model's metadata.                                              | `semantic_model` |
+| `resolve_business_term`             | Find approved terms by exact name or synonym for each input phrase.            | `glossary`       |
+| `get_term`                          | Read an approved term and its visible domains and relations.                   | `glossary`       |
+| `list_terms`                        | Browse approved terms by domain or name fragment.                              | `glossary`       |
+| `get_term_hierarchy`                | List the approved ancestors or descendants of a term.                          | `glossary`       |
+| `list_metadata_by_term`             | List the visible metadata and metric bindings of an approved term.             | `glossary`       |
+| `list_terms_for_metadata`           | List the approved terms for a metadata object.                                 | `glossary`       |
 
 ### Semantic Models
 
@@ -240,6 +246,45 @@ an ordered, non-empty `updates` array. Supported `@type` values are `rename`,
 `drop_semantic_model` takes the model's catalog, schema, and name and returns a JSON boolean
 indicating whether it was dropped. It removes semantic metadata without deleting source tables or data.
 
+### Business glossary (read-only)
+
+Use `--include-tool-tags glossary` to expose the six glossary tools. Include
+`table` and `semantic_model` in the comma-separated list to follow column and
+metric bindings. Each glossary request uses the selected metalake and the
+effective Gravitino identity. Gravitino filters roots and relations to readable
+`APPROVED` terms and returns only visible domains and binding targets.
+
+For “net revenue from VIP active users last month”, call `resolve_business_term`
+with whole, singular business phrases. Supply `domain` when the question names one.
+
+```json
+{"words": ["net revenue", "VIP", "active user"], "domain": "Sales"}
+```
+
+The tool groups exact name and synonym matches by input phrase. Use the returned
+domains to disambiguate multiple matches, or ask the user. Ask what an unmatched
+phrase means. Verify terms discovered through generic metadata tools with
+`get_term` before using their definitions.
+
+For a column binding, pass its `catalog`, `schema` and `name` to
+`get_table_metadata_details` as `catalog_name`, `schema_name` and `table_name`.
+The `column` field identifies the column in that table. For a metric, use
+`load_semantic_model` with `catalog_name`, `schema_name` and `semantic_model_name`,
+then find `metric` in the model definition. Pass the same `metalake` to each
+tool. Follow-up reads enforce their own privileges.
+
+A match contains up to 20 visible bindings by default. When `bindings_truncated`
+is true, `list_metadata_by_term` returns all visible bindings for that term and
+accepts optional `kind` and `types` filters. If the lookup exceeds its work limit,
+retry with the same domain and `include_bindings=false` to get definitions,
+then request bindings for a selected term. If the definition-only lookup also
+exceeds the limit, narrow the query.
+
+Use `list_terms` to browse definitions by domain or name fragment,
+`get_term_hierarchy` to walk ancestors or descendants, and `list_terms_for_metadata`
+to look up definitions for an object. Tables include column terms and semantic
+models include metric terms.
+
 ### Domains (read-only)
 
 See [Domains](./domains.md) for membership semantics and the
@@ -248,13 +293,13 @@ See [Domains](./domains.md) for membership semantics and the
 Use `--include-tool-tags domain` to expose the five Domain tools.
 All are annotated as read-only and idempotent and issue only GET requests.
 
-| Tool | Arguments | Result |
-|------|-----------|--------|
-| `list_of_domains` | `details=true` | Domain snapshots, or names when false |
-| `get_domain_by_name` | `domain_name` | A complete domain snapshot |
-| `list_subdomains` | `domain_name`, `details=true` | Immediate subdomain snapshots or names |
-| `list_domain_members` | `domain_name`, optional `types`, `domains`, `name_contains`, `expand` | Directly tagged objects, including catalogs and schemas. Use `expand=true` for accessible recorded leaves whose effective tags match |
-| `list_domains_for_metadata` | `metadata_type`, `metadata_full_name`, `details=true` | Domains of a leaf object, including all relations when details is true |
+| Tool                        | Arguments                                                             | Result                                                                                                                               |
+|-----------------------------|-----------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| `list_of_domains`           | `details=true`                                                        | Domain snapshots, or names when false                                                                                                |
+| `get_domain_by_name`        | `domain_name`                                                         | A complete domain snapshot                                                                                                           |
+| `list_subdomains`           | `domain_name`, `details=true`                                         | Immediate subdomain snapshots or names                                                                                               |
+| `list_domain_members`       | `domain_name`, optional `types`, `domains`, `name_contains`, `expand` | Directly tagged objects, including catalogs and schemas. Use `expand=true` for accessible recorded leaves whose effective tags match |
+| `list_domains_for_metadata` | `metadata_type`, `metadata_full_name`, `details=true`                 | Domains of a leaf object, including all relations when details is true                                                               |
 
 Results follow the existing MCP JSON-string convention; empty lists return `[]`.
 Snapshots retain the server's backing tag, status, parent, properties, audit and
@@ -297,7 +342,7 @@ binding changes are exposed. Existing tools in other groups retain their behavio
 You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows the detailed information.
 
 | Argument                         | Description                                                                                                                                                  | Default value               | Required |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | -------- |
+|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|
 | `--metalake`                     | Default metalake, used by any tool call that does not name one. See Selecting a metalake.                                                                    | none                        | No       |
 | `--gravitino-uri`                | The URI of Gravitino server.                                                                                                                                 | `http://127.0.0.1:8090`     | No       |
 | `--gravitino-read-timeout`       | Gravitino response read timeout in seconds; or set `GRAVITINO_READ_TIMEOUT`. Must be finite and positive. Connect, write and pool timeouts remain 5 seconds. | `60`                        | No       |
@@ -458,13 +503,13 @@ uv run mcp_server --transport http --mcp-url http://0.0.0.0:8000/mcp
 
 Every tool invocation is recorded as one structured JSON line in `gravitino-mcp-audit.log` (written to the server's working directory). Each record is attributed to the incoming HTTP `Authorization` header when present; otherwise to the configured service identity (`--token` or OAuth client id).
 
-| Field        | Description                                                                                                                                                                             |
-|--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `timestamp`  | UTC ISO-8601 time of the call.                                                                                                                                                          |
+| Field        | Description                                                                                                                                                                                                                                                                                                                                                                      |
+|--------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `timestamp`  | UTC ISO-8601 time of the call.                                                                                                                                                                                                                                                                                                                                                   |
 | `principal`  | Caller identity: username for `Basic` simple auth, `bearer:<first-16-hex-of-sha256-of-token>` for a Bearer token (a fingerprint of the token, so it changes when the token is refreshed), `oauth:<first-16-hex-of-sha256-of-client-id>` when OAuth client-credentials is the service identity (stdio or HTTP with no caller header), or `anonymous` when no identity is present. |
-| `tool`       | Name of the invoked MCP tool.                                                                                                                                                           |
-| `outcome`    | `allow` for successful calls, `deny` for failed ones. `deny` is emitted for any tool-call exception (authorization denial being the common case); inspect `error_type` to disambiguate. |
-| `error_type` | Exception class name, present only when `outcome` is `deny`.                                                                                                                            |
+| `tool`       | Name of the invoked MCP tool.                                                                                                                                                                                                                                                                                                                                                    |
+| `outcome`    | `allow` for successful calls, `deny` for failed ones. `deny` is emitted for any tool-call exception (authorization denial being the common case); inspect `error_type` to disambiguate.                                                                                                                                                                                          |
+| `error_type` | Exception class name, present only when `outcome` is `deny`.                                                                                                                                                                                                                                                                                                                     |
 
 For every scheme other than `Basic`, `principal` is a fingerprint of one credential, not a stable user identity. The hash has no key, so the fingerprint suits high-entropy tokens only: a short static credential can be recovered from the log by guessing. To trace what one user did, use the Gravitino server's [audit log](./gravitino-server-config.md#audit-logging).
 
