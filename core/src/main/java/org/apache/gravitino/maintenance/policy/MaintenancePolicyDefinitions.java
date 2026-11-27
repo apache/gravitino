@@ -56,7 +56,7 @@ public final class MaintenancePolicyDefinitions {
         map,
         Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION,
         MaintenanceMinIntervalConfigs.SNAPSHOT_EXPIRY_MIN_INTERVAL_MS);
-    // Orphan cleanup is timeTrigger-only and has no On-write minIntervalMs config.
+    // Orphan cleanup is timeTrigger-only and has no minIntervalMs config.
     register(map, Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL, null);
     BY_TYPE = ImmutableMap.copyOf(map);
   }

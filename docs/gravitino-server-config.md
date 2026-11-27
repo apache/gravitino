@@ -684,16 +684,16 @@ server, are documented with those services. See
 
 #### Table maintenance cooldowns
 
-For On-write (`commitTrigger=true`) policies that omit `minIntervalMs`, the server uses these
+For `commitTrigger=true` policies that omit `minIntervalMs`, the server uses these
 per-type keys, then the code defaults below. Policy content always wins when set. Scheduled
 (`timeTrigger`) runs do not apply this cooldown. Orphan cleanup is timeTrigger-only and has no
 cooldown config.
 
 | Configuration Item                                     | Description                                              | Default Value  |
 |--------------------------------------------------------|----------------------------------------------------------|----------------|
-| `gravitino.maintenance.compaction.minIntervalMs`       | On-write cooldown between finished compaction runs       | `3600000` (1h) |
-| `gravitino.maintenance.manifest-rewrite.minIntervalMs` | On-write cooldown between finished manifest-rewrite runs | `3600000` (1h) |
-| `gravitino.maintenance.snapshot-expiry.minIntervalMs`  | On-write cooldown between finished snapshot-expiry runs  | `3600000` (1h) |
+| `gravitino.maintenance.compaction.minIntervalMs`       | Cooldown between finished compaction runs when `commitTrigger=true` | `3600000` (1h) |
+| `gravitino.maintenance.manifest-rewrite.minIntervalMs` | Cooldown between finished manifest-rewrite runs when `commitTrigger=true` | `3600000` (1h) |
+| `gravitino.maintenance.snapshot-expiry.minIntervalMs`  | Cooldown between finished snapshot-expiry runs when `commitTrigger=true` | `3600000` (1h) |
 
 ### Key Management
 

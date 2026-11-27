@@ -96,14 +96,14 @@ public final class PolicyExecutionSpec {
     String normalizedTimeTrigger = StringUtils.isBlank(timeTrigger) ? null : timeTrigger;
     Map<String, String> normalizedJobOptions = copyOptions(jobOptions);
     Map<String, String> normalizedUpdaterOptions = copyOptions(updaterOptions);
-    boolean onWrite = Boolean.TRUE.equals(commitTrigger);
+    boolean commitTriggered = Boolean.TRUE.equals(commitTrigger);
     Preconditions.checkArgument(
-        normalizedTimeTrigger == null || !onWrite,
+        normalizedTimeTrigger == null || !commitTriggered,
         "timeTrigger and commitTrigger=true are mutually exclusive; set exactly one trigger mode");
     if (minIntervalMs != null) {
       Preconditions.checkArgument(minIntervalMs >= 0, "minIntervalMs must be >= 0");
       Preconditions.checkArgument(
-          onWrite, "minIntervalMs is only allowed when commitTrigger is true");
+          commitTriggered, "minIntervalMs is only allowed when commitTrigger is true");
     }
     validateOptionMap(normalizedJobOptions, "jobOptions");
     validateOptionMap(normalizedUpdaterOptions, "updaterOptions");

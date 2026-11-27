@@ -14,7 +14,7 @@ The table maintenance service runs inside the Gravitino server. Associate a poli
 
 `timeTrigger` is a six-field Quartz cron (`second minute hour day-of-month month day-of-week`) on the policy. When it is due, the expand pool lists matching tables and inserts one cron-job per table. The cron pool then submits Spark. Operators do not create cron-job rows.
 
-`commitTrigger=true` is the On-write switch. A successful Iceberg REST table update enqueues one chained job and does not pass through the expand pool. See [Commit Trigger](#commit-trigger).
+`commitTrigger=true` enables commit-triggered maintenance. A successful Iceberg REST table update enqueues one chained job and does not pass through the expand pool. See [Commit Trigger](#commit-trigger).
 
 A policy may set **at most one** of a non-blank `timeTrigger` or `commitTrigger=true`. Create and alter reject both together. `minIntervalMs` is allowed only with `commitTrigger=true`.
 
@@ -109,11 +109,11 @@ Three objects decide which tables run:
 
 | Object          | What to set                                                                                              |
 | --------------- | -------------------------------------------------------------------------------------------------------- |
-| Policy          | `policyType`, `enabled`, and exactly one trigger: `timeTrigger` **or** `commitTrigger=true` (optional `minIntervalMs` only with On write). |
+| Policy          | `policyType`, `enabled`, and exactly one trigger: `timeTrigger` **or** `commitTrigger=true` (optional `minIntervalMs` only with commitTrigger=true). |
 | Tag association | `POST /api/metalakes/{metalake}/tags/{tag}/policies/{policy}` with selector `ALL_VALUES` or `TAG_VALUE`. |
 | Tag assignment  | Assign the tag to the table, or to a catalog or schema ancestor.                                         |
 
-`minIntervalMs` is the On-write cooldown after a finished run of that policy on that table. It is valid only when `commitTrigger` is `true`. When an On-write policy omits it, the server uses the per-type default in [Table maintenance cooldowns](../gravitino-server-config.md#table-maintenance-cooldowns). Scheduled (`timeTrigger`) runs do not use `minIntervalMs`; overlap is blocked only by the in-flight check.
+`minIntervalMs` is the cooldown after a finished run of that policy on that table. It is valid only when `commitTrigger` is `true`. When a `commitTrigger=true` policy omits it, the server uses the per-type default in [Table maintenance cooldowns](../gravitino-server-config.md#table-maintenance-cooldowns). Scheduled (`timeTrigger`) runs do not use `minIntervalMs`; overlap is blocked only by the in-flight check.
 
 Built-in content types:
 
@@ -219,7 +219,7 @@ resolved partition spec, not from Spark SQL.
 
 ## Commit Trigger
 
-Set `commitTrigger` to `true` on a policy that should run after a successful Iceberg REST table update (and omit `timeTrigger`). Orphan file removal cannot set `commitTrigger`. Optional `minIntervalMs` applies only on this On-write path.
+Set `commitTrigger` to `true` on a policy that should run after a successful Iceberg REST table update (and omit `timeTrigger`). Orphan file removal cannot set `commitTrigger`. Optional `minIntervalMs` applies only on the commitTrigger path.
 
 Commit-triggered maintenance needs the Iceberg REST auxiliary service and the listener:
 

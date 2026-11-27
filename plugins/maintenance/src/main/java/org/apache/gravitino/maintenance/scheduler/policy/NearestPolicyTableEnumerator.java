@@ -82,7 +82,8 @@ public final class NearestPolicyTableEnumerator {
    * Skip check used while scanning for schedulable tables.
    *
    * <p>Production expand skips when the soft slot is occupied or a pending {@code cron-job} already
-   * covers the table. Expand does not apply {@code minIntervalMs} (On-write only).
+   * covers the table. Expand does not apply {@code minIntervalMs} ({@code commitTrigger} path
+   * only).
    */
   @FunctionalInterface
   interface ShouldSkipTable {

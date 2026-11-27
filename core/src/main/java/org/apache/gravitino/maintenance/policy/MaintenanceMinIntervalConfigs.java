@@ -27,69 +27,70 @@ import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.policy.Policy;
 
 /**
- * Server config entries for On-write ({@code commitTrigger=true}) {@code minIntervalMs} cooldowns
- * in {@code gravitino.conf}.
+ * Server config entries for {@code minIntervalMs} cooldowns used by {@code commitTrigger=true}
+ * policies in {@code gravitino.conf}.
  *
- * <p>Used when an On-write maintenance policy omits {@code minIntervalMs}. Resolution order is
- * policy content → these server keys → the code defaults below. Orphan cleanup is timeTrigger-only
- * and has no cooldown config.
+ * <p>Used when a {@code commitTrigger=true} maintenance policy omits {@code minIntervalMs}.
+ * Resolution order is policy content → these server keys → the code defaults below. Orphan cleanup
+ * is timeTrigger-only and has no cooldown config.
  *
  * <p>Lookup by {@link Policy.BuiltInType} goes through {@link MaintenancePolicyDefinitions}; do not
  * add a parallel switch or task-type enum for the same 1:1 mapping.
  */
 public final class MaintenanceMinIntervalConfigs {
 
-  /** Default On-write cooldown for compaction / manifest-rewrite / snapshot-expiry (1 hour). */
+  /** Default cooldown for compaction / manifest-rewrite / snapshot-expiry (1 hour). */
   public static final long DEFAULT_HOURLY_MIN_INTERVAL_MS = 3_600_000L;
 
-  /** Config key for compaction On-write cooldown. */
+  /** Config key for compaction cooldown ({@code commitTrigger=true}). */
   public static final String COMPACTION_MIN_INTERVAL_MS_KEY =
       "gravitino.maintenance.compaction.minIntervalMs";
 
-  /** Config key for manifest-rewrite On-write cooldown. */
+  /** Config key for manifest-rewrite cooldown ({@code commitTrigger=true}). */
   public static final String MANIFEST_REWRITE_MIN_INTERVAL_MS_KEY =
       "gravitino.maintenance.manifest-rewrite.minIntervalMs";
 
-  /** Config key for snapshot-expiry On-write cooldown. */
+  /** Config key for snapshot-expiry cooldown ({@code commitTrigger=true}). */
   public static final String SNAPSHOT_EXPIRY_MIN_INTERVAL_MS_KEY =
       "gravitino.maintenance.snapshot-expiry.minIntervalMs";
 
   /**
-   * On-write cooldown between finished compaction runs when the policy omits {@code minIntervalMs}.
+   * Cooldown between finished compaction runs when a {@code commitTrigger=true} policy omits {@code
+   * minIntervalMs}.
    */
   public static final ConfigEntry<Long> COMPACTION_MIN_INTERVAL_MS =
       new ConfigBuilder(COMPACTION_MIN_INTERVAL_MS_KEY)
           .doc(
-              "On-write (commitTrigger=true) minimum interval in milliseconds between finished "
-                  + "compaction runs when the policy omits minIntervalMs")
+              "Minimum interval in milliseconds between finished compaction runs when a "
+                  + "commitTrigger=true policy omits minIntervalMs")
           .version(ConfigConstants.VERSION_2_0_0)
           .longConf()
           .checkValue(v -> v != null && v >= 0, "minIntervalMs must be >= 0")
           .createWithDefault(DEFAULT_HOURLY_MIN_INTERVAL_MS);
 
   /**
-   * On-write cooldown between finished manifest-rewrite runs when the policy omits {@code
-   * minIntervalMs}.
+   * Cooldown between finished manifest-rewrite runs when a {@code commitTrigger=true} policy omits
+   * {@code minIntervalMs}.
    */
   public static final ConfigEntry<Long> MANIFEST_REWRITE_MIN_INTERVAL_MS =
       new ConfigBuilder(MANIFEST_REWRITE_MIN_INTERVAL_MS_KEY)
           .doc(
-              "On-write (commitTrigger=true) minimum interval in milliseconds between finished "
-                  + "manifest-rewrite runs when the policy omits minIntervalMs")
+              "Minimum interval in milliseconds between finished manifest-rewrite runs when a "
+                  + "commitTrigger=true policy omits minIntervalMs")
           .version(ConfigConstants.VERSION_2_0_0)
           .longConf()
           .checkValue(v -> v != null && v >= 0, "minIntervalMs must be >= 0")
           .createWithDefault(DEFAULT_HOURLY_MIN_INTERVAL_MS);
 
   /**
-   * On-write cooldown between finished snapshot-expiry runs when the policy omits {@code
-   * minIntervalMs}.
+   * Cooldown between finished snapshot-expiry runs when a {@code commitTrigger=true} policy omits
+   * {@code minIntervalMs}.
    */
   public static final ConfigEntry<Long> SNAPSHOT_EXPIRY_MIN_INTERVAL_MS =
       new ConfigBuilder(SNAPSHOT_EXPIRY_MIN_INTERVAL_MS_KEY)
           .doc(
-              "On-write (commitTrigger=true) minimum interval in milliseconds between finished "
-                  + "snapshot-expiry runs when the policy omits minIntervalMs")
+              "Minimum interval in milliseconds between finished snapshot-expiry runs when a "
+                  + "commitTrigger=true policy omits minIntervalMs")
           .version(ConfigConstants.VERSION_2_0_0)
           .longConf()
           .checkValue(v -> v != null && v >= 0, "minIntervalMs must be >= 0")
@@ -98,7 +99,7 @@ public final class MaintenanceMinIntervalConfigs {
   private MaintenanceMinIntervalConfigs() {}
 
   /**
-   * Returns the On-write {@code minIntervalMs} config entry for a built-in maintenance policy type.
+   * Returns the {@code minIntervalMs} config entry for a built-in maintenance policy type.
    *
    * @param builtInType built-in policy type
    * @return config entry
@@ -108,15 +109,13 @@ public final class MaintenanceMinIntervalConfigs {
   public static ConfigEntry<Long> forBuiltInType(Policy.BuiltInType builtInType) {
     ConfigEntry<Long> entry = MaintenancePolicyDefinitions.require(builtInType).minIntervalMs();
     Preconditions.checkArgument(
-        entry != null,
-        "No On-write minIntervalMs config for built-in policy type: %s",
-        builtInType);
+        entry != null, "No minIntervalMs config for built-in policy type: %s", builtInType);
     return entry;
   }
 
   /**
-   * Resolves On-write minimum interval: policy content, then server config entry (with code
-   * default).
+   * Resolves minimum interval for a {@code commitTrigger=true} policy: content, then server config
+   * entry (with code default).
    *
    * @param config gravitino server config
    * @param builtInType built-in policy type

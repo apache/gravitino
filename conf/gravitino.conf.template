@@ -147,7 +147,7 @@ gravitino.lance-rest.namespace-backend = gravitino
 # gravitino.lance-rest.gravitino-metalake = metalake
 
 # THE CONFIGURATION FOR table maintenance (TMS)
-# On-write (commitTrigger=true) cooldown defaults when a policy omits minIntervalMs (1h).
+# Cooldown defaults for commitTrigger=true policies that omit minIntervalMs (1h).
 # Orphan cleanup is timeTrigger-only and has no minIntervalMs config.
 # gravitino.maintenance.compaction.minIntervalMs = 3600000
 # gravitino.maintenance.manifest-rewrite.minIntervalMs = 3600000

@@ -27,9 +27,9 @@ import org.apache.gravitino.policy.Policy;
  * Per-type maintenance metadata keyed by {@link Policy.BuiltInType}.
  *
  * <p>{@link Policy.BuiltInType} is the single policy/activity identity (not a db-scheduler task
- * kind). On-write server defaults for {@code minIntervalMs} are looked up from {@link
- * MaintenancePolicyDefinitions} rather than parallel switches or a second activity enum. Types that
- * cannot use On write (orphan cleanup) have a null cooldown entry.
+ * kind). Server defaults for {@code minIntervalMs} ({@code commitTrigger=true} policies) are looked
+ * up from {@link MaintenancePolicyDefinitions} rather than parallel switches or a second activity
+ * enum. Types that cannot use {@code commitTrigger} (orphan cleanup) have a null cooldown entry.
  */
 public final class MaintenancePolicyDefinition {
 
@@ -50,7 +50,7 @@ public final class MaintenancePolicyDefinition {
   }
 
   /**
-   * @return server config entry for On-write cooldown when policy content omits {@code
+   * @return server config entry for cooldown when a {@code commitTrigger=true} policy omits {@code
    *     minIntervalMs}, or {@code null} when this type has no cooldown config
    */
   @Nullable
@@ -59,12 +59,11 @@ public final class MaintenancePolicyDefinition {
   }
 
   /**
-   * @return {@code gravitino.conf} key for this type's On-write cooldown
+   * @return {@code gravitino.conf} key for this type's {@code minIntervalMs} default
    * @throws IllegalStateException if this type has no cooldown config
    */
   public String minIntervalMsKey() {
-    Preconditions.checkState(
-        minIntervalMs != null, "No On-write minIntervalMs config for %s", builtInType);
+    Preconditions.checkState(minIntervalMs != null, "No minIntervalMs config for %s", builtInType);
     return minIntervalMs.getKey();
   }
 }
