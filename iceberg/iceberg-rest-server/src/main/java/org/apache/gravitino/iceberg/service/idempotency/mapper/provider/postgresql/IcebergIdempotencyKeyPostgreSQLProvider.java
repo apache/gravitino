@@ -24,15 +24,8 @@ import static org.apache.gravitino.iceberg.service.idempotency.mapper.IcebergIde
 import org.apache.gravitino.iceberg.service.idempotency.mapper.provider.base.IcebergIdempotencyKeyBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
-/** PostgreSQL statements for generation allocation and bounded purge. */
+/** PostgreSQL statements for bounded purge. */
 public class IcebergIdempotencyKeyPostgreSQLProvider extends IcebergIdempotencyKeyBaseSQLProvider {
-  @Override
-  public String advanceGeneration(@Param("stripe") int stripe) {
-    return "INSERT INTO iceberg_idempotency_generation_meta (stripe, generation) VALUES (#{stripe}, 1)"
-        + " ON CONFLICT (stripe) DO UPDATE SET generation ="
-        + " iceberg_idempotency_generation_meta.generation + 1";
-  }
-
   @Override
   public String deleteExpiredBatch(
       @Param("beforeMs") long beforeMs, @Param("batchSize") int batchSize) {

@@ -21,7 +21,6 @@ package org.apache.gravitino.iceberg.service.idempotency;
 import java.io.Closeable;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalLong;
 import javax.annotation.Nullable;
 
 /**
@@ -36,11 +35,10 @@ import javax.annotation.Nullable;
  * duplicate mutation.
  *
  * <p>A reservation does not always survive until its owner finishes: a bounded store can drop it
- * under memory pressure, and a purge can remove it once it expires. The key is then free, and
- * another caller can reserve it while the first is still running. Every call that mutates an
- * existing record therefore carries the {@code claim} its caller reserved with, and implementations
- * must ignore the call when the stored claim differs, so a caller that has lost its reservation
- * cannot finalize or release a record that now belongs to someone else.
+ * under memory pressure, and a purge can remove it once it expires. The key is then free and
+ * treated as never seen, so another caller can reserve it while the first is still running.
+ * Built-in stores match common HTTP {@code Idempotency-Key} practice and the Iceberg REST reuse
+ * window: after hard delete there is no per-reservation token.
  *
  * <p>Keys are compared in the folded form returned by {@link IdempotencyKeys#canonicalize}, so
  * implementations must canonicalize before reading or writing storage rather than trusting the
@@ -59,7 +57,7 @@ public interface IdempotencyStore extends Closeable {
   void initialize(Map<String, String> properties);
 
   /**
-   * Atomically attempts to claim a key. An expired record is treated as absent, so the key can be
+   * Atomically attempts to reserve a key. An expired record is treated as absent, so the key can be
    * reserved again without waiting for a purge.
    *
    * <p>The store retains the operation binding but does not compare it when a reservation already
@@ -72,11 +70,9 @@ public interface IdempotencyStore extends Closeable {
    * @param operationBinding request identity, as the HTTP method, a space, and the encoded path. A
    *     query fingerprint may follow the path, separated by a question mark.
    * @param expiresAtMs time after which the record may be purged, in unix epoch millis
-   * @return a fresh fencing token when the reservation is acquired, or empty if the key is live.
-   *     Tokens must not repeat for a key after release, eviction, or purge, and callers must pass
-   *     the returned token to {@link #finalizeRecord} or {@link #release}.
+   * @return {@code true} when the reservation is acquired, or {@code false} if the key is live
    */
-  OptionalLong reserve(String idempotencyKey, String operationBinding, long expiresAtMs);
+  boolean reserve(String idempotencyKey, String operationBinding, long expiresAtMs);
 
   /**
    * Loads a finalized record for replay.
@@ -91,28 +87,23 @@ public interface IdempotencyStore extends Closeable {
    * Marks a reserved key finalized, storing the response replayed to later retries.
    *
    * <p>The call is a no-op when the record has already expired or been purged, so it is not
-   * resurrected, and when the stored claim differs, so a caller that has lost its reservation
-   * cannot overwrite the record of whoever holds the key now.
+   * resurrected, and when the key is already finalized or absent.
    *
    * @param idempotencyKey the client-provided key
-   * @param claim the claim this caller reserved with
    * @param httpStatus HTTP status of the original response
    * @param responseSummary serialized response body, {@code null} for responses without a body
    */
-  void finalizeRecord(
-      String idempotencyKey, long claim, int httpStatus, @Nullable String responseSummary);
+  void finalizeRecord(String idempotencyKey, int httpStatus, @Nullable String responseSummary);
 
   /**
    * Releases a reservation so the client can retry with the same key. Called when the mutation
    * failed in a way the Iceberg REST spec treats as retryable, which is any {@code 5xx} response.
    *
-   * <p>The call is a no-op when the stored claim differs, so a caller that has lost its reservation
-   * cannot free a key another caller is currently executing under.
+   * <p>The call is a no-op when the key is already finalized or absent.
    *
    * @param idempotencyKey the client-provided key
-   * @param claim the claim this caller reserved with
    */
-  void release(String idempotencyKey, long claim);
+  void release(String idempotencyKey);
 
   /**
    * Purges records whose reuse window has elapsed.

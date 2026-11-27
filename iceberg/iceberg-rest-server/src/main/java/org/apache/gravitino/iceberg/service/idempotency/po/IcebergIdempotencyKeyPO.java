@@ -39,7 +39,6 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * mapped by {@link IcebergIdempotencyKeyMapper}, and converts to the {@link IdempotencyRecord} the
  * store SPI hands back. Instances are created through the generated {@code builder()} (or populated
  * by MyBatis via field reflection through the private no-arg constructor) and expose no setters.
- * The store supplies the fencing token when it inserts or replaces the reservation.
  */
 @Getter
 @Builder(setterPrefix = "with")
@@ -50,7 +49,6 @@ public class IcebergIdempotencyKeyPO {
   private String idempotencyKey;
   private String httpMethod;
   private String requestUri;
-  private Long generation;
   @Nullable private Integer httpStatus;
   @Nullable private String responseSummary;
   private String auditInfo;
@@ -63,17 +61,12 @@ public class IcebergIdempotencyKeyPO {
    * @param idempotencyKey the client-provided UUIDv7 key
    * @param operationBinding request identity, for example {@code POST
    *     /v1/cat1/namespaces/ns1/tables}
-   * @param generation the reservation fencing token
    * @param createdAtMs reservation time in unix epoch millis
    * @param expiresAtMs time after which the record may be purged, in unix epoch millis
    * @return the persistence object
    */
   public static IcebergIdempotencyKeyPO reserved(
-      String idempotencyKey,
-      String operationBinding,
-      long generation,
-      long createdAtMs,
-      long expiresAtMs) {
+      String idempotencyKey, String operationBinding, long createdAtMs, long expiresAtMs) {
     int separator = operationBinding.indexOf(' ');
     String method = separator < 0 ? operationBinding : operationBinding.substring(0, separator);
     String uri = separator < 0 ? "" : operationBinding.substring(separator + 1);
@@ -81,7 +74,6 @@ public class IcebergIdempotencyKeyPO {
         .withIdempotencyKey(idempotencyKey)
         .withHttpMethod(method)
         .withRequestUri(uri)
-        .withGeneration(generation)
         .withHttpStatus(null)
         .withResponseSummary(null)
         .withAuditInfo(auditInfoJson(createdAtMs))
@@ -98,7 +90,7 @@ public class IcebergIdempotencyKeyPO {
   public IdempotencyRecord toIdempotencyRecord() {
     String binding = requestUri.isEmpty() ? httpMethod : httpMethod + " " + requestUri;
     IdempotencyRecord record =
-        IdempotencyRecord.reserved(idempotencyKey, binding, generation, createdAt, expiresAt);
+        IdempotencyRecord.reserved(idempotencyKey, binding, createdAt, expiresAt);
     return httpStatus == null ? record : record.withResponse(httpStatus, responseSummary);
   }
 

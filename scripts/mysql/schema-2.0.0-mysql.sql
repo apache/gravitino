@@ -846,7 +846,6 @@ CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
   `idempotency_key`  VARCHAR(36)         NOT NULL     COMMENT 'client-provided UUIDv7 idempotency key',
   `http_method`      VARCHAR(16)         NOT NULL     COMMENT 'HTTP method of the request',
   `request_uri`      MEDIUMTEXT          NOT NULL     COMMENT 'encoded request path and sorted query string',
-  `generation`       BIGINT              NOT NULL     COMMENT 'reservation fencing token',
   `http_status`      INT(10) UNSIGNED    DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
   `response_summary` MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
   `audit_info`       MEDIUMTEXT          NOT NULL     COMMENT 'idempotency record audit info',
@@ -855,12 +854,6 @@ CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
   PRIMARY KEY (`idempotency_key`),
   KEY `idx_iim_expires` (`expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency records';
-
-
-CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
-  stripe INT NOT NULL PRIMARY KEY,
-  generation BIGINT NOT NULL
-) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `ontology_meta` (
     `ontology_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'ontology id',

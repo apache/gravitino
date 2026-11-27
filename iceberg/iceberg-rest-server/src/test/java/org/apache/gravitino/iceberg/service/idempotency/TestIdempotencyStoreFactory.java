@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalLong;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.junit.jupiter.api.Assertions;
@@ -128,8 +127,8 @@ public class TestIdempotencyStoreFactory {
     }
 
     @Override
-    public OptionalLong reserve(String idempotencyKey, String operationBinding, long expiresAtMs) {
-      return OptionalLong.of(1);
+    public boolean reserve(String idempotencyKey, String operationBinding, long expiresAtMs) {
+      return true;
     }
 
     @Override
@@ -138,11 +137,10 @@ public class TestIdempotencyStoreFactory {
     }
 
     @Override
-    public void finalizeRecord(
-        String idempotencyKey, long claim, int httpStatus, String responseSummary) {}
+    public void finalizeRecord(String idempotencyKey, int httpStatus, String responseSummary) {}
 
     @Override
-    public void release(String idempotencyKey, long claim) {}
+    public void release(String idempotencyKey) {}
 
     @Override
     public int purgeExpired(long beforeMs) {

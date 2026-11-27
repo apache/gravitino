@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.Optional;
-import java.util.OptionalLong;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -135,21 +134,21 @@ public class TestIcebergIdempotencyFinalizeFailure extends IcebergTestBase {
   /** Fault-injection store simulating missing writes and lost commit acknowledgements. */
   public static class FaultInjectingStore extends InMemoryIdempotencyStore {
     @Override
-    public OptionalLong reserve(String key, String binding, long expiresAtMs) {
+    public boolean reserve(String key, String binding, long expiresAtMs) {
       if (key.endsWith("3")) {
         throw new IllegalStateException("reservation unavailable");
       }
-      OptionalLong result = super.reserve(key, binding, expiresAtMs);
-      if (key.endsWith("4") && result.isPresent()) {
+      boolean reserved = super.reserve(key, binding, expiresAtMs);
+      if (key.endsWith("4") && reserved) {
         throw new IllegalStateException("reservation committed but acknowledgement lost");
       }
-      return result;
+      return reserved;
     }
 
     @Override
-    public void finalizeRecord(String key, long claim, int status, @Nullable String summary) {
+    public void finalizeRecord(String key, int status, @Nullable String summary) {
       if (key.endsWith("2")) {
-        super.finalizeRecord(key, claim, status, summary);
+        super.finalizeRecord(key, status, summary);
         throw new IllegalStateException("response committed but acknowledgement lost");
       }
       if (key.endsWith("1")) {
