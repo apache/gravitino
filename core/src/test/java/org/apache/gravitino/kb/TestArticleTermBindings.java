@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -120,6 +121,39 @@ class TestArticleTermBindings extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void cancellingEditsOnlyRequireApprovalForNewBindings() throws Exception {
+    createAndInsertMakeLake(LAKE);
+    term("Existing");
+    term("Other");
+    var created = create("guide", ArticleStatus.PUBLISHED, "Existing");
+    for (String name : List.of("Existing", "Other")) {
+      glossary.alterTerm(LAKE, name, TermChange.setStatus(GlossaryTerm.Status.DEPRECATED));
+    }
+    var edited =
+        articles.alterArticle(
+            LAKE,
+            "guide",
+            created.revisionToken(),
+            KnowledgeBaseArticleChange.removeTerms("Existing"),
+            KnowledgeBaseArticleChange.addTerms("Other", "existing"),
+            KnowledgeBaseArticleChange.removeTerms("OTHER"));
+    assertEquals(created.revisionToken(), edited.revisionToken());
+    assertEquals(
+        List.of("Existing"),
+        edited.article().terms().stream().map(ArticleTermBinding::name).toList());
+    assertThrows(
+        UnapprovedTermException.class,
+        () ->
+            articles.alterArticle(
+                LAKE,
+                "guide",
+                edited.revisionToken(),
+                KnowledgeBaseArticleChange.removeTerms("Existing"),
+                KnowledgeBaseArticleChange.addTerms("Other")));
+    assertEquals(created.revisionToken(), articles.loadArticle(LAKE, "guide").revisionToken());
+  }
+
+  @TestTemplate
   void termPagesFollowLiveIdsAndReversePagesFilterBeforeOffset() throws Exception {
     createAndInsertMakeLake(LAKE);
     term("Zed");
@@ -203,7 +237,22 @@ class TestArticleTermBindings extends TestJDBCBackend {
         articles.loadArticle(LAKE, "guide", 1, 129).article().terms().stream()
             .map(ArticleTermBinding::name)
             .toList());
-    var summary = articles.listArticlesForTerm(LAKE, names[129], false, 1, 0).articles().get(0);
+    insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    create(
+        "second", ArticleStatus.PUBLISHED, Arrays.copyOf(names, ArticleListFilter.DEFAULT_LIMIT));
+    articles.alterArticle(
+        LAKE, "second", null, KnowledgeBaseArticleChange.updateDomains(new String[] {"Sales"}));
+    var summaries = articles.listArticlesForTerm(LAKE, names[0], false, 2, 0).articles();
+    assertEquals(List.of("guide", "second"), summaries.stream().map(ArticleSummary::name).toList());
+    var second = summaries.get(1);
+    assertEquals(List.of("Sales"), List.of(second.domains()));
+    assertEquals(ArticleListFilter.DEFAULT_LIMIT, second.terms().length);
+    assertEquals(
+        names[ArticleListFilter.DEFAULT_LIMIT - 1],
+        second.terms()[ArticleListFilter.DEFAULT_LIMIT - 1].name());
+    assertFalse(second.termsHasMore());
+    var summary = summaries.get(0);
+    assertTrue(List.of(summary.domains()).isEmpty());
     assertEquals(ArticleListFilter.DEFAULT_LIMIT, summary.terms().length);
     assertTrue(summary.termsHasMore());
   }

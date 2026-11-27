@@ -1,0 +1,43 @@
+{
+  "results": [
+    {
+      "word": "net revenue",
+      "matches": [
+        {
+          "term": "Net revenue",
+          "definition": "Revenue after refunds and discounts.",
+          "matched_by": "NAME",
+          "domains": ["Sales"],
+          "broader": ["Revenue"],
+          "related": ["Order"],
+          "bindings": [
+            {"kind": "USED_BY", "type": "SEMANTIC_MODEL", "catalog": "dw", "schema": "sales",
+             "name": "sales_model", "metric": "net_revenue"}
+          ],
+          "bindings_truncated": false
+        }
+      ]
+    },
+    {
+      "word": "active user",
+      "matches": [
+        {
+          "term": "Active Customer",
+          "definition": "A customer with at least one order in the last 90 days.",
+          "matched_by": "SYNONYM",
+          "domains": ["Sales"],
+          "broader": ["Customer"],
+          "related": [],
+          "bindings": [
+            {"kind": "IMPLEMENTED_BY", "type": "COLUMN", "catalog": "dw", "schema": "sales",
+             "name": "customers", "column": "is_active"},
+            {"kind": "USED_BY", "type": "SEMANTIC_MODEL", "catalog": "dw", "schema": "sales",
+             "name": "sales_model", "metric": "active_customers"}
+          ],
+          "bindings_truncated": false
+        }
+      ]
+    }
+  ],
+  "unmatched": ["VIP"]
+}
