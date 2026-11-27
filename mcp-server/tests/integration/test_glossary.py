@@ -35,27 +35,41 @@ def _auth(user):
 
 
 def _provision(rest, lake):
-    rest.post("users", json={"name": "writer"}).raise_for_status()
-    rest.post(
-        "roles",
-        json={
-            "name": "authors",
-            "properties": {},
-            "securableObjects": [
-                {
-                    "fullName": lake,
-                    "type": "METALAKE",
-                    "privileges": [
-                        {"name": name, "condition": "ALLOW"}
-                        for name in ("CREATE_DEFINITION", "VIEW_DEFINITION")
-                    ],
-                }
+    for user, privileges in (
+        ("writer", ["VIEW_DEFINITION", "CREATE_DEFINITION"]),
+        ("manager", ["VIEW_DEFINITION", "MANAGE_DEFINITIONS"]),
+        (
+            "viewer",
+            [
+                "VIEW_DEFINITION",
+                "USE_CATALOG",
+                "USE_SCHEMA",
+                "SELECT_TABLE",
+                "USE_SEMANTIC_MODEL",
             ],
-        },
-    ).raise_for_status()
-    rest.put(
-        "permissions/users/writer/grant", json={"roleNames": ["authors"]}
-    ).raise_for_status()
+        ),
+    ):
+        rest.post("users", json={"name": user}).raise_for_status()
+        rest.post(
+            "roles",
+            json={
+                "name": user,
+                "properties": {},
+                "securableObjects": [
+                    {
+                        "type": "METALAKE",
+                        "fullName": lake,
+                        "privileges": [
+                            {"name": privilege, "condition": "ALLOW"}
+                            for privilege in privileges
+                        ],
+                    }
+                ],
+            },
+        ).raise_for_status()
+        rest.put(
+            f"permissions/users/{user}/grant", json={"roleNames": [user]}
+        ).raise_for_status()
     rest.post(
         "domains",
         json={
@@ -110,10 +124,44 @@ def _provision(rest, lake):
             },
         },
     ).raise_for_status()
+    rest.post(
+        "catalogs/dw/schemas/sales/semantic-models",
+        json={
+            "name": "sales_model",
+            "definition": {
+                "datasets": [
+                    {
+                        "name": "orders",
+                        "source": {
+                            "namespace": ["dw", "sales"],
+                            "name": "orders",
+                        },
+                    }
+                ],
+                "metrics": [
+                    {
+                        "name": "net_revenue",
+                        "expression": {
+                            "dialects": [
+                                {
+                                    "dialect": "ANSI_SQL",
+                                    "expression": "SUM(orders.amount)",
+                                }
+                            ]
+                        },
+                    }
+                ],
+            },
+        },
+    ).raise_for_status()
     for target, terms in (
         ("table/dw.sales.orders", ["Revenue", "Legacy"]),
         ("column/dw.sales.orders.amount", ["Net", "Candidate"]),
         ("column/dw.sales.orders.old", ["Legacy"]),
+        (
+            "semantic_model/dw.sales.sales_model/metrics/net_revenue",
+            ["Net", "Legacy"],
+        ),
     ):
         rest.post(
             f"objects/{target}/terms", json={"termsToAdd": terms}
@@ -163,32 +211,56 @@ async def _check_reads(url, lake, user):
 
 async def _check_bindings(read, user, preview):
     bindings = await read("list_metadata_by_term", term="Net")
-    assert bindings == preview
-    args = {
-        "metadata_type": "table",
-        "metadata_full_name": "dw.sales.orders",
+    assert len(bindings) == len(preview)
+    assert all(binding in preview for binding in bindings)
+    table = {"metadata_type": "table", "metadata_full_name": "dw.sales.orders"}
+    model = {
+        "metadata_type": "semantic_model",
+        "metadata_full_name": "dw.sales.sales_model",
     }
-    if user == "admin":
-        assert bindings == [
-            {
-                "kind": "IMPLEMENTED_BY",
-                "type": "COLUMN",
-                "catalog": "dw",
-                "schema": "sales",
-                "name": "orders",
-                "column": "amount",
-            }
-        ]
-        reverse = await read("list_terms_for_metadata", **args)
-        assert [term["name"] for term in reverse["terms"]] == ["Revenue"]
-        assert [
-            (child["name"], [t["name"] for t in child["terms"]])
-            for child in reverse["children"]
-        ] == [("amount", ["Net"])]
-    else:
+    if user in ("manager", "writer"):
         assert bindings == []
-        with pytest.raises(ToolError, match="ForbiddenException"):
-            await read("list_terms_for_metadata", **args)
+        for target in (table, model):
+            with pytest.raises(ToolError, match="ForbiddenException"):
+                await read("list_terms_for_metadata", **target)
+        return
+
+    by_type = {binding["type"]: binding for binding in bindings}
+    assert len(bindings) == 2 and set(by_type) == {"COLUMN", "SEMANTIC_MODEL"}
+    column = by_type["COLUMN"]
+    assert column["kind"] == "IMPLEMENTED_BY" and column["column"] == "amount"
+    table_details = await read(
+        "get_table_metadata_details",
+        catalog_name=column["catalog"],
+        schema_name=column["schema"],
+        table_name=column["name"],
+    )
+    assert column["column"] in {
+        field["name"] for field in table_details["columns"]
+    }
+
+    metric = by_type["SEMANTIC_MODEL"]
+    assert metric["kind"] == "USED_BY" and metric["metric"] == "net_revenue"
+    model_details = await read(
+        "load_semantic_model",
+        catalog_name=metric["catalog"],
+        schema_name=metric["schema"],
+        semantic_model_name=metric["name"],
+    )
+    assert metric["metric"] in {
+        m["name"] for m in model_details["definition"]["metrics"]
+    }
+
+    for target, direct, child in (
+        (table, ["Revenue"], "amount"),
+        (model, [], "net_revenue"),
+    ):
+        reverse = await read("list_terms_for_metadata", **target)
+        assert [term["name"] for term in reverse["terms"]] == direct
+        assert [
+            (item["name"], [term["name"] for term in item["terms"]])
+            for item in reverse["children"]
+        ] == [(child, ["Net"])]
 
 
 def test_manager_and_draft_owner_only_read_approved_terms(integration_env):
@@ -203,7 +275,7 @@ def test_manager_and_draft_owner_only_read_approved_terms(integration_env):
         ).raise_for_status()
         try:
             _provision(rest, lake)
-            for user in ("admin", "writer"):
+            for user in ("admin", "manager", "writer"):
                 assert (
                     rest.get("terms/Candidate", headers=_auth(user)).json()[
                         "term"
@@ -211,14 +283,19 @@ def test_manager_and_draft_owner_only_read_approved_terms(integration_env):
                     == "DRAFT"
                 )
 
-            async def check_both_callers():
+            assert (
+                rest.get("terms/Candidate", headers=_auth("viewer")).status_code
+                == 404
+            )
+
+            async def check_callers():
                 await asyncio.gather(
                     *(
                         _check_reads(integration_env["mcp_url"], lake, user)
-                        for user in ("admin", "writer")
+                        for user in ("admin", "manager", "writer", "viewer")
                     )
                 )
 
-            asyncio.run(check_both_callers())
+            asyncio.run(check_callers())
         finally:
             rest.delete("", params={"force": "true"}).raise_for_status()

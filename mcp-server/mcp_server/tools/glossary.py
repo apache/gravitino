@@ -51,10 +51,16 @@ def load_glossary_tools(mcp: FastMCP):
         the domains to choose a term or ask the user. Ask for clarification on unmatched
         words. They have no readable approved exact match in this query.
 
-        A binding identifies the data behind a term. Reading it requires its own privileges.
+        For a TABLE or COLUMN binding, pass catalog, schema and name to
+        get_table_metadata_details as catalog_name, schema_name and table_name.
+        For a metric, pass them to load_semantic_model as catalog_name, schema_name
+        and semantic_model_name, then find the named metric. Use the same metalake.
+        These reads require their own privileges. Cite the terms and definitions you used.
+
         When bindings_truncated is true, call list_metadata_by_term for the full list.
-        On LookupTooBroadException, retry with include_bindings=false for definitions
-        only, then list bindings by term. If that lookup is also too broad, narrow the query.
+        On LookupTooBroadException, retry with the same domain and include_bindings=false.
+        This omits binding fields. Use list_metadata_by_term for a selected term.
+        If the definition-only lookup also exceeds its budget, ask for a narrower query.
         """
         return await _glossary(ctx).resolve_business_term(
             words, domain, include_bindings

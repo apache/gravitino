@@ -19,7 +19,11 @@ import simplejson
 
 from mcp_server.client.glossary_operation import GlossaryOperation
 from mcp_server.client.plain.exception import GravitinoException
-from mcp_server.client.plain.utils import encode_path_segment, response_content
+from mcp_server.client.plain.utils import (
+    encode_path_segment,
+    required_array,
+    response_content,
+)
 
 _MAX_MATCH_WORDS = 20
 
@@ -48,13 +52,20 @@ def _match(term: dict, include_bindings: bool) -> dict:
     match = {
         "term": term["name"],
         "definition": term.get("definition"),
-        "domains": term["domains"],
-        "broader": term["broader"],
-        "related": term["related"],
+        "domains": required_array(term, "domains"),
+        "broader": required_array(term, "broader"),
+        "related": required_array(term, "related"),
     }
     if include_bindings:
-        match["bindings"] = [_binding(binding) for binding in term["bindings"]]
-        match["bindings_truncated"] = term["bindingsTruncated"]
+        match["bindings"] = [
+            _binding(binding) for binding in required_array(term, "bindings")
+        ]
+        truncated = term.get("bindingsTruncated")
+        if not isinstance(truncated, bool):
+            raise GravitinoException(
+                "Invalid Gravitino response: bindingsTruncated must be a boolean"
+            )
+        match["bindings_truncated"] = truncated
     return match
 
 
@@ -93,17 +104,28 @@ class PlainRESTClientGlossaryOperation(GlossaryOperation):
         matches: dict[str, list] = {word: [] for word in words}
         distinct = list(matches)
         for start in range(0, len(distinct), _MAX_MATCH_WORDS):
+            batch = distinct[start : start + _MAX_MATCH_WORDS]
             payload = await self._get(
                 "terms",
-                match=distinct[start : start + _MAX_MATCH_WORDS],
+                match=batch,
                 domain=domain,
                 details="true",
                 bindings=str(include_bindings).lower(),
             )
-            for term in payload["terms"]:
+            for term in required_array(payload, "terms"):
+                evidence = required_array(term, "matchedBy")
+                if not evidence:
+                    raise GravitinoException(
+                        "Invalid Gravitino response: matchedBy must identify a requested word"
+                    )
                 match = _match(term, include_bindings)
-                for matched_by in term["matchedBy"]:
-                    matches[matched_by["word"]].append(
+                for matched_by in evidence:
+                    word = matched_by["word"]
+                    if word not in batch:
+                        raise GravitinoException(
+                            "Invalid Gravitino response: matchedBy word was not in this batch"
+                        )
+                    matches[word].append(
                         {**match, "matched_by": matched_by["field"]}
                     )
 
@@ -120,7 +142,12 @@ class PlainRESTClientGlossaryOperation(GlossaryOperation):
 
     async def get_term(self, term: str) -> str:
         payload = await self._get(f"terms/{encode_path_segment(term)}")
-        return simplejson.dumps(payload["term"])
+        snapshot = payload.get("term")
+        if not isinstance(snapshot, dict):
+            raise GravitinoException(
+                "Invalid Gravitino response: term must be a JSON object"
+            )
+        return simplejson.dumps(snapshot)
 
     async def list_terms(
         self, domain: str | None = None, name_contains: str | None = None
@@ -128,7 +155,7 @@ class PlainRESTClientGlossaryOperation(GlossaryOperation):
         payload = await self._get(
             "terms", details="true", domain=domain, nameContains=name_contains
         )
-        return simplejson.dumps(payload["terms"])
+        return simplejson.dumps(required_array(payload, "terms"))
 
     async def get_term_hierarchy(
         self, term: str, direction: str = "NARROWER"
@@ -136,7 +163,7 @@ class PlainRESTClientGlossaryOperation(GlossaryOperation):
         payload = await self._get(
             f"terms/{encode_path_segment(term)}/hierarchy", direction=direction
         )
-        return simplejson.dumps(payload["terms"])
+        return simplejson.dumps(required_array(payload, "terms"))
 
     async def list_metadata_by_term(
         self, term: str, kind: str | None = None, types: list[str] | None = None
@@ -145,7 +172,10 @@ class PlainRESTClientGlossaryOperation(GlossaryOperation):
             f"terms/{encode_path_segment(term)}/objects", kind=kind, types=types
         )
         return simplejson.dumps(
-            [_binding(binding) for binding in payload["bindings"]]
+            [
+                _binding(binding)
+                for binding in required_array(payload, "bindings")
+            ]
         )
 
     async def list_terms_for_metadata(
@@ -158,5 +188,8 @@ class PlainRESTClientGlossaryOperation(GlossaryOperation):
             children="true" if children else None,
         )
         return simplejson.dumps(
-            {"terms": payload["terms"], "children": payload["children"]}
+            {
+                "terms": required_array(payload, "terms"),
+                "children": required_array(payload, "children"),
+            }
         )

@@ -90,7 +90,12 @@ class TestGlossary(unittest.IsolatedAsyncioTestCase):
     def _respond(self, request):
         self.requests.append(request)
         self.assertEqual(request.method, "GET")
-        self.assertEqual(request.url.params.get_list("status"), ["APPROVED"])
+        if request.url.path == "/api/metalakes/lake/tags/review/objects":
+            self.assertNotIn("status", request.url.params)
+        else:
+            self.assertEqual(
+                request.url.params.get_list("status"), ["APPROVED"]
+            )
         return self.responses.pop(0)
 
     def _ok(self, **fields):
@@ -114,6 +119,16 @@ class TestGlossary(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(tool.annotations.readOnlyHint)
             self.assertTrue(tool.annotations.idempotentHint)
             self.assertFalse(tool.annotations.destructiveHint)
+        tag_only = GravitinoMCPServer(Setting("lake", tags={"tag"}))
+        async with Client(tag_only.mcp) as client:
+            self.assertTrue(
+                set(tools).isdisjoint(
+                    tool.name for tool in await client.list_tools()
+                )
+            )
+            with self.assertRaises(ToolError):
+                await _call(client, "get_term", term="Revenue")
+        self.assertFalse(self.requests)
         description = tools["resolve_business_term"].description
         for rule in (
             "singular",
@@ -397,6 +412,94 @@ class TestGlossary(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ToolError, "missing code"):
                 await _call(client, "resolve_business_term", words=["Revenue"])
             self.assertEqual(len(self.requests), 4)
+
+    async def test_malformed_lookup_is_a_tool_error(self):
+        term = _term("Revenue", ("revenue", "NAME"))
+        async with Client(self.mcp) as client:
+            for fields, message in (
+                ({"terms": {}}, "terms"),
+                ({"terms": [dict(term, matchedBy=[])]}, "matchedBy"),
+                ({"terms": [dict(term, bindings={})]}, "bindings"),
+                (
+                    {"terms": [dict(term, bindingsTruncated=None)]},
+                    "bindingsTruncated",
+                ),
+            ):
+                with self.subTest(fields=fields):
+                    self._ok(**fields)
+                    with self.assertRaisesRegex(ToolError, message):
+                        await _call(
+                            client, "resolve_business_term", words=["revenue"]
+                        )
+
+    async def test_match_must_belong_to_its_rest_batch(self):
+        words = [f"term {i}" for i in range(21)]
+        self._ok(terms=[])
+        self._ok(terms=[_term("Wrong batch", (words[0], "NAME"))])
+        async with Client(self.mcp) as client:
+            with self.assertRaisesRegex(ToolError, "matchedBy"):
+                await _call(client, "resolve_business_term", words=words)
+        self.assertEqual(
+            [r.url.params.get_list("match") for r in self.requests],
+            [words[:20], words[20:]],
+        )
+
+    async def test_malformed_snapshots_and_binding_lists(self):
+        async with Client(self.mcp) as client:
+            for tool, args, payload, field in (
+                ("get_term", {"term": "Net"}, {"term": None}, "term"),
+                ("list_terms", {}, {"terms": None}, "terms"),
+                ("get_term_hierarchy", {"term": "Net"}, {"terms": ""}, "terms"),
+                (
+                    "list_metadata_by_term",
+                    {"term": "Net"},
+                    {"bindings": {}},
+                    "bindings",
+                ),
+                (
+                    "list_terms_for_metadata",
+                    {"metadata_type": "TABLE", "metadata_full_name": "c.s.t"},
+                    {"terms": [], "children": {}},
+                    "children",
+                ),
+            ):
+                with self.subTest(tool=tool):
+                    self._ok(**payload)
+                    with self.assertRaisesRegex(ToolError, field):
+                        await _call(client, tool, **args)
+
+    async def test_generic_tag_discovery_requires_approved_glossary_reads(self):
+        # The tag API can expose a visible name. Only a glossary read can supply its meaning.
+        tagged = [
+            {"type": "glossary_term", "fullName": name}
+            for name in ("Candidate", "Legacy")
+        ]
+        server = GravitinoMCPServer(Setting("lake", tags={"tag", "glossary"}))
+        async with Client(server.mcp) as client:
+            self._ok(metadataObjects=tagged)
+            discovered = await _call(
+                client, "list_metadata_by_tag", tag_name="review"
+            )
+            self.assertEqual(discovered, tagged)
+            words = [obj["fullName"] for obj in discovered]
+            for term in words:
+                for tool in ("get_term", "list_metadata_by_term"):
+                    self.responses.append(
+                        httpx.Response(
+                            404,
+                            json={"code": 1003, "type": "NoSuchTermException"},
+                        )
+                    )
+                    with self.assertRaisesRegex(
+                        ToolError, "NoSuchTermException"
+                    ):
+                        await _call(client, tool, term=term)
+            self._ok(terms=[])
+            self.assertEqual(
+                await _call(client, "resolve_business_term", words=words),
+                {"results": [], "unmatched": words},
+            )
+        self.assertEqual(len(self.requests), 6)
 
     async def test_identity_selection(self):
         for token, http, fallback_disabled, header, expected in (
