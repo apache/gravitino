@@ -447,7 +447,7 @@ public final class KnowledgeBaseArticleMetaService {
           KnowledgeBaseArticleEntity before;
           KnowledgeBaseArticlePO row;
           if (requestedDomains == null) {
-            row = mapper.lock(lake, ident.name());
+            row = mapper.lock(lake, KnowledgeBaseArticle.normalizeName(ident.name()));
             if (row == null) {
               throw missing(ident);
             }
@@ -489,7 +489,8 @@ public final class KnowledgeBaseArticleMetaService {
         mapper -> {
           long lake = lockMetalake(ident.namespace());
           lockDomain.accept(lake);
-          KnowledgeBaseArticlePO row = mapper.lock(lake, ident.name());
+          KnowledgeBaseArticlePO row =
+              mapper.lock(lake, KnowledgeBaseArticle.normalizeName(ident.name()));
           if (row != null) {
             KnowledgeBaseArticleEntity before = materialize(ident.namespace(), row, mapper);
             if (before.domainIds().contains(domainId)) {

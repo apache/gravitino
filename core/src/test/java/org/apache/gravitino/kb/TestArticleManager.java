@@ -43,6 +43,7 @@ import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.junit.jupiter.api.TestTemplate;
 
 class TestArticleManager extends TestJDBCBackend {
@@ -204,6 +205,32 @@ class TestArticleManager extends TestJDBCBackend {
     assertEquals(3, article.revision());
     assertEquals("New title", article.title());
     assertEquals("New comment", article.comment());
+  }
+
+  @TestTemplate
+  void domainReadsWithoutAuthorizationRequireASnapshot() throws Exception {
+    createAndInsertMakeLake(LAKE);
+    insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    var created = manager.createArticle(LAKE, request().addDomains("Sales").build());
+    SqlSessions.getSqlSession();
+    try {
+      assertThrows(IllegalStateException.class, () -> manager.loadArticle(LAKE, "guide"));
+      assertThrows(IllegalStateException.class, () -> manager.listArticles(LAKE, "Sales"));
+      assertEquals(
+          created.revisionToken(), manager.getArticleContent(LAKE, "guide").revisionToken());
+    } finally {
+      SqlSessions.closeSqlSession();
+    }
+    SqlSessions.readSnapshot(
+        () -> {
+          assertEquals(List.of("Sales"), manager.loadArticle(LAKE, "guide").article().domains());
+          CompletableFuture.runAsync(() -> manager.detachDomain(LAKE, "guide", "Sales"))
+              .orTimeout(15, TimeUnit.SECONDS)
+              .join();
+          assertEquals(List.of("Sales"), manager.listArticles(LAKE, "Sales").get(0).domains());
+          return null;
+        });
+    assertTrue(manager.listArticles(LAKE, "Sales").isEmpty());
   }
 
   @TestTemplate

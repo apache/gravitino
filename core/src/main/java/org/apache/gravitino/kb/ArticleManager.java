@@ -48,6 +48,7 @@ import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaS
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.MissingArticleScopeException;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.NameConflictException;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.ScopedArticle;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.StoredContent;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.TransactionHook;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
@@ -77,12 +78,13 @@ public final class ArticleManager {
     this(ids, maxBodyBytes, authorizationEnabled, (before, after) -> {});
   }
 
-  /** Creates a manager whose write policy participates in each effective write transaction. */
+  /** Creates a manager with a transactional write policy and authorization disabled. */
   public ArticleManager(IdGenerator ids, int maxBodyBytes, TransactionHook policy) {
     this(ids, maxBodyBytes, false, policy);
   }
 
-  private ArticleManager(
+  /** Creates a manager with the configured authorization mode and transactional write policy. */
+  public ArticleManager(
       IdGenerator ids, int maxBodyBytes, boolean authorizationEnabled, TransactionHook policy) {
     this.authorizationEnabled = authorizationEnabled;
     this.ids = Preconditions.checkNotNull(ids, "ids");
@@ -165,13 +167,16 @@ public final class ArticleManager {
   /** Reads the stored body and its token from the same row. */
   public ArticleContent getArticleContent(String metalake, String name) {
     NameIdentifier ident = ident(metalake, name);
+    Supplier<StoredContent> fetch = () -> articles.getContent(ident);
     var content =
-        readArticle(
-            ident,
-            () -> articles.getContent(ident),
-            (access, current) ->
-                access.requireRead(ident, current.revision().articleId(), current.status()),
-            UnaryOperator.identity());
+        authorizationEnabled
+            ? readArticle(
+                ident,
+                fetch,
+                (access, current) ->
+                    access.requireRead(ident, current.revision().articleId(), current.status()),
+                UnaryOperator.identity())
+            : loadStored(ident, fetch);
     var revision = content.revision();
     return new ArticleContent(
         content.body(), encode(revision.metalakeId(), revision.articleId(), revision.revision()));
@@ -185,7 +190,7 @@ public final class ArticleManager {
   /** Lists readable Articles in the requested Domain and its readable direct subdomains. */
   public List<KnowledgeBaseArticleEntity> listArticles(String metalake, @Nullable String domain) {
     Namespace namespace = Namespace.of(metalake);
-    return readSnapshot(
+    return SqlSessions.readSnapshotOrJoin(
         () -> {
           try {
             MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
@@ -303,18 +308,12 @@ public final class ArticleManager {
     }
   }
 
-  private <T> T readSnapshot(Supplier<T> read) {
-    return !authorizationEnabled && SqlSessions.hasActiveSession()
-        ? read.get()
-        : SqlSessions.readSnapshot(read);
-  }
-
   private <T> T readArticle(
       NameIdentifier ident,
       Supplier<T> fetch,
       BiConsumer<ArticleAccess, T> checkVisibility,
       UnaryOperator<T> project) {
-    return readSnapshot(
+    return SqlSessions.readSnapshotOrJoin(
         () -> {
           if (!authorizationEnabled) {
             return project.apply(loadStored(ident, fetch));
