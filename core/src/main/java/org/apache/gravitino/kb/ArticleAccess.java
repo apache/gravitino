@@ -21,6 +21,8 @@ package org.apache.gravitino.kb;
 
 import java.security.Principal;
 import java.util.EnumMap;
+import java.util.List;
+import java.util.Set;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -33,6 +35,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.ArticleIdentityAndStatus;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -112,6 +115,25 @@ public final class ArticleAccess {
     return canView() && (status != ArticleStatus.DRAFT || canEdit(id));
   }
 
+  /** Filters list results after the caller has passed the VIEW check. */
+  List<KnowledgeBaseArticleEntity> visibleArticles(List<KnowledgeBaseArticleEntity> articles) {
+    List<Long> drafts =
+        articles.stream()
+            .filter(article -> article.status() == ArticleStatus.DRAFT)
+            .map(KnowledgeBaseArticleEntity::id)
+            .toList();
+    if (drafts.isEmpty() || allowed(Name.MANAGE_DEFINITIONS)) {
+      return articles;
+    }
+    Set<Long> owned =
+        allowed(Name.CREATE_DEFINITION)
+            ? authorizer.ownedArticleIds(principal, metalake, drafts, context)
+            : Set.of();
+    return articles.stream()
+        .filter(article -> article.status() != ArticleStatus.DRAFT || owned.contains(article.id()))
+        .toList();
+  }
+
   void requireRead(NameIdentifier ident, long id, ArticleStatus status) {
     if (!canRead(id, status)) {
       throw new NoSuchKnowledgeBaseArticleException("Article %s does not exist", ident);
@@ -141,13 +163,13 @@ public final class ArticleAccess {
   }
 
   private boolean canRead(NameIdentifier ident) {
-    KnowledgeBaseArticleEntity article;
+    ArticleIdentityAndStatus article;
     try {
-      article = KnowledgeBaseArticleMetaService.getInstance().get(ident);
+      article = KnowledgeBaseArticleMetaService.getInstance().getIdentityAndStatus(ident);
     } catch (NoSuchEntityException absent) {
       return false;
     }
-    return canRead(article.id(), article.status());
+    return canRead(article.articleId(), article.status());
   }
 
   private boolean canEdit(long id) {
