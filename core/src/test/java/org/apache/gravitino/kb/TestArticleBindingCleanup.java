@@ -59,6 +59,7 @@ import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRelationMapper;
+import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRelationMapper.ArticleBindingCandidate;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -102,6 +103,26 @@ class TestArticleBindingCleanup extends TestJDBCBackend {
         "first", articles.listArticlesForTerm(LAKE, "Cost", false, 10, 0).articles().get(0).name());
     assertEquals(2, KnowledgeBaseArticleMetaService.getInstance().collect(Long.MAX_VALUE, 10));
     assertEquals(0, KnowledgeBaseArticleMetaService.getInstance().collect(Long.MAX_VALUE, 10));
+  }
+
+  @TestTemplate
+  void sweepContinuesPastLivePagesAndRestartsFromTheBeginning() throws Exception {
+    createAndInsertMakeLake(LAKE);
+    var glossary = new GlossaryManager(ids::incrementAndGet, false);
+    glossary.createTerm(LAKE, TermSpec.builder("Kept").build());
+    glossary.createTerm(LAKE, TermSpec.builder("Dropped").build());
+    articles.createArticle(LAKE, request("first").addTerms("Kept").build());
+    articles.createArticle(LAKE, request("second").addTerms("Kept").build());
+    articles.createArticle(LAKE, request("third").addTerms("Dropped").build());
+    assertTrue(glossary.dropTerm(LAKE, "Dropped"));
+    var cleanup = OrphanedMetadataObjectRelationService.getInstance();
+    cleanup.sweepOrphanedRelations(MetadataObject.Type.GLOSSARY_TERM, 1);
+    assertEquals(
+        2, countActiveRowsWhere("kb_article_relation_meta", "target_type='GLOSSARY_TERM'"));
+    assertTrue(glossary.dropTerm(LAKE, "Kept"));
+    cleanup.sweepOrphanedRelations(MetadataObject.Type.GLOSSARY_TERM, 1);
+    assertEquals(
+        0, countActiveRowsWhere("kb_article_relation_meta", "target_type='GLOSSARY_TERM'"));
   }
 
   @TestTemplate
@@ -199,7 +220,13 @@ class TestArticleBindingCleanup extends TestJDBCBackend {
     try (var sweepSession =
         SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession()) {
       var mapper = sweepSession.getMapper(OrphanedMetadataObjectRelationMapper.class);
-      var candidates = mapper.orphanedArticleBindingIds("table_meta", "table_id", "TABLE", 10);
+      var candidates =
+          mapper
+              .articleBindingCandidates("table_meta", "table_id", "TABLE", 0, Long.MAX_VALUE, 10)
+              .stream()
+              .filter(ArticleBindingCandidate::orphaned)
+              .map(ArticleBindingCandidate::id)
+              .toList();
       assertEquals(2, candidates.size());
       backend.insert(createTableEntity(99L, NS, "orders", AUDIT_INFO), false);
       backend.insert(createTableEntity(77L, NS, "restored", AUDIT_INFO), false);

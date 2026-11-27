@@ -16,10 +16,12 @@
 # under the License.
 
 from typing import Optional
+from unittest.mock import create_autospec
 
 from mcp_server.client import (
     CatalogOperation,
     DomainOperation,
+    GlossaryOperation,
     GravitinoOperation,
     ModelOperation,
     PolicyOperation,
@@ -63,6 +65,9 @@ class MockOperation(GravitinoOperation):
 
     def as_domain_operation(self) -> DomainOperation:
         return MockDomainOperation()
+
+    def as_glossary_operation(self) -> GlossaryOperation:
+        return create_autospec(GlossaryOperation, instance=True)
 
     def as_tag_operation(self) -> TagOperation:
         return MockTagOperation()

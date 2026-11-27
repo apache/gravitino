@@ -63,4 +63,19 @@ public class GlossaryTermDomainRelBaseSQLProvider {
         + "<foreach collection='domainIds' item='id' open='(' separator=',' close=')'>#{id}"
         + "</foreach></script>";
   }
+
+  /** Counts at most the remaining membership budget and one overflow row before hydrating roots. */
+  public String countLiveMemberships() {
+    return """
+        <script>
+        SELECT COUNT(*) FROM (SELECT 1 FROM %s m
+          JOIN %s d ON d.domain_id=m.domain_id AND d.metalake_id=m.metalake_id AND d.deleted_at=0
+          WHERE m.metalake_id=#{metalakeId} AND m.member_type='GLOSSARY_TERM' AND m.deleted_at=0
+          AND m.member_id IN
+          <foreach collection="termIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+          LIMIT #{limit}) memberships
+        </script>
+        """
+        .formatted(TABLE, DomainMetaMapper.DOMAIN_TABLE_NAME);
+  }
 }

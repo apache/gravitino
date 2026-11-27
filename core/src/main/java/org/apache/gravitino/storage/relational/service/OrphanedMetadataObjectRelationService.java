@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
@@ -35,6 +36,7 @@ import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRelationMapper;
+import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRelationMapper.ArticleBindingCandidate;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -117,62 +119,111 @@ public class OrphanedMetadataObjectRelationService {
    * @return number of relation rows soft-deleted
    */
   public int softDeleteOrphanedRelations(MetadataObject.Type metadataObjectType, int limit) {
-    Preconditions.checkArgument(metadataObjectType != null, "metadataObjectType cannot be null");
-    Preconditions.checkArgument(limit > 0, "limit must be positive");
-    EntityTable entityTable = ENTITY_TABLES.get(metadataObjectType);
+    EntityTable entityTable = tableForCleanup(metadataObjectType, limit);
     if (entityTable == null) {
       return 0;
     }
+    int bindings = (int) retireArticleBindings(metadataObjectType, entityTable, limit, limit);
+    return bindings + retireGenericRelations(metadataObjectType, entityTable, limit);
+  }
 
+  /** Sweeps each Article binding page once, then drains the generic relation tables. */
+  public void sweepOrphanedRelations(MetadataObject.Type type, int limit) {
+    EntityTable entityTable = tableForCleanup(type, limit);
+    if (entityTable == null) {
+      return;
+    }
+    retireArticleBindings(type, entityTable, limit, Long.MAX_VALUE);
+    while (retireGenericRelations(type, entityTable, limit) > 0) {
+      // Generic tables return the number of rows retired by this batch.
+    }
+  }
+
+  @Nullable
+  private static EntityTable tableForCleanup(MetadataObject.Type type, int limit) {
+    Preconditions.checkArgument(type != null, "metadataObjectType cannot be null");
+    Preconditions.checkArgument(limit > 0, "limit must be positive");
+    return ENTITY_TABLES.get(type);
+  }
+
+  private static long retireArticleBindings(
+      MetadataObject.Type type, EntityTable table, int pageSize, long deletionLimit) {
+    if (!Binding.supportsTargetType(type.name())) {
+      return 0;
+    }
+    long last =
+        SessionUtils.getWithoutCommit(
+            OrphanedMetadataObjectRelationMapper.class,
+            mapper -> mapper.lastLiveArticleBindingId(type.name()));
+    long after = 0;
+    long retired = 0;
+    while (after < last && retired < deletionLimit) {
+      long cursor = after;
+      int limit = (int) Math.min(pageSize, deletionLimit - retired);
+      var page =
+          SessionUtils.getWithoutCommit(
+              OrphanedMetadataObjectRelationMapper.class,
+              mapper ->
+                  mapper.articleBindingCandidates(
+                      table.tableName, table.idColumn, type.name(), cursor, last, limit));
+      if (page.isEmpty()) {
+        break;
+      }
+      List<Long> ids =
+          page.stream()
+              .filter(ArticleBindingCandidate::orphaned)
+              .map(ArticleBindingCandidate::id)
+              .toList();
+      if (!ids.isEmpty()) {
+        retired +=
+            SessionUtils.doWithCommitAndFetchResult(
+                OrphanedMetadataObjectRelationMapper.class,
+                mapper ->
+                    mapper.retireOrphanedArticleBindings(
+                        table.tableName,
+                        table.idColumn,
+                        type.name(),
+                        ids,
+                        System.currentTimeMillis()));
+      }
+      after = page.get(page.size() - 1).id();
+    }
+    return retired;
+  }
+
+  private static int retireGenericRelations(
+      MetadataObject.Type metadataObjectType, EntityTable entityTable, int limit) {
+    if (metadataObjectType == MetadataObject.Type.GLOSSARY_TERM) {
+      return 0;
+    }
     long deletedAt = System.currentTimeMillis();
     return SessionUtils.doWithCommitAndFetchResult(
         OrphanedMetadataObjectRelationMapper.class,
-        mapper -> {
-          int bindings = 0;
-          if (Binding.supportsTargetType(metadataObjectType.name())) {
-            List<Long> ids =
-                mapper.orphanedArticleBindingIds(
-                    entityTable.tableName, entityTable.idColumn, metadataObjectType.name(), limit);
-            if (!ids.isEmpty()) {
-              bindings =
-                  mapper.retireOrphanedArticleBindings(
-                      entityTable.tableName,
-                      entityTable.idColumn,
-                      metadataObjectType.name(),
-                      ids,
-                      deletedAt);
-            }
-          }
-          // Term registration here covers Article bindings to Terms.
-          if (metadataObjectType == MetadataObject.Type.GLOSSARY_TERM) {
-            return bindings;
-          }
-          return bindings
-              + mapper.softDeleteOrphanedOwnerRelations(
-                  entityTable.tableName,
-                  entityTable.idColumn,
-                  metadataObjectType.name(),
-                  deletedAt,
-                  limit)
-              + mapper.softDeleteOrphanedTagRelations(
-                  entityTable.tableName,
-                  entityTable.idColumn,
-                  metadataObjectType.name(),
-                  deletedAt,
-                  limit)
-              + mapper.softDeleteOrphanedStatistics(
-                  entityTable.tableName,
-                  entityTable.idColumn,
-                  metadataObjectType.name(),
-                  deletedAt,
-                  limit)
-              + mapper.softDeleteOrphanedSecurableObjects(
-                  entityTable.tableName,
-                  entityTable.idColumn,
-                  metadataObjectType.name(),
-                  deletedAt,
-                  limit);
-        });
+        mapper ->
+            mapper.softDeleteOrphanedOwnerRelations(
+                    entityTable.tableName,
+                    entityTable.idColumn,
+                    metadataObjectType.name(),
+                    deletedAt,
+                    limit)
+                + mapper.softDeleteOrphanedTagRelations(
+                    entityTable.tableName,
+                    entityTable.idColumn,
+                    metadataObjectType.name(),
+                    deletedAt,
+                    limit)
+                + mapper.softDeleteOrphanedStatistics(
+                    entityTable.tableName,
+                    entityTable.idColumn,
+                    metadataObjectType.name(),
+                    deletedAt,
+                    limit)
+                + mapper.softDeleteOrphanedSecurableObjects(
+                    entityTable.tableName,
+                    entityTable.idColumn,
+                    metadataObjectType.name(),
+                    deletedAt,
+                    limit));
   }
 
   private static class EntityTable {
