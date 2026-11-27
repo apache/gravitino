@@ -27,6 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
+import org.apache.gravitino.domain.DefinitionMemberPage;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
@@ -233,6 +234,22 @@ public interface SupportsDomainOperations {
       AuditInfo auditInfo,
       Consumer<LockedDomainState> check)
       throws IOException, NoSuchEntityException;
+
+  /**
+   * Lists live definitions assigned directly to the Domain, in stable type and ID order.
+   * Authorization against the current Domain and the member query share one read snapshot.
+   *
+   * @param domain The requested Domain identifier.
+   * @param limit The page size, from 1 to 1000.
+   * @param offset The number of direct members to skip.
+   * @param authorize The effective MANAGE_DOMAIN check on the Domain and its current parent.
+   * @return The member types and names on the requested page.
+   * @throws IOException If the definitions cannot be read.
+   * @throws NoSuchEntityException If the Domain does not exist.
+   */
+  DefinitionMemberPage listDefinitionMembers(
+      NameIdentifier domain, int limit, int offset, Consumer<DomainEntity> authorize)
+      throws IOException;
 
   /**
    * Lists the sub-domains of a domain.

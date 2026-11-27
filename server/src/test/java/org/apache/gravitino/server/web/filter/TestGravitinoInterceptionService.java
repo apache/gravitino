@@ -107,6 +107,7 @@ import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
+import org.apache.gravitino.server.web.rest.ArticleOperations;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.DomainMembershipOperations;
 import org.apache.gravitino.server.web.rest.DomainOperations;
@@ -278,6 +279,7 @@ public class TestGravitinoInterceptionService {
               DomainOperations.class,
               TermOperations.class,
               MetadataObjectTermOperations.class,
+              ArticleOperations.class,
               DomainMembershipOperations.class,
               MetadataObjectDomainOperations.class)) {
         Descriptor descriptor = mock(Descriptor.class);

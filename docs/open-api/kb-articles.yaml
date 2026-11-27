@@ -1,0 +1,740 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+  "/metalakes/{metalake}/kb-articles":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+    get:
+      operationId: listKnowledgeBaseArticles
+      tags: [knowledge-base]
+      summary: List or search Knowledge Base Articles
+      description: Returns readable Articles ordered by title, then immutable name. All supplied filters
+        apply together before pagination. Ordinary lists include readable drafts and deprecated Articles.
+        Filtering by Term or asset matches live direct bindings and always excludes drafts.
+        A missing or unreadable Term or asset returns 404. Without effective Article VIEW, the
+        ordinary list returns an empty page.
+      parameters:
+        - in: query
+          name: q
+          description: Case-insensitive literal substring of the current title, a synonym or the stored body,
+            including markup. Percent, underscore, exclamation mark and backslash are literal.
+            Non-ASCII case matching depends on the database locale.
+          schema: {type: string}
+        - in: query
+          name: domain
+          description: Match members of this Domain or its readable subdomains. The server resolves
+            this filter for callers with Article VIEW. A missing Domain or hidden draft returns 404.
+            A published Domain for which the caller lacks USE returns 403.
+          schema: {type: string, minLength: 1}
+        - in: query
+          name: status
+          description: Select one Article status from those eligible for this request.
+          schema:
+            $ref: "#/components/schemas/ArticleStatus"
+        - in: query
+          name: owner
+          description: Direct owner in user:<name> or group:<name> form. Group membership is not expanded.
+          schema: {type: string, pattern: "^(user|group):.+$"}
+          example: "group:Finance"
+        - in: query
+          name: term
+          description: Exact name of a readable bound Term.
+          schema: {type: string, minLength: 1}
+        - in: query
+          name: objectType
+          description: Type of the bound asset. Requires name and the namespace components for that type.
+            Input is case-insensitive. Supported types are CATALOG, SCHEMA, TABLE, VIEW, FILESET,
+            TOPIC, MODEL, SEMANTIC_MODEL and COLUMN (table column).
+          schema: {type: string}
+          example: COLUMN
+        - in: query
+          name: namespace
+          description: Repeat once per exact asset namespace component, from outermost to innermost.
+            Omit for CATALOG. Pass one component for SCHEMA, two for a schema child, or three for COLUMN.
+            A dot within a component is literal.
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 3
+            items: {type: string, minLength: 1}
+          example: [iceberg, sales, orders]
+        - in: query
+          name: name
+          description: Exact name of the bound asset. Requires objectType. Dots are literal.
+          schema: {type: string, minLength: 1}
+          example: total.amount
+        - in: query
+          name: includeDeprecated
+          description: Include deprecated Articles alongside published Articles when filtering by Term or asset.
+          schema: {type: boolean, default: false}
+        - in: query
+          name: limit
+          description: Maximum number of readable matching Articles to return.
+          schema: {type: integer, format: int32, minimum: 1, maximum: 1000, default: 20}
+        - in: query
+          name: offset
+          description: Number of readable matching Articles to skip.
+          schema: {type: integer, format: int32, minimum: 0, default: 0}
+      responses:
+        "200":
+          description: A page of Article summaries. An additional readable match sets hasMore to true.
+            To continue, keep the same filters and advance the offset by the number of Articles returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArticleListResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: ./openapi.yaml#/components/responses/ForbiddenErrorResponse
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
+        5XX:
+          $ref: "#/components/responses/ServerError"
+    post:
+      operationId: createKnowledgeBaseArticle
+      tags: [knowledge-base]
+      summary: Create a Knowledge Base Article
+      description: Creates the Article and its initial Domain, Term and asset relations in one transaction.
+        The server generates a name from the title if the caller omits it. New Term bindings
+        require approved Terms.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArticleCreateRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ArticleMetadata"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: ./openapi.yaml#/components/responses/ForbiddenErrorResponse
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/WriteConflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        5XX:
+          $ref: "#/components/responses/ServerError"
+  "/metalakes/{metalake}/kb-articles/{article}":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - $ref: "#/components/parameters/article"
+    get:
+      operationId: getKnowledgeBaseArticle
+      tags: [knowledge-base]
+      summary: Get Article metadata
+      description: Returns metadata and independent previews of readable Terms and assets from the same snapshot.
+        Use the content endpoint to read the body.
+      parameters:
+        - $ref: "#/components/parameters/bindingLimit"
+        - $ref: "#/components/parameters/bindingOffset"
+      responses:
+        "200":
+          $ref: "#/components/responses/ArticleMetadata"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: ./openapi.yaml#/components/responses/ForbiddenErrorResponse
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
+        5XX:
+          $ref: "#/components/responses/ServerError"
+    put:
+      operationId: alterKnowledgeBaseArticle
+      tags: [knowledge-base]
+      summary: Alter a Knowledge Base Article
+      description: Applies all changes atomically. Supplying expectedRevision makes the edit conditional on
+        the Article identity and revision. A matching no-op preserves the revision.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArticleUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ArticleMetadata"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: ./openapi.yaml#/components/responses/ForbiddenErrorResponse
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/WriteConflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        5XX:
+          $ref: "#/components/responses/ServerError"
+    delete:
+      operationId: deleteKnowledgeBaseArticle
+      tags: [knowledge-base]
+      summary: Delete a Knowledge Base Article
+      description: Returns dropped=true on deletion and dropped=false for a missing, previously deleted or hidden Article.
+        A caller who can read the Article but lacks delete permission receives HTTP 403.
+      responses:
+        "200":
+          $ref: "#/components/responses/ArticleDropped"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: ./openapi.yaml#/components/responses/ForbiddenErrorResponse
+        "404":
+          $ref: "#/components/responses/MissingMetalake"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
+        5XX:
+          $ref: "#/components/responses/ServerError"
+  "/metalakes/{metalake}/kb-articles/{article}/content":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - $ref: "#/components/parameters/article"
+    get:
+      operationId: getKnowledgeBaseArticleContent
+      tags: [knowledge-base]
+      summary: Get the current Article body
+      description: Returns the stored body and revision token from a single snapshot using the same
+        visibility rules as an Article metadata read.
+      responses:
+        "200":
+          $ref: "#/components/responses/ArticleContent"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: ./openapi.yaml#/components/responses/ForbiddenErrorResponse
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
+        5XX:
+          $ref: "#/components/responses/ServerError"
+
+  "/metalakes/{metalake}/kb-articles/{article}/terms":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - $ref: "#/components/parameters/article"
+    get:
+      operationId: listKnowledgeBaseArticleTermBindings
+      tags: [knowledge-base]
+      summary: List Terms bound to an Article
+      description: Returns live, readable Terms in stable binding order. Visibility is applied before pagination.
+      parameters:
+        - $ref: "#/components/parameters/bindingLimit"
+        - $ref: "#/components/parameters/bindingOffset"
+      responses:
+        "200":
+          description: The binding page. An additional readable binding sets hasMore to true.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArticleTermBindingsResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: ./openapi.yaml#/components/responses/ForbiddenErrorResponse
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
+        5XX:
+          $ref: "#/components/responses/ServerError"
+  "/metalakes/{metalake}/kb-articles/{article}/objects":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - $ref: "#/components/parameters/article"
+    get:
+      operationId: listKnowledgeBaseArticleAssetBindings
+      tags: [knowledge-base]
+      summary: List assets bound to an Article
+      description: Returns live, readable assets in stable binding order. Visibility is applied before pagination.
+      parameters:
+        - $ref: "#/components/parameters/bindingLimit"
+        - $ref: "#/components/parameters/bindingOffset"
+      responses:
+        "200":
+          description: The binding page. An additional readable binding sets hasMore to true.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArticleAssetBindingsResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: ./openapi.yaml#/components/responses/ForbiddenErrorResponse
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
+        5XX:
+          $ref: "#/components/responses/ServerError"
+
+  "/metalakes/{metalake}/kb-articles/{article}/domains/{domain}":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - $ref: "#/components/parameters/article"
+      - $ref: ./domains.yaml#/components/parameters/domain
+    delete:
+      operationId: detachKnowledgeBaseArticleFromDomain
+      tags: [knowledge-base]
+      summary: Detach an Article from one domain
+      description: >-
+        Checks effective MANAGE_DOMAIN on the requested domain before looking up the Article.
+        A domain administrator can detach a hidden draft. Removing a membership advances the
+        Article revision once and preserves memberships in other domains.
+      responses:
+        "200":
+          description: The membership was removed, or the Article or membership was already absent.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [code]
+                properties:
+                  code: {type: integer, enum: [0]}
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: ./openapi.yaml#/components/responses/ForbiddenErrorResponse
+        "404":
+          $ref: ./domains.yaml#/components/responses/MissingDomainResponse
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
+        5XX:
+          $ref: "#/components/responses/ServerError"
+
+components:
+  parameters:
+    bindingLimit:
+      in: query
+      name: limit
+      description: Maximum number of readable entries per binding list.
+      schema: {type: integer, format: int32, minimum: 1, maximum: 1000, default: 20}
+    bindingOffset:
+      in: query
+      name: offset
+      description: Number of readable entries to skip in each binding list.
+      schema: {type: integer, format: int32, minimum: 0, default: 0}
+    article:
+      in: path
+      name: article
+      required: true
+      description: Immutable Article name, UTF-8 percent-encoded as one path segment.
+        The server normalizes the decoded name to NFC.
+      schema: {type: string, minLength: 1}
+  schemas:
+    ArticleBody:
+      type: object
+      required: [format, content]
+      properties:
+        format:
+          type: string
+          description: MARKDOWN or HTML. Input is case-insensitive. Responses use uppercase.
+          pattern: "^([Mm][Aa][Rr][Kk][Dd][Oo][Ww][Nn]|[Hh][Tt][Mm][Ll])$"
+          example: MARKDOWN
+        content:
+          type: string
+          minLength: 1
+          description: Markdown source or sanitized HTML. The configurable UTF-8 byte limit defaults to 1 MiB.
+    ArticleStatus:
+      type: string
+      description: DRAFT, PUBLISHED or DEPRECATED. Input is case-insensitive. Responses use uppercase.
+      pattern: "^([Dd][Rr][Aa][Ff][Tt]|[Pp][Uu][Bb][Ll][Ii][Ss][Hh][Ee][Dd]|[Dd][Ee][Pp][Rr][Ee][Cc][Aa][Tt][Ee][Dd])$"
+      example: PUBLISHED
+    ArticleObjectIdentifier:
+      type: object
+      required: [type, namespace, name]
+      description: The namespace contains zero components for a catalog, one for a schema,
+        two for a schema child, or three for a table column. Dots are literal within each component.
+      properties:
+        type:
+          type: string
+          description: CATALOG, SCHEMA, TABLE, VIEW, FILESET, TOPIC, MODEL, SEMANTIC_MODEL or COLUMN.
+            Input is case-insensitive. Responses use uppercase.
+          example: COLUMN
+        namespace:
+          type: array
+          maxItems: 3
+          items: {type: string, minLength: 1}
+        name: {type: string, minLength: 1}
+      oneOf:
+        - properties:
+            type: {pattern: "^([Cc][Aa][Tt][Aa][Ll][Oo][Gg])$"}
+            namespace: {minItems: 0, maxItems: 0}
+        - properties:
+            type: {pattern: "^([Ss][Cc][Hh][Ee][Mm][Aa])$"}
+            namespace: {minItems: 1, maxItems: 1}
+        - properties:
+            type: {pattern: "^([Tt][Aa][Bb][Ll][Ee]|[Vv][Ii][Ee][Ww]|[Ff][Ii][Ll][Ee][Ss][Ee][Tt]|[Tt][Oo][Pp][Ii][Cc]|[Mm][Oo][Dd][Ee][Ll]|[Ss][Ee][Mm][Aa][Nn][Tt][Ii][Cc]_[Mm][Oo][Dd][Ee][Ll])$"}
+            namespace: {minItems: 2, maxItems: 2}
+        - properties:
+            type: {pattern: "^([Cc][Oo][Ll][Uu][Mm][Nn])$"}
+            namespace: {minItems: 3, maxItems: 3}
+      example:
+        type: COLUMN
+        namespace: [iceberg, sales, orders]
+        name: total.amount
+    ArticleObjects:
+      type: array
+      items:
+        $ref: "#/components/schemas/ArticleObjectIdentifier"
+    Names:
+      type: array
+      items: {type: string, minLength: 1}
+    Synonyms:
+      type: array
+      description: At most 20 distinct synonyms after trimming and case-insensitive deduplication.
+        Each trimmed synonym is at most 128 characters.
+      items: {type: string, minLength: 1}
+    Properties:
+      type: object
+      additionalProperties: {type: string}
+    ArticleCreateRequest:
+      type: object
+      required: [title, body]
+      properties:
+        name:
+          type: string
+          nullable: true
+          description: Omit to generate a name. Explicit names use letters, decimal digits, combining
+            marks, underscores or hyphens, include a letter or digit, and have at most 128 code points after NFC normalization.
+        title:
+          type: string
+          minLength: 1
+          description: Nonblank display title of at most 512 Unicode code points after trimming.
+        body:
+          $ref: "#/components/schemas/ArticleBody"
+        status:
+          description: Defaults to PUBLISHED.
+          allOf:
+            - $ref: "#/components/schemas/ArticleStatus"
+        domains:
+          $ref: "#/components/schemas/Names"
+        terms:
+          $ref: "#/components/schemas/Names"
+        objects:
+          $ref: "#/components/schemas/ArticleObjects"
+        comment: {type: string, maxLength: 256, nullable: true}
+        synonyms:
+          $ref: "#/components/schemas/Synonyms"
+        sourceReference: {type: string, maxLength: 1024, nullable: true}
+        properties:
+          $ref: "#/components/schemas/Properties"
+      example:
+        name: revenue-guide
+        title: Revenue guide
+        body: {format: MARKDOWN, content: "Revenue excludes refunds."}
+        domains: [Finance]
+        terms: [net-revenue]
+        objects: [{type: TABLE, namespace: [iceberg, sales], name: orders}]
+    ArticleUpdatesRequest:
+      type: object
+      required: [updates]
+      properties:
+        expectedRevision:
+          type: string
+          minLength: 1
+          description: Optional opaque token from a metadata or content read.
+            A malformed token returns 400. A valid token for a different identity or revision returns 409.
+        updates:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ArticleUpdate"
+      example:
+        expectedRevision: AAAAAAAAAAEAAAAAAAAAAgAAAAAAAAAD
+        updates:
+          - "@type": updateBody
+            newBody: {format: MARKDOWN, content: "Revenue includes refunds."}
+          - "@type": addObjects
+            objects: [{type: COLUMN, namespace: [iceberg, sales, orders], name: total.amount}]
+    ArticleUpdate:
+      oneOf:
+        - type: object
+          required: ["@type", newTitle]
+          properties:
+            "@type": {type: string, enum: [updateTitle]}
+            newTitle: {type: string, minLength: 1}
+        - type: object
+          required: ["@type", newBody]
+          properties:
+            "@type": {type: string, enum: [updateBody]}
+            newBody:
+              $ref: "#/components/schemas/ArticleBody"
+        - type: object
+          required: ["@type", newDomains]
+          properties:
+            "@type": {type: string, enum: [updateDomains]}
+            newDomains:
+              $ref: "#/components/schemas/Names"
+        - type: object
+          required: ["@type", newStatus]
+          properties:
+            "@type": {type: string, enum: [updateStatus]}
+            newStatus:
+              $ref: "#/components/schemas/ArticleStatus"
+        - type: object
+          required: ["@type", newComment]
+          properties:
+            "@type": {type: string, enum: [updateComment]}
+            newComment: {type: string, maxLength: 256, nullable: true}
+        - type: object
+          required: ["@type", newSynonyms]
+          properties:
+            "@type": {type: string, enum: [updateSynonyms]}
+            newSynonyms:
+              $ref: "#/components/schemas/Synonyms"
+        - type: object
+          required: ["@type", newSourceReference]
+          properties:
+            "@type": {type: string, enum: [updateSourceReference]}
+            newSourceReference: {type: string, maxLength: 1024, nullable: true}
+        - type: object
+          required: ["@type", property, value]
+          properties:
+            "@type": {type: string, enum: [setProperty]}
+            property: {type: string}
+            value: {type: string}
+        - type: object
+          required: ["@type", property]
+          properties:
+            "@type": {type: string, enum: [removeProperty]}
+            property: {type: string}
+        - type: object
+          required: ["@type", terms]
+          properties:
+            "@type": {type: string, enum: [addTerms, removeTerms]}
+            terms:
+              $ref: "#/components/schemas/Names"
+        - type: object
+          required: ["@type", objects]
+          properties:
+            "@type": {type: string, enum: [addObjects, removeObjects]}
+            objects:
+              $ref: "#/components/schemas/ArticleObjects"
+    ArticleTerms:
+      type: array
+      items:
+        type: object
+        required: [name, status]
+        properties:
+          name: {type: string}
+          status:
+            $ref: ./terms.yaml#/components/schemas/TermStatus
+    ArticleTermBindingsResponse:
+      type: object
+      required: [code, terms, hasMore]
+      properties:
+        code: {type: integer, enum: [0]}
+        terms:
+          $ref: "#/components/schemas/ArticleTerms"
+        hasMore: {type: boolean}
+    ArticleAssetBindingsResponse:
+      type: object
+      required: [code, objects, hasMore]
+      properties:
+        code: {type: integer, enum: [0]}
+        objects:
+          $ref: "#/components/schemas/ArticleObjects"
+        hasMore: {type: boolean}
+    ArticleOwner:
+      description: Current direct owner. Null when there is no owner relation.
+      type: object
+      nullable: true
+      required: [name, type]
+      properties:
+        name: {type: string}
+        type: {type: string, enum: [user, group]}
+    ArticleSummary:
+      type: object
+      required: [name, title, status, domains, owner, terms, termsHasMore, audit_info]
+      properties:
+        name: {type: string}
+        title: {type: string}
+        status:
+          $ref: "#/components/schemas/ArticleStatus"
+        domains:
+          $ref: "#/components/schemas/Names"
+        owner:
+          $ref: "#/components/schemas/ArticleOwner"
+        terms:
+          description: Preview of up to 20 readable bound Terms.
+          maxItems: 20
+          allOf:
+            - $ref: "#/components/schemas/ArticleTerms"
+        termsHasMore:
+          type: boolean
+          description: An additional readable bound Term follows the preview.
+        audit_info:
+          $ref: ./openapi.yaml#/components/schemas/Audit
+    ArticleListResponse:
+      type: object
+      required: [code, articles, hasMore]
+      properties:
+        code: {type: integer, enum: [0]}
+        articles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArticleSummary"
+        hasMore: {type: boolean}
+    ArticleMetadata:
+      type: object
+      required: [name, title, status, domains, terms, termsHasMore, objects, objectsHasMore,
+                 synonyms, properties, owner, audit_info, revisionToken]
+      properties:
+        name: {type: string}
+        title: {type: string}
+        status:
+          $ref: "#/components/schemas/ArticleStatus"
+        domains:
+          $ref: "#/components/schemas/Names"
+        terms:
+          $ref: "#/components/schemas/ArticleTerms"
+        termsHasMore: {type: boolean}
+        objects:
+          $ref: "#/components/schemas/ArticleObjects"
+        objectsHasMore: {type: boolean}
+        comment: {type: string, nullable: true}
+        synonyms:
+          $ref: "#/components/schemas/Synonyms"
+        sourceReference: {type: string, nullable: true}
+        properties:
+          $ref: "#/components/schemas/Properties"
+        owner:
+          $ref: "#/components/schemas/ArticleOwner"
+        audit_info:
+          $ref: ./openapi.yaml#/components/schemas/Audit
+        revisionToken:
+          type: string
+          description: Opaque token for conditional updates.
+    ArticleResponse:
+      type: object
+      required: [code, article]
+      properties:
+        code: {type: integer, enum: [0]}
+        article:
+          $ref: "#/components/schemas/ArticleMetadata"
+    ArticleContentResponse:
+      type: object
+      required: [code, body, revisionToken]
+      properties:
+        code: {type: integer, enum: [0]}
+        body:
+          $ref: "#/components/schemas/ArticleBody"
+        revisionToken:
+          type: string
+          description: Token from the same snapshot as the body.
+      example:
+        code: 0
+        body: {format: MARKDOWN, content: "Revenue excludes refunds."}
+        revisionToken: AAAAAAAAAAEAAAAAAAAAAgAAAAAAAAAD
+  responses:
+    ArticleMetadata:
+      description: Article metadata with bounded previews of readable Terms and assets.
+        Set Accept to application/json or application/vnd.gravitino.v1+json. The response uses application/json.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ArticleResponse"
+    ArticleContent:
+      description: Stored body with the token for editing this snapshot.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ArticleContentResponse"
+    ArticleDropped:
+      description: Deletion result. A false value covers both a missing Article and a hidden Article.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [code, dropped]
+            properties:
+              code: {type: integer, enum: [0]}
+              dropped: {type: boolean}
+    InvalidRequest:
+      description: Invalid fields, pagination, body size, identifier or revision token.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel
+    NotFound:
+      description: The requested Article, metalake or referenced target is missing or hidden.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel
+    MissingMetalake:
+      description: The metalake does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel
+    MetalakeNotInUse:
+      description: The metalake is not in use.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel
+    WriteConflict:
+      description: Conflicting name or revision, a new binding to an unapproved Term, or a metalake that is not in use.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel
+    UnsupportedMediaType:
+      description: The request requires a JSON body.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel
+    ServerError:
+      description: Internal failure, federated backend connection failure (502), or temporarily unavailable dependency (503).
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel

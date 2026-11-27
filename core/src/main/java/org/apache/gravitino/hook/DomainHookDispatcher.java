@@ -29,6 +29,7 @@ import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.domain.DefinitionMemberPage;
 import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainMember;
@@ -136,6 +137,12 @@ public final class DomainHookDispatcher implements DomainDispatcher {
   @Override
   public DomainEntity[] listSubdomainInfos(String metalake, String name) {
     return dispatcher.listSubdomainInfos(metalake, name);
+  }
+
+  @Override
+  public DefinitionMemberPage listDefinitionMembers(
+      String metalake, String name, int limit, int offset, Consumer<DomainEntity> authorize) {
+    return dispatcher.listDefinitionMembers(metalake, name, limit, offset, authorize);
   }
 
   @Override
