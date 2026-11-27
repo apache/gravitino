@@ -84,7 +84,7 @@ Gravitino builds from source on Linux and macOS natively, and on Windows through
   :::note
   The first time you build the project, downloading the dependencies may take a while.
  
-  You can add `-x test` to skip the tests using `./gradlew build -x test`.
+  To build artifacts without running the Gradle test and check tasks, use `./gradlew build -x test -x check`. The `check` task also runs the server's H2 tag assignment tests.
 
   The built Gravitino libraries are Java 17 compatible and verified under 17 environments. Use Java 17 runtimes to run the Gravitino server, no matter which JDK version was used to build the project.
 
@@ -100,7 +100,7 @@ Gravitino builds from source on Linux and macOS natively, and on Windows through
    To skip compiling and packaging the Web UI artifacts, use:
 
    ```shell
-   ./gradlew compileDistribution -PskipWebBuild=true
+   ./gradlew compileDistribution -PskipWeb=true
    ```
 
   The `compileDistribution` command creates a `distribution` directory in the Gravitino root directory. It contains two subdirectories: `package` and `package-all`. The difference between these two subdirectories is that `package` is the **Gravitino server distribution package**, while `package-all` contains extra catalogs in `catalogs-contrib` and all contents in `package`.
@@ -116,9 +116,9 @@ Gravitino builds from source on Linux and macOS natively, and on Windows through
    ./gradlew assembleDistribution
    ```
 
-  The `assembleDistribution` command creates `gravitino-{version}-bin.tar.gz`, `gravitino-{version}-bin.tar.gz.sha256`, `gravitino-{version}-bin-all.tar.gz`, `gravitino-{version}-bin-all.tar.gz.sha256` under the `distribution` directory.
-  
-  `gravitino-{version}-bin.tar.gz` and `gravitino-{version}-bin-all.tar.gz` follow the same distinction as `package` and `package-all` from the previous step.  
+  `assembleDistribution` creates `gravitino-{version}-bin.tar.gz` under `distribution/`.
+  To include the extra catalogs from `package-all`, run `./gradlew assembleDistributionAll` to create
+  `gravitino-{version}-bin-all.tar.gz`. Each task writes a `.sha256` file alongside its archive.
 
   Deploy these to your production environment.
 
@@ -237,7 +237,7 @@ These commands add a repository that provides the latest Python versions and ins
 ```shell
 git clone https://github.com/apache/gravitino.git
 cd gravitino
-./gradlew compileDistribution -x test
+./gradlew compileDistribution -x test -x check
 cd distribution/package/
 ./bin/gravitino.sh start
 ```
