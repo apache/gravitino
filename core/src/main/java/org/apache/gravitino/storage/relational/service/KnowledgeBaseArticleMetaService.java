@@ -38,7 +38,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
@@ -49,6 +51,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.kb.ArticleBody;
@@ -79,7 +82,6 @@ public final class KnowledgeBaseArticleMetaService {
   private static final int LOOKUP_BATCH_SIZE = 500;
   private static final MemberType ARTICLE = MemberType.KNOWLEDGE_BASE_ARTICLE;
   private static final TransactionHook NO_HOOK = (before, after) -> {};
-
   private static final Pattern H2_NAME_CONSTRAINT =
       Pattern.compile(
           "(?i)^Unique index or primary key violation: \"(?:[\\w]+\\.)?uk_kba_name_index_[0-9a-f]+ on ");
@@ -91,6 +93,20 @@ public final class KnowledgeBaseArticleMetaService {
   public static final class NameConflictException extends EntityAlreadyExistsException {
     private NameConflictException(Throwable cause, String name) {
       super(cause, "Article name %s already exists", name);
+    }
+  }
+
+  /** Current Article and its metalake identity observed in the same transaction. */
+  public record ScopedArticle(long metalakeId, KnowledgeBaseArticleEntity article) {}
+
+  /** The addressed Article or its parent is missing, independently of any extension failure. */
+  public static final class MissingArticleScopeException extends NoSuchEntityException {
+    private MissingArticleScopeException(NameIdentifier ident) {
+      super("Knowledge Base Article %s does not exist", ident);
+    }
+
+    private MissingArticleScopeException(NoSuchEntityException parent) {
+      super(parent, "%s", parent.getMessage());
     }
   }
 
@@ -134,17 +150,48 @@ public final class KnowledgeBaseArticleMetaService {
 
   /** Returns Article metadata and binding identities from one snapshot. */
   public KnowledgeBaseArticleEntity get(NameIdentifier ident) {
-    String name = KnowledgeBaseArticle.normalizeName(ident.name());
-    List<KnowledgeBaseArticleEntity> result = read(ident.namespace(), name);
-    if (result.isEmpty()) {
-      throw missing(ident);
-    }
-    return result.get(0);
+    return getScoped(ident).article();
   }
 
   /** Lists stored metadata and binding identities. */
   public List<KnowledgeBaseArticleEntity> list(Namespace namespace) {
-    return read(namespace, null);
+    return readAll(namespace);
+  }
+
+  /** Reads the Article and the identity used for its editing token from one snapshot. */
+  public ScopedArticle getScoped(NameIdentifier ident) {
+    String name = KnowledgeBaseArticle.normalizeName(ident.name());
+    if (SqlSessions.hasActiveSession()) {
+      ScopedArticle result = joinedArticle(ident.namespace(), name);
+      if (result == null) {
+        throw missing(ident);
+      }
+      return result;
+    }
+    return SqlSessions.readSnapshot(
+        () -> {
+          long lake =
+              MetalakeMetaService.getInstance()
+                  .getMetalakeIdByName(metalakeName(ident.namespace()));
+          return SessionUtils.getWithoutCommit(
+              KnowledgeBaseArticleMapper.class,
+              mapper -> {
+                KnowledgeBaseArticlePO row = mapper.get(lake, name);
+                if (row == null) {
+                  throw missing(ident);
+                }
+                return new ScopedArticle(lake, materialize(ident.namespace(), row, mapper));
+              });
+        });
+  }
+
+  /** Returns the live names among the proposed allocation candidates. */
+  public Set<String> occupiedNames(String metalake, List<String> candidates) {
+    if (candidates.isEmpty()) {
+      return Set.of();
+    }
+    return SessionUtils.getWithoutCommit(
+        KnowledgeBaseArticleMapper.class, mapper -> mapper.occupiedNames(metalake, candidates));
   }
 
   /** Reads only the current content and its editing identity. */
@@ -217,13 +264,72 @@ public final class KnowledgeBaseArticleMetaService {
    */
   public void insert(KnowledgeBaseArticleEntity entity, boolean overwrite, TransactionHook hook)
       throws IOException {
+    insertScoped(entity, overwrite, hook);
+  }
+
+  /** Returns the stored state with the metalake ID fenced by the write. */
+  public ScopedArticle insertScoped(
+      KnowledgeBaseArticleEntity entity, boolean overwrite, TransactionHook hook)
+      throws IOException {
+    return insertScoped(
+        entity,
+        overwrite,
+        hook,
+        () -> lockMetalake(entity.namespace()),
+        (id, conflict) -> conflict);
+  }
+
+  /**
+   * Creates an Article under the original metalake. Only a conflict from this Article's row insert
+   * is passed to the caller for name allocation.
+   *
+   * @param entity the Article to create
+   * @param expectedMetalakeId the locked parent from a previous attempt, or null on the first
+   * @param hook the extension participating in the transaction
+   * @param onNameConflict maps a target name conflict and its locked metalake ID
+   * @return the created Article and its metalake ID
+   * @throws IOException if the storage write fails
+   */
+  public ScopedArticle createScoped(
+      KnowledgeBaseArticleEntity entity,
+      @Nullable Long expectedMetalakeId,
+      TransactionHook hook,
+      BiFunction<Long, NameConflictException, RuntimeException> onNameConflict)
+      throws IOException {
+    return insertScoped(
+        entity,
+        false,
+        hook,
+        () -> {
+          String name = metalakeName(entity.namespace());
+          long id;
+          try {
+            id = lockMetalake(entity.namespace());
+          } catch (NoSuchEntityException missing) {
+            throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", name);
+          }
+          if (expectedMetalakeId != null && expectedMetalakeId != id) {
+            throw new NoSuchMetalakeException("Metalake %s was replaced", name);
+          }
+          return id;
+        },
+        onNameConflict);
+  }
+
+  private ScopedArticle insertScoped(
+      KnowledgeBaseArticleEntity entity,
+      boolean overwrite,
+      TransactionHook hook,
+      LongSupplier lockParent,
+      BiFunction<Long, NameConflictException, RuntimeException> onNameConflict)
+      throws IOException {
     record InsertConflict(long metalakeId, EntityAlreadyExistsException failure) {}
     AtomicReference<InsertConflict> insertConflict = new AtomicReference<>();
     boolean retryInsert = overwrite && !SqlSessions.hasActiveSession();
     try {
-      write(
+      return write(
           mapper -> {
-            long metalakeId = lockMetalake(entity.namespace());
+            long metalakeId = lockParent.getAsLong();
             KnowledgeBaseArticleEntity before = overwrite ? observe(entity.nameIdentifier()) : null;
             InsertConflict conflict = insertConflict.get();
             if (conflict != null
@@ -235,8 +341,7 @@ public final class KnowledgeBaseArticleMetaService {
             if (before != null) {
               KnowledgeBaseArticlePO row =
                   lockForChange(mapper, metalakeId, before, entity.domainIds(), null);
-              replace(mapper, row, before, entity, hook);
-              return null;
+              return new ScopedArticle(metalakeId, replace(mapper, row, before, entity, hook));
             }
             entity.validateTextForWrite(null);
             requireDomainsLive(lockLiveDomains(metalakeId, entity.domainIds()));
@@ -252,6 +357,9 @@ public final class KnowledgeBaseArticleMetaService {
               insertArticleRow(mapper, row);
             } catch (EntityAlreadyExistsException e) {
               if (!retryInsert) {
+                if (e instanceof NameConflictException nameConflict) {
+                  throw onNameConflict.apply(metalakeId, nameConflict);
+                }
                 throw e;
               }
               // Leave the failed insert transaction before observing the row that won.
@@ -261,7 +369,7 @@ public final class KnowledgeBaseArticleMetaService {
             addBindings(mapper, row, initial.bindings());
             changeMemberships(row, Set.of(), initial.domainIds());
             hook.onChange(null, initial);
-            return null;
+            return new ScopedArticle(metalakeId, initial);
           });
     } catch (RuntimeException e) {
       // A duplicate from a binding or extension belongs to that write.
@@ -290,14 +398,47 @@ public final class KnowledgeBaseArticleMetaService {
       @Nullable ExpectedRevision expected,
       Function<KnowledgeBaseArticleEntity, KnowledgeBaseArticleEntity> updater,
       TransactionHook hook) {
+    return updateScoped(ident, expected, updater, hook).article();
+  }
+
+  /** Returns the effective state and its token identity while the write locks are held. */
+  public ScopedArticle updateScoped(
+      NameIdentifier ident,
+      @Nullable ExpectedRevision expected,
+      Function<KnowledgeBaseArticleEntity, KnowledgeBaseArticleEntity> updater,
+      TransactionHook hook) {
+    return updateScoped(ident, expected, updater, hook, missing -> missing);
+  }
+
+  /**
+   * Updates an Article, mapping absence only while locating the target of this write.
+   *
+   * @param ident the Article name identifier
+   * @param expected the revision to match, or null for an unconditional edit
+   * @param updater the transformation to apply to the current Article
+   * @param hook the extension participating in the transaction
+   * @param onMissingTarget maps a missing Article or metalake to the caller's exception
+   * @return the effective Article and its metalake ID
+   */
+  public ScopedArticle updateScoped(
+      NameIdentifier ident,
+      @Nullable ExpectedRevision expected,
+      Function<KnowledgeBaseArticleEntity, KnowledgeBaseArticleEntity> updater,
+      TransactionHook hook,
+      Function<NoSuchEntityException, RuntimeException> onMissingTarget) {
     record ArticleIdentity(long metalakeId, long articleId) {}
     AtomicReference<ArticleIdentity> firstObserved = new AtomicReference<>();
     return write(
         mapper -> {
-          long metalakeId = lockMetalake(ident.namespace());
+          long metalakeId;
+          try {
+            metalakeId = lockMetalake(ident.namespace());
+          } catch (NoSuchEntityException missing) {
+            throw onMissingTarget.apply(missing);
+          }
           KnowledgeBaseArticleEntity before = observe(ident);
           if (before == null) {
-            throw missing(ident);
+            throw onMissingTarget.apply(missing(ident));
           }
           ArticleIdentity current = new ArticleIdentity(metalakeId, before.id());
           ArticleIdentity first = firstObserved.compareAndExchange(null, current);
@@ -311,7 +452,7 @@ public final class KnowledgeBaseArticleMetaService {
           KnowledgeBaseArticleEntity proposed = updater.apply(before);
           KnowledgeBaseArticlePO row =
               lockForChange(mapper, metalakeId, before, proposed.domainIds(), expected);
-          return replace(mapper, row, before, proposed, hook);
+          return new ScopedArticle(metalakeId, replace(mapper, row, before, proposed, hook));
         });
   }
 
@@ -443,7 +584,7 @@ public final class KnowledgeBaseArticleMetaService {
   }
 
   private static NoSuchEntityException missing(NameIdentifier ident) {
-    return new NoSuchEntityException("Knowledge Base Article %s does not exist", ident);
+    return new MissingArticleScopeException(ident);
   }
 
   private static final class StaleArticlePlan extends OptimisticLockException {
@@ -474,12 +615,17 @@ public final class KnowledgeBaseArticleMetaService {
     String name = metalakeName(ns);
     SessionUtils.clearSessionCache();
     MetalakeMetaService parents = MetalakeMetaService.getInstance();
-    long id = parents.requireMetalakeByName(name).getMetalakeId();
-    parents.lockMetalakeForChildWrite(name, id);
+    long id;
+    try {
+      id = parents.requireMetalakeByName(name).getMetalakeId();
+      parents.lockMetalakeForChildWrite(name, id);
+    } catch (NoSuchEntityException missing) {
+      throw new MissingArticleScopeException(missing);
+    }
     return id;
   }
 
-  private List<KnowledgeBaseArticleEntity> read(Namespace ns, @Nullable String name) {
+  private List<KnowledgeBaseArticleEntity> readAll(Namespace ns) {
     String metalake = metalakeName(ns);
     if (SqlSessions.hasActiveSession()) {
       // A caller's READ_COMMITTED transaction may contain uncommitted writes. A single
@@ -487,8 +633,8 @@ public final class KnowledgeBaseArticleMetaService {
       return SessionUtils.getWithoutCommitFresh(
           KnowledgeBaseArticleMapper.class,
           m -> {
-            List<KnowledgeBaseArticlePO> rows = m.joined(metalake, name);
-            if (name == null && rows.isEmpty()) {
+            List<KnowledgeBaseArticlePO> rows = m.joined(metalake, null);
+            if (rows.isEmpty()) {
               throw new NoSuchEntityException(
                   NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "metalake", metalake);
             }
@@ -504,10 +650,6 @@ public final class KnowledgeBaseArticleMetaService {
                       MetalakeMetaService.getInstance()
                           .requireMetalakeByName(metalake)
                           .getMetalakeId();
-                  if (name != null) {
-                    KnowledgeBaseArticlePO row = m.get(metalakeId, name);
-                    return row == null ? List.of() : List.of(materialize(ns, row, m));
-                  }
                   Map<Long, Set<Binding>> bindings = new HashMap<>();
                   for (KnowledgeBaseArticlePO target : m.listBindings(metalakeId)) {
                     bindings
@@ -583,9 +725,20 @@ public final class KnowledgeBaseArticleMetaService {
 
   @Nullable
   private KnowledgeBaseArticleEntity observe(NameIdentifier ident) {
-    List<KnowledgeBaseArticleEntity> articles =
-        read(ident.namespace(), KnowledgeBaseArticle.normalizeName(ident.name()));
-    return articles.isEmpty() ? null : articles.get(0);
+    ScopedArticle current =
+        joinedArticle(ident.namespace(), KnowledgeBaseArticle.normalizeName(ident.name()));
+    return current == null ? null : current.article();
+  }
+
+  @Nullable
+  private ScopedArticle joinedArticle(Namespace namespace, String name) {
+    List<KnowledgeBaseArticlePO> rows =
+        SessionUtils.getWithoutCommitFresh(
+            KnowledgeBaseArticleMapper.class,
+            mapper -> mapper.joined(metalakeName(namespace), name));
+    return rows.isEmpty()
+        ? null
+        : new ScopedArticle(rows.get(0).getMetalakeId(), aggregate(namespace, rows).get(0));
   }
 
   private KnowledgeBaseArticlePO lockForChange(

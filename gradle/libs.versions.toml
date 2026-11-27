@@ -109,6 +109,7 @@ nimbus-jose-jwt = "10.9"
 jline = "3.21.0"
 okhttp3 = "4.11.0"
 opencsv = "2.3"
+owaspHtmlSanitizer = "20261110.1"
 metrics = "4.2.25"
 prometheus = "0.16.0"
 clickhouse = "0.7.1"
@@ -361,6 +362,7 @@ metrics-caffeine = { group = "io.dropwizard.metrics", name = "metrics-caffeine",
 jline-terminal = { group = "org.jline", name = "jline-terminal", version.ref = "jline" }
 okhttp3-loginterceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp3" }
 opencsv = {group = "net.sf.opencsv", name = "opencsv", version.ref = "opencsv"}
+owasp-html-sanitizer = { group = "com.googlecode.owasp-java-html-sanitizer", name = "owasp-java-html-sanitizer", version.ref = "owaspHtmlSanitizer" }
 metrics-servlets = { group = "io.dropwizard.metrics", name = "metrics-servlets", version.ref = "metrics" }
 prometheus-client = { group = "io.prometheus", name = "simpleclient", version.ref = "prometheus" }
 prometheus-dropwizard = { group = "io.prometheus", name = "simpleclient_dropwizard", version.ref = "prometheus" }

@@ -86,6 +86,7 @@ import org.apache.gravitino.job.BuiltInJobTemplateEventListener;
 import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.job.JobTemplateValidationDispatcher;
+import org.apache.gravitino.kb.ArticleManager;
 import org.apache.gravitino.listener.AccessControlEventDispatcher;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.DomainEventDispatcher;
@@ -149,6 +150,7 @@ public class GravitinoEnv {
 
   private DomainManager domainManager;
   private GlossaryManager glossaryManager;
+  private ArticleManager articleManager;
 
   private SchemaDispatcher schemaDispatcher;
   private SchemaDispatcher internalSchemaDispatcher;
@@ -617,6 +619,11 @@ public class GravitinoEnv {
     return glossaryManager;
   }
 
+  /** Returns the core Knowledge Base Article manager. */
+  public ArticleManager articleManager() {
+    return articleManager;
+  }
+
   /**
    * Get the CatalogManager associated with the Gravitino environment.
    *
@@ -975,6 +982,8 @@ public class GravitinoEnv {
     this.internalPolicyDispatcher = new PolicyManager(idGenerator, entityStore);
     this.glossaryManager =
         new GlossaryManager(idGenerator, config.get(Configs.ENABLE_AUTHORIZATION));
+    this.articleManager =
+        new ArticleManager(idGenerator, config.get(Configs.KB_ARTICLE_MAX_BODY_BYTES));
     this.domainManager = new DomainManager(idGenerator, entityStore);
     this.internalDomainDispatcher = new DomainNormalizeDispatcher(domainManager);
 

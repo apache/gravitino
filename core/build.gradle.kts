@@ -81,6 +81,7 @@ dependencies {
     exclude(group = "io.opentelemetry", module = "*")
   }
   implementation(libs.mybatis)
+  implementation(libs.owasp.html.sanitizer)
 
   annotationProcessor(libs.lombok)
 

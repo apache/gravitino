@@ -382,6 +382,7 @@
    SQLite JDBC Driver
    Immutables
    MyBatis
+   OWASP Java HTML Sanitizer
    Javax Inject
    Javax JDO API
    JBoss Threads

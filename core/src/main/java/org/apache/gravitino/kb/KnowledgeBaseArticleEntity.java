@@ -19,6 +19,7 @@
 package org.apache.gravitino.kb;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -151,14 +152,23 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
    */
   public void validateTextForWrite(@Nullable KnowledgeBaseArticleEntity before) {
     if (before == null || !title.equals(before.title)) {
-      ArticleValidation.checkNoNullCharacter(title, "Title");
+      ArticleValidation.checkMetadataText(title, "Title");
     }
     if (before == null || !Objects.equals(comment, before.comment)) {
-      ArticleValidation.checkNoNullCharacter(comment, "Comment");
+      ArticleValidation.checkMetadataText(comment, "Comment");
     }
     if (before == null || !Objects.equals(sourceReference, before.sourceReference)) {
-      ArticleValidation.checkNoNullCharacter(sourceReference, "Source reference");
+      ArticleValidation.checkMetadataText(sourceReference, "Source reference");
     }
+    if (before == null || !synonyms.equals(before.synonyms)) {
+      synonyms.forEach(Utf8::encodedLength);
+    }
+    properties.forEach(
+        (key, value) -> {
+          if (before == null || !value.equals(before.properties.get(key))) {
+            ArticleValidation.checkProperty(key, value);
+          }
+        });
   }
 
   @Override

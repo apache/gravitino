@@ -28,6 +28,7 @@ import org.apache.gravitino.audit.v2.SimpleFormatterV2;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.kb.KnowledgeBaseArticle;
 import org.apache.gravitino.secret.SensitivePropertyKeyKeywords;
 import org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory;
 import org.apache.gravitino.utils.FileFetcher;
@@ -36,6 +37,17 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 public class Configs {
 
   private Configs() {}
+
+  /** Maximum UTF-8 byte length of both submitted and stored Knowledge Base Article bodies. */
+  public static final ConfigEntry<Integer> KB_ARTICLE_MAX_BODY_BYTES =
+      new ConfigBuilder("gravitino.kb.article.maxBodyBytes")
+          .doc("Maximum size in bytes of a submitted or stored Knowledge Base Article body.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(
+              value -> value >= 1 && value <= KnowledgeBaseArticle.MAX_BODY_BYTES_LIMIT,
+              "Must be between 1 and " + KnowledgeBaseArticle.MAX_BODY_BYTES_LIMIT + " bytes")
+          .createWithDefault(Math.toIntExact(KnowledgeBaseArticle.DEFAULT_MAX_BODY_BYTES));
 
   public static final String RELATIONAL_ENTITY_STORE = "relational";
   public static final String ENTITY_STORE_KEY = "gravitino.entity.store";
