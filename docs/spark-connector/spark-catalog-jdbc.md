@@ -25,7 +25,7 @@ generic JDBC behavior. Other JDBC providers require a separate Spark connector e
 
 Set `spark.sql.gravitino.enableDorisSupport=true` to select the specialized Spark 3.5 / Scala 2.12 Doris read path for a `jdbc-doris` catalog. The specialized path requires a catalog-managed `jdbc-url` and `jdbc-driver`, plus a vended JDBC credential. The generic JDBC credential behavior remains unchanged for other providers and when specialized Doris support is disabled.
 
-The specialized path validates the Gravitino logical schema against Doris FE and JDBC metadata, rejects schema drift and unsupported Doris types, and checks Gravitino authorization before physical access. Queries use the existing Spark JDBC V2 delegate for supported pushdowns and partitioned reads. Doris-specific optimizations, native tablet reads, and special-type normalization are not provided.
+The specialized path validates the Gravitino logical schema against Doris FE and JDBC metadata, rejects schema drift and unsupported Doris types, and checks Gravitino authorization before physical access. Queries use the existing Spark JDBC V2 delegate for supported pushdowns and partitioned reads. See [JDBC query consistency](spark-connector.md#jdbc-query-consistency) for pushdown behavior and source-dependent semantics. Doris-specific optimizations, native tablet reads, and special-type normalization are not provided.
 
 Ordinary scalar reads require agreement among the FE, JDBC, Gravitino, and Spark schemas. Supported type families are `BIGINT`, `BOOLEAN`, `DATE`/`DATEV2`, `DATETIME`/`DATETIMEV2`, `DECIMAL`/`DECIMALV3`, `DOUBLE`, `INT`/`INTEGER`, `SMALLINT`, `STRING`/`TEXT`, `TINYINT`, and `VARCHAR`. Precision, scale, length, and nullability must match the available metadata. `CHAR` and `FLOAT` are rejected because their Gravitino logical types differ from the types exposed by Spark JDBC. `DATETIME` uses Spark `TimestampType`, so string rendering follows `spark.sql.session.timeZone`.
 
@@ -34,6 +34,19 @@ With Spark 3.5.3, MySQL Connector/J 8.0.33, and Doris 3.0.6.2, `SMALLINT` retain
 This baseline uses the MySQL Connector/J driver for Doris FE's MySQL protocol; it does not bundle a separate Doris Spark connector. MySQL Connector/J and any required external runtime dependencies must be available on the Spark driver and executors. Do not pass connection credentials or protected catalog settings through Spark catalog options.
 
 Catalog properties prefixed with `spark.bypass.` supply JDBC defaults. Application catalog options take precedence when keys match ignoring case. Spark read-option names are case-insensitive, but native Connector/J property names must use the driver's exact spelling, such as `connectTimeout` and `sslMode`; their spelling is preserved when forwarded. For example, application option `spark.sql.catalog.<catalog>.connectTimeout=20000` overrides catalog property `spark.bypass.connectTimeout=10000`.
+
+For an individual table read, Spark JDBC partition options can be provided through `DataFrameReader`. For example, to partition an integer column:
+
+```scala
+val rows = spark.read
+  .option("partitionColumn", "partition_key")
+  .option("lowerBound", "0")
+  .option("upperBound", "100")
+  .option("numPartitions", "3")
+  .table("jdbc_doris.example_db.example_table")
+```
+
+Specify all four partition options together. The bounds determine the partition stride; they do not filter rows. Spark includes null partition-column values and may choose fewer partitions than requested. These options apply to the individual read. The number of partitions can affect the number of concurrent JDBC connections.
 
 Application catalog/scan options and catalog bypass properties cannot override the connection URL, driver, credentials, or table/query target, or supply Spark's `prepareQuery`/`sessionInitStatement` or the driver's `dbname`/`createDatabaseIfNotExist`. Read-only support rejects Spark writes and catalog DDL. Use vended database credentials with only the required read and metadata permissions; this API boundary does not make arbitrary JDBC driver configuration free of connection or session side effects.
 
