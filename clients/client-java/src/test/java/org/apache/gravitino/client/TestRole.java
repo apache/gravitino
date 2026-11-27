@@ -42,6 +42,7 @@ import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
@@ -210,6 +211,13 @@ public class TestRole extends TestBase {
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.DELETE, rolePath, null, errResp, SC_SERVER_ERROR);
     Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.deleteRole(roleName));
+
+    // test InUseException, for a role that an access control policy names
+    ErrorResponse inUseResp =
+        ErrorResponse.inUse(
+            InUseException.class.getSimpleName(), "role is referenced by policies", null);
+    buildMockResource(Method.DELETE, rolePath, null, inUseResp, SC_CONFLICT);
+    Assertions.assertThrows(InUseException.class, () -> gravitinoClient.deleteRole(roleName));
   }
 
   @Test

@@ -176,6 +176,15 @@ public class TestTagMetaService extends TestJDBCBackend {
               service.associateTagsWithMetadataObject(
                   catalog.nameIdentifier(), catalog.type(), added, removed));
     }
+    // An access control policy must name an existing role.
+    backend.insert(
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "reader",
+            AUDIT_INFO,
+            "catalog"),
+        false);
     PolicyEntity policy =
         PolicyEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())

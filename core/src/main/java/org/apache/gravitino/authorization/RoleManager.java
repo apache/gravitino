@@ -111,20 +111,16 @@ class RoleManager {
   boolean deleteRole(String metalake, String role) {
     try {
       NameIdentifier ident = AuthorizationUtils.ofRole(metalake, role);
-
-      try {
-        RoleEntity roleEntity = store.get(ident, Entity.EntityType.ROLE, RoleEntity.class);
-        AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
-            metalake,
-            roleEntity.securableObjects(),
-            (authorizationPlugin, catalogName) ->
-                authorizationPlugin.onRoleDeleted(
-                    AuthorizationUtils.filterSecurableObjects(roleEntity, metalake, catalogName)));
-      } catch (NoSuchEntityException nse) {
-        // ignore, because the role may have been deleted.
-      }
-
-      return store.delete(ident, Entity.EntityType.ROLE);
+      // The store refuses a role that an access control policy names, and holds the role locked
+      // until it commits, so the plugins run only for a deletion that goes ahead. A plugin failure
+      // rolls the deletion back, which leaves the role for a retry to reach the plugins again.
+      return store
+          .deleteAndGet(
+              ident,
+              Entity.EntityType.ROLE,
+              RoleEntity.class,
+              roleEntity -> notifyRoleDeleted(metalake, roleEntity))
+          .isPresent();
     } catch (IOException ioe) {
       LOG.error(
           "Deleting role {} in the metalake {} failed due to storage issues", role, metalake, ioe);
@@ -171,6 +167,15 @@ class RoleManager {
           ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  private static void notifyRoleDeleted(String metalake, RoleEntity roleEntity) {
+    AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
+        metalake,
+        roleEntity.securableObjects(),
+        (authorizationPlugin, catalogName) ->
+            authorizationPlugin.onRoleDeleted(
+                AuthorizationUtils.filterSecurableObjects(roleEntity, metalake, catalogName)));
   }
 
   private RoleEntity getRoleEntity(NameIdentifier identifier) {

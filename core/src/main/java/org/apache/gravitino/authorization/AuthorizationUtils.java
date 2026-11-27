@@ -70,6 +70,11 @@ public class AuthorizationUtils {
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
 
+  /** Message for deleting a role that an access control policy names; takes role and metalake. */
+  public static final String ROLE_IN_USE_MSG =
+      "Role %s in metalake %s is referenced by access control policies; remove it from those"
+          + " policies before deleting it";
+
   /**
    * Bidirectional map of deprecated privilege names to their new equivalents. This map is used for
    * backward compatibility when handling legacy privilege names.

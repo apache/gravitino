@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.time.Instant;
@@ -30,6 +31,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -1662,19 +1664,8 @@ public class POConverters {
    */
   public static List<PolicyRoleRelPO> initializePolicyRoleRelPOs(
       Long policyId, PolicyEntity policyEntity) {
-    PolicyContent content = policyEntity.content();
-    if (!(content instanceof AccessControlContent)) {
-      return ImmutableList.of();
-    }
-
     ImmutableList.Builder<PolicyRoleRelPO> relations = ImmutableList.builder();
-    for (String roleName :
-        new LinkedHashSet<>(((AccessControlContent) content).applicableRoles())) {
-      EntityFieldLimits.checkMaxLength(
-          roleName,
-          EntityFieldLimits.MAX_NAME_LENGTH,
-          "applicable role name",
-          Entity.EntityType.POLICY);
+    for (String roleName : policyRoleNames(policyEntity)) {
       relations.add(
           PolicyRoleRelPO.builder()
               .withPolicyId(policyId)
@@ -1685,6 +1676,31 @@ public class POConverters {
               .build());
     }
     return relations.build();
+  }
+
+  /**
+   * Returns the role names a policy's content names, in content order and without exact duplicates.
+   * See {@link #initializePolicyRoleRelPOs} for how names are validated.
+   *
+   * @param policyEntity the policy being written
+   * @return the role names, empty for content other than access control
+   * @throws IllegalArgumentException if a role name is longer than a role name can be
+   */
+  public static Set<String> policyRoleNames(PolicyEntity policyEntity) {
+    PolicyContent content = policyEntity.content();
+    if (!(content instanceof AccessControlContent)) {
+      return ImmutableSet.of();
+    }
+
+    Set<String> roleNames = new LinkedHashSet<>(((AccessControlContent) content).applicableRoles());
+    for (String roleName : roleNames) {
+      EntityFieldLimits.checkMaxLength(
+          roleName,
+          EntityFieldLimits.MAX_NAME_LENGTH,
+          "applicable role name",
+          Entity.EntityType.POLICY);
+    }
+    return Collections.unmodifiableSet(roleNames);
   }
 
   public static OwnerRelPO initializeOwnerRelPOsWithVersion(
