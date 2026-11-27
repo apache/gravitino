@@ -150,7 +150,7 @@ public class GroupMetaBaseSQLProvider {
   }
 
   /** Returns SQL that selects an active group by ID. */
-  protected String selectGroupMetaById(Long groupId) {
+  public String selectGroupMetaById(Long groupId) {
     return "SELECT group_id as groupId, group_name as groupName,"
         + " metalake_id as metalakeId, audit_info as auditInfo,"
         + " current_version as currentVersion, last_version as lastVersion,"

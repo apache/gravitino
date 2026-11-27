@@ -61,6 +61,11 @@ public class UserMetaSQLProviderFactory {
     return getProvider().selectUserMetaByMetalakeIdAndName(metalakeId, name);
   }
 
+  /** Returns SQL that selects an active user by ID. */
+  public static String selectUserMetaById(@Param("userId") Long userId) {
+    return getProvider().selectUserMetaById(userId);
+  }
+
   /** Returns SQL that selects and locks an active user by ID. */
   public static String selectUserMetaByIdForUpdate(@Param("userId") Long userId) {
     return getProvider().selectUserMetaByIdForUpdate(userId);
