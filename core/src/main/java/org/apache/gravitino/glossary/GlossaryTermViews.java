@@ -23,24 +23,29 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.glossary.TermDTO;
 import org.apache.gravitino.dto.glossary.TermLinkDTO;
+import org.apache.gravitino.dto.responses.ObjectTermsResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.LookupTooBroadException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService;
+import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
@@ -64,12 +69,44 @@ public final class GlossaryTermViews {
       @Nullable String domain,
       @Nullable String nameContains,
       @Nullable GlossaryTerm.Status status) {
+    return listTerms(metalake, domain, nameContains, status, List.of(), false);
+  }
+
+  /**
+   * Lists visible definitions, optionally annotating exact matches and their binding previews.
+   *
+   * @param metalake the metalake name
+   * @param domain optional domain filter
+   * @param nameContains optional literal name fragment
+   * @param status optional filter on roots and relation endpoints
+   * @param words original lookup words, or an empty list for browsing
+   * @param bindings whether to include a binding preview
+   * @return the visible term snapshots
+   * @throws ForbiddenException if previews are requested for visible terms and the configured
+   *     authorizer cannot check resolved target IDs
+   * @throws LookupTooBroadException if the exact lookup exceeds its work budget
+   */
+  public TermDTO[] listTerms(
+      String metalake,
+      @Nullable String domain,
+      @Nullable String nameContains,
+      @Nullable GlossaryTerm.Status status,
+      List<String> words,
+      boolean bindings) {
+    Preconditions.checkArgument(!bindings || !words.isEmpty(), "bindings requires match words");
+    Map<String, String> keys = GlossaryTermQuery.wordKeys(words);
     return SqlSessions.readSnapshot(
         () -> {
-          GlossaryManager.SnapshotTerms snapshot =
-              manager.listTermsInSnapshot(metalake, domain, matchesName(nameContains), status);
+          GlossaryTermQuery query =
+              new GlossaryTermQuery(manager, metalake, domain, nameContains, status, keys);
           return projectTermSnapshots(
-              metalake, snapshot.metalakeId(), snapshot.access(), snapshot.terms(), status);
+              metalake,
+              query.lake,
+              query.access,
+              query.definitions(true),
+              status,
+              keys.isEmpty() ? null : query,
+              bindings);
         });
   }
 
@@ -79,8 +116,133 @@ public final class GlossaryTermViews {
       @Nullable String domain,
       @Nullable String nameContains,
       @Nullable GlossaryTerm.Status status) {
+    return listTermNames(metalake, domain, nameContains, status, List.of());
+  }
+
+  /**
+   * Lists visible names matching the supplied filters without projecting their definitions.
+   *
+   * @param metalake the metalake name
+   * @param domain optional domain filter
+   * @param nameContains optional literal name fragment
+   * @param status optional term status
+   * @param words original lookup words, or an empty list for browsing
+   * @return the matching names
+   * @throws LookupTooBroadException if the exact lookup exceeds its work budget
+   */
+  public String[] listTermNames(
+      String metalake,
+      @Nullable String domain,
+      @Nullable String nameContains,
+      @Nullable GlossaryTerm.Status status,
+      List<String> words) {
+    Map<String, String> keys = GlossaryTermQuery.wordKeys(words);
     return SqlSessions.readSnapshot(
-        () -> manager.listTermNamesInSnapshot(metalake, domain, matchesName(nameContains), status));
+        () -> new GlossaryTermQuery(manager, metalake, domain, nameContains, status, keys).names());
+  }
+
+  /** Lists all visible bindings of a term that match the requested filters. */
+  public List<TermBinding> listTermBindings(
+      String metalake,
+      String term,
+      @Nullable TermBinding.Kind kind,
+      @Nullable Set<MetadataObject.Type> types,
+      @Nullable GlossaryTerm.Status status) {
+    return manager.listTermBindings(metalake, term, kind, types, status);
+  }
+
+  /**
+   * Atomically changes bindings on an object or an exact metric name and returns its visible direct
+   * term names. A missing target or term and an unauthorized write fail the entire change.
+   */
+  public String[] associateTerms(
+      String metalake,
+      MetadataObject object,
+      @Nullable String metric,
+      @Nullable String[] add,
+      @Nullable String[] remove) {
+    return metric == null
+        ? manager.associateTerms(metalake, object, add, remove)
+        : manager.associateMetricTerms(metalake, object, metric, add, remove);
+  }
+
+  /** Lists visible direct term names without projecting owners, domains, relations or children. */
+  public String[] listTargetTermNames(
+      String metalake,
+      MetadataObject object,
+      @Nullable String metric,
+      @Nullable GlossaryTerm.Status status) {
+    return manager.readTargetTerms(
+        metalake,
+        object,
+        metric,
+        false,
+        false,
+        status,
+        bound -> bound.direct().stream().map(GlossaryTermEntity::name).toArray(String[]::new));
+  }
+
+  /** Returns the visible direct definitions for an object or metric in a single read snapshot. */
+  public TermDTO[] listDirectTargetTerms(
+      String metalake,
+      MetadataObject object,
+      @Nullable String metric,
+      @Nullable GlossaryTerm.Status status) {
+    return manager.readTargetTerms(
+        metalake,
+        object,
+        metric,
+        false,
+        true,
+        status,
+        bound ->
+            projectTermSnapshots(metalake, bound.lake(), bound.access(), bound.direct(), status));
+  }
+
+  /**
+   * Returns visible direct terms and the matching children of a table or semantic model. A semantic
+   * model has no direct terms. Target authorization, status and nested domain visibility are
+   * evaluated within the binding read snapshot.
+   *
+   * @throws IllegalArgumentException when the target does not support the requested expansion
+   * @throws ForbiddenException when the caller cannot read the target
+   * @throws NoSuchMetadataObjectException when the authorized target is missing
+   */
+  public ObjectTermsResponse listTargetTermsWithChildren(
+      String metalake, MetadataObject object, @Nullable GlossaryTerm.Status status) {
+    return manager.readTargetTerms(
+        metalake,
+        object,
+        null,
+        true,
+        true,
+        status,
+        bound -> {
+          Map<Long, GlossaryTermEntity> distinct = new LinkedHashMap<>();
+          bound.direct().forEach(term -> distinct.put(term.id(), term));
+          bound
+              .children()
+              .values()
+              .forEach(terms -> terms.forEach(term -> distinct.putIfAbsent(term.id(), term)));
+          List<GlossaryTermEntity> roots = List.copyOf(distinct.values());
+          TermDTO[] projected =
+              projectTermSnapshots(metalake, bound.lake(), bound.access(), roots, status);
+          Map<Long, TermDTO> byId = new HashMap<>();
+          for (int i = 0; i < roots.size(); i++) {
+            byId.put(roots.get(i).id(), projected[i]);
+          }
+          TermDTO[] direct =
+              bound.direct().stream().map(term -> byId.get(term.id())).toArray(TermDTO[]::new);
+          List<ObjectTermsResponse.Child> result = new ArrayList<>();
+          bound
+              .children()
+              .forEach(
+                  (name, terms) ->
+                      result.add(
+                          new ObjectTermsResponse.Child(
+                              name, terms.stream().map(term -> byId.get(term.id())).toList())));
+          return new ObjectTermsResponse(direct, result);
+        });
   }
 
   /** Drops the term if it is visible and the caller may delete it. */
@@ -140,14 +302,6 @@ public final class GlossaryTermViews {
                 : manager.alterTerm(metalake, name, revision, changes));
   }
 
-  private static Predicate<GlossaryTermEntity> matchesName(@Nullable String nameContains) {
-    if (nameContains == null) {
-      return term -> true;
-    }
-    String fragment = nameContains.toLowerCase(Locale.ROOT);
-    return term -> term.name().toLowerCase(Locale.ROOT).contains(fragment);
-  }
-
   private TermDTO applyChangeAndProjectTerm(String metalake, Supplier<GlossaryTermEntity> change) {
     SessionUtils.beginTransaction();
     try {
@@ -179,6 +333,17 @@ public final class GlossaryTermViews {
       @Nullable GlossaryAccess resolvedAccess,
       List<GlossaryTermEntity> roots,
       @Nullable GlossaryTerm.Status status) {
+    return projectTermSnapshots(metalake, lake, resolvedAccess, roots, status, null, false);
+  }
+
+  private TermDTO[] projectTermSnapshots(
+      String metalake,
+      long lake,
+      @Nullable GlossaryAccess resolvedAccess,
+      List<GlossaryTermEntity> roots,
+      @Nullable GlossaryTerm.Status status,
+      @Nullable GlossaryTermQuery lookup,
+      boolean includeBindings) {
     if (roots.isEmpty()) {
       return new TermDTO[0];
     }
@@ -191,16 +356,19 @@ public final class GlossaryTermViews {
     Map<Long, List<Long>> narrower = new HashMap<>();
     Map<Long, List<Long>> related = new HashMap<>();
     Set<Long> endpoints = new HashSet<>();
-    edges
-        .listBroaderEdges(lake, ids)
+    (lookup == null
+            ? edges.listBroaderEdges(lake, ids)
+            : lookup.edges(ids, RelationType.BROADER, false))
         .forEach(
             e -> recordRelationEndpoint(broader, e.getFromTermId(), e.getToTermId(), endpoints));
-    edges
-        .listNarrowerEdges(lake, ids)
+    (lookup == null
+            ? edges.listNarrowerEdges(lake, ids)
+            : lookup.edges(ids, RelationType.BROADER, true))
         .forEach(
             e -> recordRelationEndpoint(narrower, e.getToTermId(), e.getFromTermId(), endpoints));
-    edges
-        .listRelatedEdges(lake, ids)
+    (lookup == null
+            ? edges.listRelatedEdges(lake, ids)
+            : lookup.edges(ids, RelationType.RELATED, false))
         .forEach(
             e -> {
               if (ids.contains(e.getFromTermId())) {
@@ -217,7 +385,9 @@ public final class GlossaryTermViews {
         names.put(id, identifiers.get(id).name());
       }
     }
-    if (!endpoints.isEmpty()) {
+    if (lookup != null) {
+      lookup.addEndpointNames(endpoints, names);
+    } else if (!endpoints.isEmpty()) {
       GlossaryAccess access =
           resolvedAccess != null ? resolvedAccess : manager.accessForMetalake(metalake);
       for (GlossaryTermEntity term :
@@ -239,27 +409,34 @@ public final class GlossaryTermViews {
                         .withName(rel.targetEntity().name())
                         .withType(Owner.Type.valueOf(rel.targetEntity().type().name()))
                         .build()));
+    Map<Long, GlossaryTermQuery.Preview> previews =
+        includeBindings ? lookup.previews(ids) : Map.of();
     return roots.stream()
         .map(
-            term ->
-                new TermDTO(
-                    term.name(),
-                    term.definition(),
-                    term.synonyms(),
-                    term.status(),
-                    term.domains(),
-                    visibleRelationNames(broader, term.id(), names),
-                    visibleRelationNames(narrower, term.id(), names),
-                    visibleRelationNames(related, term.id(), names),
-                    Arrays.stream(term.links())
-                        .map(link -> new TermLinkDTO(link.label(), link.url()))
-                        .toArray(TermLinkDTO[]::new),
-                    owners.get(term.name()),
-                    term.sourceRef(),
-                    term.properties(),
-                    term.version(),
-                    term.revisionToken(),
-                    DTOConverters.toDTO(term.auditInfo())))
+            term -> {
+              GlossaryTermQuery.Preview preview = previews.get(term.id());
+              return new TermDTO(
+                  term.name(),
+                  term.definition(),
+                  term.synonyms(),
+                  term.status(),
+                  term.domains(),
+                  visibleRelationNames(broader, term.id(), names),
+                  visibleRelationNames(narrower, term.id(), names),
+                  visibleRelationNames(related, term.id(), names),
+                  Arrays.stream(term.links())
+                      .map(link -> new TermLinkDTO(link.label(), link.url()))
+                      .toArray(TermLinkDTO[]::new),
+                  owners.get(term.name()),
+                  term.sourceRef(),
+                  term.properties(),
+                  term.version(),
+                  term.revisionToken(),
+                  DTOConverters.toDTO(term.auditInfo()),
+                  lookup == null ? null : lookup.matches(term),
+                  preview == null ? null : preview.bindings(),
+                  preview == null ? null : preview.truncated());
+            })
         .toArray(TermDTO[]::new);
   }
 

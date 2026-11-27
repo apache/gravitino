@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
+import java.util.Collection;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
@@ -157,4 +158,37 @@ public interface GlossaryTermMetaMapper {
       @Param("metalakeId") long metalakeId,
       @Param("metalakeName") String metalakeName,
       @Param("ids") List<Long> ids);
+
+  /**
+   * Selects only the identity, name and status needed to authorize list results.
+   *
+   * @param metalakeId the metalake ID
+   * @param domainIds optional IDs of the visible domains in scope
+   * @param pattern optional escaped substring pattern on the normalized name key
+   * @param status optional root status
+   * @param wordKeys normalized names and synonyms, empty when browsing
+   * @param after exclusive term ID from the previous page, or null for the first page
+   * @param limit optional page size for lookup candidates
+   * @return matching root candidates in stable ID order
+   */
+  @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "listLookupCandidates")
+  List<GlossaryTermPO> listLookupCandidates(
+      @Param("metalakeId") long metalakeId,
+      @Param("domainIds") @Nullable Collection<Long> domainIds,
+      @Param("pattern") @Nullable String pattern,
+      @Param("status") @Nullable String status,
+      @Param("wordKeys") Collection<String> wordKeys,
+      @Param("after") @Nullable Long after,
+      @Param("limit") @Nullable Integer limit);
+
+  /**
+   * Reads the names and visibility fields of live relation endpoints.
+   *
+   * @param metalakeId the metalake ID
+   * @param endpointIds the endpoint IDs
+   * @return the endpoint candidates
+   */
+  @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "listLookupEndpoints")
+  List<GlossaryTermPO> listLookupEndpoints(
+      @Param("metalakeId") long metalakeId, @Param("endpointIds") Collection<Long> endpointIds);
 }
