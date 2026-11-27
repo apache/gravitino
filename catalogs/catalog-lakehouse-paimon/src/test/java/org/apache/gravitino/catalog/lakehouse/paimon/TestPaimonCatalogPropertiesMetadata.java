@@ -18,9 +18,13 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.COSProperties;
 import org.apache.gravitino.storage.GCSProperties;
@@ -31,6 +35,25 @@ import org.junit.jupiter.api.Test;
 public class TestPaimonCatalogPropertiesMetadata {
 
   private final PaimonCatalogPropertiesMetadata metadata = new PaimonCatalogPropertiesMetadata();
+
+  @Test
+  void testSharedConversionMatchesEveryDeclaredCatalogMapping() {
+    Map<String, String> mappings =
+        new HashMap<>(PaimonCatalogPropertiesMetadata.GRAVITINO_CONFIG_TO_PAIMON);
+    mappings.putAll(PaimonCatalogPropertiesMetadata.KERBEROS_CONFIGURATION);
+    mappings.putAll(PaimonCatalogPropertiesMetadata.S3_CONFIGURATION);
+    mappings.putAll(PaimonCatalogPropertiesMetadata.OSS_CONFIGURATION);
+    mappings.forEach(
+        (key, nativeKey) -> {
+          Map<String, String> properties = new HashMap<>();
+          properties.put(key, "value");
+          Map<String, String> expected = new HashMap<>();
+          expected.put(nativeKey, "value");
+          assertEquals(expected, CatalogUtils.toInnerProperty(properties, false));
+          assertEquals(
+              expected, PaimonCatalogPropertiesConverter.toInnerProperties(properties, false));
+        });
+  }
 
   @Test
   void testSensitivePropertiesAreHidden() {

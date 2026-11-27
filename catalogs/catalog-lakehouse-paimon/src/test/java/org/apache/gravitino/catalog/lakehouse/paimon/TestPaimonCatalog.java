@@ -111,6 +111,28 @@ public class TestPaimonCatalog {
   }
 
   @Test
+  public void testStsProvidersPassCatalogRegistrationValidation() {
+    PaimonCatalog catalog =
+        new PaimonCatalog()
+            .withCatalogEntity(
+                CatalogEntity.builder()
+                    .withId(1L)
+                    .withName("sts")
+                    .withNamespace(Namespace.of("metalake"))
+                    .withType(PaimonCatalog.Type.RELATIONAL)
+                    .withProvider("lakehouse-paimon")
+                    .withAuditInfo(AuditInfo.EMPTY)
+                    .build());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> catalog.validateCredentialProviders(Map.of("credential-providers", "gcs-token")));
+    for (String provider : new String[] {"s3-token", "oss-token"}) {
+      Assertions.assertDoesNotThrow(
+          () -> catalog.validateCredentialProviders(Map.of("credential-providers", provider)));
+    }
+  }
+
+  @Test
   public void testCatalogOperation() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -122,6 +144,7 @@ public class TestPaimonCatalog {
             .withNamespace(Namespace.of("metalake"))
             .withType(PaimonCatalog.Type.RELATIONAL)
             .withProvider("lakehouse-paimon")
+            .withProperties(Map.of())
             .withAuditInfo(auditInfo)
             .build();
 
@@ -130,6 +153,11 @@ public class TestPaimonCatalog {
     conf.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, tempDir);
     PaimonCatalog paimonCatalog =
         new PaimonCatalog().withCatalogConf(conf).withCatalogEntity(entity);
+    Assertions.assertEquals(
+        "true",
+        paimonCatalog
+            .propertiesWithCredentialProviders()
+            .get(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX));
     Assertions.assertTrue(
         paimonCatalog.newCapability().caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
     CatalogOperations catalogOperations = paimonCatalog.ops();

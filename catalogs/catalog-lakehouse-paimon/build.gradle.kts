@@ -51,6 +51,21 @@ dependencies {
     exclude("*")
   }
 
+  // The auxiliary REST service resolves credentials using the catalog plugin's classloader.
+  runtimeOnly(project(":bundles:aws")) {
+    exclude("*")
+  }
+  runtimeOnly(project(":bundles:aliyun")) {
+    exclude("*")
+  }
+  runtimeOnly(libs.aws.sts)
+  runtimeOnly(libs.aws.policy)
+  runtimeOnly(libs.aliyun.credentials.sdk) {
+    exclude(group = "org.jacoco", module = "org.jacoco.agent")
+    exclude(group = "com.sun.xml.bind", module = "jaxb-core")
+    exclude(group = "com.sun.xml.bind", module = "jaxb-impl")
+  }
+
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.paimon) {
     exclude("com.sun.jersey")

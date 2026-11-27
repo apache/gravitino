@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -45,4 +46,17 @@ public interface TableDispatcher extends TableCatalog {
    * @throws NoSuchTableException if the external table does not exist
    */
   Table importTable(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchTableException;
+
+  /**
+   * Imports a table after an external schema change, preserving renamed columns' identities.
+   *
+   * @param ident the table identifier
+   * @param auditInfo fallback creation audit
+   * @param columnNameChanges original column names mapped to new names, or null for drops
+   * @return the refreshed table
+   * @throws NoSuchTableException if the external table does not exist
+   */
+  Table importTable(
+      NameIdentifier ident, AuditInfo auditInfo, Map<String, String> columnNameChanges)
+      throws NoSuchTableException;
 }

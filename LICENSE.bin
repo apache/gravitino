@@ -211,7 +211,11 @@
    Ethlo Time ITU
    Apache Hive
    Apache Paimon
-   FastDoubleParser (older Jackson copy shaded in paimon-format 1.2.0)
+   Hilbert Curve (shaded in paimon-common 2.1.0)
+   Guava Mini (shaded in paimon-common 2.1.0)
+   Zero Allocation Hashing (shaded in paimon-common 2.1.0)
+   fastutil (shaded in paimon-common 2.1.0)
+   FastDoubleParser (older Jackson copy shaded in paimon-format 1.2.0 and 2.1.0)
    Apache DataSketches Java
    Apache DataSketches Memory
    Apache Iceberg
@@ -275,6 +279,10 @@
    AWS SDK for Java 2.0 Annotations
    AWS SDK for Java 2.0
    AWS EventStream for Java
+   Alibaba Cloud Credentials Java SDK
+   Alibaba Cloud Tea
+   Kotlin Standard Library
+   JetBrains Annotations
    The Netty Project
    Open Telemetry
    Open Lineage
@@ -510,6 +518,8 @@
    JSR 374 (JSON Processing) Default Provider
    JavaServlet
    Eclipse Jersey
+   JAXB API 2.3.0
+   (see licenses/paimon-rest-thirdparty.txt)
 
    This product bundles various third-party components also under the
    Eclipse Public License 1.0
@@ -555,6 +565,7 @@
    Mozilla Public License
 
    Javassist
+   Public Suffix List (bundled in OkHttp, see licenses/MPL.txt)
 
    This product bundles various third-party components also placed in
    the public domain.
@@ -588,3 +599,17 @@ For the BSD license of the ANTLR 3 runtime, see licenses/antlr3.txt.
 For the JDOM license, see licenses/jdom.txt.
 
 For the MIT No Attribution license of Reactive Streams, see licenses/reactive-streams.txt.
+
+   This product includes JTS Topology Suite 1.20.0, shaded in paimon-format 2.1.0
+   and bundled in Gravitino paimon-common, under the Eclipse Distribution
+   License 1.0. See licenses/jts-edl.txt for its license and the OSGeo BSD
+   license covering GeoTools contributions.
+
+   Third-party license texts for Paimon REST runtime bundles, including nested
+   code generation libraries, are reproduced in licenses/paimon-rest-thirdparty.txt.
+
+Reactive Streams 1.0.4, included in the Paimon REST runtime, is distributed
+under the MIT No Attribution license, reproduced in licenses/paimon-rest-thirdparty.txt.
+
+Apache Paimon OSS 2.1.0 bundles storage dependencies and their license texts.
+See licenses/paimon-rest-thirdparty.txt for the complete upstream attachments.

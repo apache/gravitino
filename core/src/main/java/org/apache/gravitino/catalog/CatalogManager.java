@@ -670,6 +670,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   /**
+   * Unregisters a catalog cache removal listener when an auxiliary service stops.
+   *
+   * @param listener the previously registered listener
+   */
+  public void removeCatalogCacheRemoveListener(Consumer<NameIdentifier> listener) {
+    removalListeners.remove(listener);
+  }
+
+  /**
    * Lists the catalogs within the specified namespace.
    *
    * @param namespace The namespace for which to list catalogs.

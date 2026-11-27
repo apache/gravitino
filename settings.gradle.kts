@@ -67,6 +67,8 @@ include("iceberg:iceberg-rest-server-experiment")
 include("iceberg:iceberg-rest-trino-it")
 include("lance:lance-common")
 include("lance:lance-rest-server")
+include("paimon:paimon-common")
+include("paimon:paimon-rest-server")
 include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
 val skipTrinoConnector: Boolean =
   gradle.startParameter.projectProperties["skipTrinoConnector"]?.toBoolean() ?: false
