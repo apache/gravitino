@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.hive;
 
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -154,7 +155,10 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     }
     if (VendedCredentialOptions.isConfiguredInSession(
         sessionHadoopConf, OSS_ACCESS_KEY, OSS_SECRET_KEY)) {
-      LOG.info("The vended OSS credentials are not used: an OSS key is configured on the session");
+      if (Arrays.stream(credentials).anyMatch(OSSSecretKeyCredential.class::isInstance)) {
+        LOG.info(
+            "The vended OSS credentials are not used: an OSS key is configured on the session");
+      }
       return;
     }
     for (Credential credential : credentials) {

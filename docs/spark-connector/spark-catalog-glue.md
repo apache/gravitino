@@ -345,7 +345,7 @@ Alternatively, use `spark.bypass.` prefix in catalog properties to pass S3 confi
 }
 ```
 
-For this catalog's Hive-format tables, where no S3 key is configured, credentials the Gravitino catalog stores itself (`aws-access-key-id` and `aws-secret-access-key`) are written to the Spark catalog as `fs.s3a.access.key` and `fs.s3a.secret.key`, unless the Gravitino catalog property `credential-providers` is set without `s3-secret-key` (for example to `s3-token`).
+For this catalog's Hive-format tables, where no S3 key is configured, credentials the Gravitino catalog stores itself (`aws-access-key-id` and `aws-secret-access-key`) are written to the Spark catalog as `fs.s3a.access.key` and `fs.s3a.secret.key`, unless the Gravitino catalog property `credential-providers` is set without `s3-secret-key` (for example to `aws-secret-key` alone).
 
 Which key counts as configured, when session settings are read, and which reads the keys reach (Parquet and ORC tables read with Spark's native readers do not get them) is the same as for the Hive catalog; see [Credentials stored on the Gravitino catalog](spark-catalog-hive.md#credentials-stored-on-the-gravitino-catalog).
 

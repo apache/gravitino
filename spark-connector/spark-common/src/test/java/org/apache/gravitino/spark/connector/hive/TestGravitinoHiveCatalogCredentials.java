@@ -287,9 +287,9 @@ public class TestGravitinoHiveCatalogCredentials {
   }
 
   @Test
-  void testOssHalfGivenAsOptionsFillsInWhereTheSessionConfiguresNothing() {
-    // The option half arrives lower-cased, so it is written here; the session's half stays where
-    // it is, and no vended half is added.
+  void testOssHalfGivenAsOptionsIsNotCompletedFromTheVendedPair() {
+    // The option half arrives lower-cased, so it is written here; the session keeps its own half,
+    // and no vended half is added.
     Configuration session = new Configuration(false);
     session.set(OSS_SECRET_KEY, "session-secret");
     Configuration kyuubi = new Configuration(false);
@@ -301,7 +301,7 @@ public class TestGravitinoHiveCatalogCredentials {
         session);
 
     assertEquals("user-oss-id", kyuubi.get(OSS_ACCESS_KEY), "the half the user gave is written");
-    assertNull(kyuubi.get(OSS_SECRET_KEY), "neither the vended nor the user's half is added");
+    assertNull(kyuubi.get(OSS_SECRET_KEY), "no vended secret is added to the user's half");
   }
 
   @Test

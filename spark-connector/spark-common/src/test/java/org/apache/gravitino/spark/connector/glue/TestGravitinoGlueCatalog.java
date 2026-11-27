@@ -345,6 +345,10 @@ public class TestGravitinoGlueCatalog {
     try (LocalSparkSessions.Session local =
         LocalSparkSessions.create("test-glue-catalog-credentials", ImmutableMap.of())) {
       SparkSession spark = local.spark();
+      // Spark copies S3 keys from the environment into the context's configuration; drop them so
+      // that only the keys set on the session below can keep the vended pair out.
+      spark.sparkContext().hadoopConfiguration().unset("fs.s3a.access.key");
+      spark.sparkContext().hadoopConfiguration().unset("fs.s3a.secret.key");
       spark.conf().set("fs.s3a.access.key", "runtime-ak");
       spark.conf().set("fs.s3a.secret.key", "runtime-sk");
 

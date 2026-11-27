@@ -82,7 +82,7 @@ public class TestLocalSparkSessions {
             .config("spark.driver.host", "127.0.0.1")
             .config("spark.driver.bindAddress", "127.0.0.1")
             .getOrCreate();
-    // On Spark 3.5 the stopped session stays registered after this.
+    // On Spark 3.5 the stopped session stays registered as the thread's active session after this.
     stopped.stop();
 
     try (LocalSparkSessions.Session local =
