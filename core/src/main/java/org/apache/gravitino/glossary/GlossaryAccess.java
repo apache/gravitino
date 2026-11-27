@@ -80,7 +80,8 @@ public final class GlossaryAccess {
     return manage.get();
   }
 
-  static GlossaryAccess forRequest(String metalake, boolean enabled) {
+  /** Returns the current principal's Glossary access for a single operation. */
+  public static GlossaryAccess forRequest(String metalake, boolean enabled) {
     if (!enabled) {
       return UNRESTRICTED;
     }
@@ -172,7 +173,8 @@ public final class GlossaryAccess {
     return canRead(term.id(), term.status());
   }
 
-  boolean canRead(long id, GlossaryTerm.Status status) {
+  /** Checks visibility of the supplied live identity and status in the caller's snapshot. */
+  public boolean canRead(long id, GlossaryTerm.Status status) {
     return view && (status != GlossaryTerm.Status.DRAFT || canEdit(id));
   }
 
