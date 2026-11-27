@@ -179,10 +179,9 @@ public class IcebergTable extends BaseTable {
     Map<String, String> properties = new HashMap<>(table.properties());
     properties.putAll(IcebergTablePropertiesUtil.buildReservedProperties(table));
     Schema schema = table.schema();
-    // The current default may still reference source IDs that only older schemas retain.
-    Map<Integer, String> idToName = FromIcebergPartitionSpec.idToNameAcrossSchemas(table);
-    Transform[] partitionSpec =
-        FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema, idToName);
+    // Active fields are in the current schema. void is omitted, and historical specs stay in the
+    // partition-specs JSON.
+    Transform[] partitionSpec = FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema);
     SortOrder[] sortOrder = FromIcebergSortOrder.fromSortOrder(table.sortOrder());
     IcebergColumn[] icebergColumns =
         schema.columns().stream().map(ConvertUtil::fromNestedField).toArray(IcebergColumn[]::new);

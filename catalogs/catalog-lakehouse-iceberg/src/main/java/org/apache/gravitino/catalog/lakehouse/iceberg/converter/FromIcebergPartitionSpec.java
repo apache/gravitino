@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg.converter;
 
 import com.google.common.collect.Lists;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -27,7 +26,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
 
 /**
@@ -98,29 +96,15 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
   }
 
   /**
-   * Builds a field-id → dotted-name map from every schema retained in {@code metadata}.
-   *
-   * <p>Historical partition specs can still reference source IDs that the current schema dropped.
-   * Those names live in earlier schemas. The current schema is applied last so renames win.
-   *
-   * @param metadata Iceberg table metadata
-   * @return merged id-to-name map
-   */
-  public static Map<Integer, String> idToNameAcrossSchemas(TableMetadata metadata) {
-    Map<Integer, String> idToName = new HashMap<>();
-    for (Schema schema : metadata.schemas()) {
-      idToName.putAll(schema.idToName());
-    }
-    idToName.putAll(metadata.schema().idToName());
-    return idToName;
-  }
-
-  /**
    * Transform assembled into Gravitino using the given schema's id-to-name map.
+   *
+   * <p>Iceberg checks the current default spec against the current schema. {@code void} fields are
+   * omitted, so a dropped source id is not resolved. Historical specs stay in the native {@code
+   * partition-specs} JSON.
    *
    * @param partitionSpec Iceberg partition spec.
    * @param schema Iceberg schema.
-   * @return array of transforms for partition fields.
+   * @return array of transforms for partition fields. {@code void} fields are omitted.
    */
   public static Transform[] fromPartitionSpec(PartitionSpec partitionSpec, Schema schema) {
     return fromPartitionSpec(partitionSpec, schema, schema.idToName());
@@ -129,13 +113,9 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
   /**
    * Transform assembled into Gravitino.
    *
-   * <p>{@code idToName} may include names from retained Iceberg schemas so historical specs whose
-   * source columns were later dropped still resolve. {@code schema} is only used to dispatch the
-   * Iceberg transform type.
-   *
    * @param partitionSpec Iceberg partition spec.
    * @param schema Iceberg schema used by {@link PartitionSpecVisitor}.
-   * @param idToName field-id to dotted Iceberg name, including retained schemas when needed.
+   * @param idToName field-id to dotted Iceberg name for non-void fields.
    * @return array of transforms for partition fields. {@code void} fields are omitted.
    */
   public static Transform[] fromPartitionSpec(

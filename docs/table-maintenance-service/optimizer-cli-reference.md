@@ -541,9 +541,11 @@ Leave `use_caching` unset to use the installed Iceberg version's default (`false
 1.11.0). Set it explicitly when consistent behavior across versions is required.
 
 Omit `spec_id` for routine maintenance of the current partition spec. Do not guess IDs such as
-`0` or `1`. Read the reserved, read-only Gravitino table property `default-spec-id` for the current
-default. Use the `partition-specs` array in the table's Iceberg metadata JSON to see each
-`spec-id`'s partition fields and transforms. To list specs represented in the current snapshot:
+`0` or `1`. Read the reserved, read-only properties from the loaded table:
+`loadTable(...).properties().get("default-spec-id")` is the current default, and
+`loadTable(...).properties().get("partition-specs")` is a JSON array of Iceberg partition-spec
+objects. Each object has a `spec-id` and its partition fields and transforms. To list specs
+represented in the current snapshot:
 
 ```sql
 SELECT DISTINCT partition_spec_id
