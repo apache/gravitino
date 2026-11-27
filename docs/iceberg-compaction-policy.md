@@ -13,7 +13,11 @@ import TabItem from '@theme/TabItem';
 
 `system_iceberg_compaction` is a built-in policy type used by the optimizer to generate compaction strategies and job contexts for Iceberg tables.
 
-This policy supports `CATALOG`, `SCHEMA`, and `TABLE` metadata objects.
+The optimizer treats `CATALOG`, `SCHEMA`, and `TABLE` as the applicable object types for this
+policy. That list is not an association reject list: associating a policy does not check
+`supportedObjectTypes`, and object policy lookup does not filter by it. Consumers decide whether
+the policy type applies to the object they are processing. See
+[Policies](./policies.md) and the OpenAPI description of `supportedObjectTypes`.
 
 ## Policy Content
 
@@ -35,18 +39,28 @@ parameters separate from the `options` map.
 
 ## Generated Rules and Properties
 
-The policy content is converted to:
+Typed content fields on CREATE/GET are the REST payload. The optimizer (and other consumers)
+derive stable properties and evaluation rules from those fields. The derived keys below are
+**not** serialized as `strategy.type`, `trigger-expr`, or `job.options.*` entries on the policy
+REST `content` object.
 
-- Properties:
-  - `strategy.type=iceberg-data-compaction`
-  - `job.template-name=builtin-iceberg-rewrite-data-files`
-- Rules:
-  - `trigger-expr=custom-data-file-mse >= minDataFileMse || custom-delete-file-number >= minDeleteFileNumber`
-  - `score-expr=custom-data-file-mse * dataFileMseWeight + custom-delete-file-number * deleteFileNumberWeight`
-  - `max-partition-num=<maxPartitionNum>`
-  - `rewriteStrategy=<rewriteStrategy>`
-  - `sortOrder=<sortOrder>`
-  - `job.options.<key>=<value>` for each rewrite option
+After a GET (or create) through the Java or Python client, inspect them with
+`policy.content().properties()` and `policy.content().rules()` (for example
+`metalake.getPolicy(name).content().rules()`).
+
+Derived properties:
+
+- `strategy.type=iceberg-data-compaction`
+- `job.template-name=builtin-iceberg-rewrite-data-files`
+
+Derived rules:
+
+- `trigger-expr=custom-data-file-mse >= minDataFileMse || custom-delete-file-number >= minDeleteFileNumber`
+- `score-expr=custom-data-file-mse * dataFileMseWeight + custom-delete-file-number * deleteFileNumberWeight`
+- `max-partition-num=<maxPartitionNum>`
+- `rewriteStrategy=<rewriteStrategy>`
+- `sortOrder=<sortOrder>`
+- `job.options.<key>=<value>` for each rewrite option
 
 ## Parameter Tuning Guide
 

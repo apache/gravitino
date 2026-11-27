@@ -195,7 +195,9 @@ class TestGravitinoMetricsUpdater {
                 "gravitino.optimizer.jdbcMetrics.jdbcUser",
                 "sa",
                 "gravitino.optimizer.jdbcMetrics.jdbcPassword",
-                ""));
+                "",
+                "gravitino.optimizer.jdbcMetrics.jdbcDriver",
+                "org.h2.Driver"));
     updater.initialize(new OptimizerEnv(config));
     MetricsRepository repository = updater.metricsRepositoryForTest();
     Assertions.assertInstanceOf(GenericJdbcMetricsRepository.class, repository);

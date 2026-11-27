@@ -14,8 +14,12 @@ import TabItem from '@theme/TabItem';
 Table Maintenance Service to remove unreferenced Iceberg files through
 `builtin-iceberg-remove-orphan-files`.
 
-This policy supports `CATALOG`, `SCHEMA`, and `TABLE` metadata objects. It accepts time triggers
-only; `commitTrigger=true` is rejected.
+The optimizer treats `CATALOG`, `SCHEMA`, and `TABLE` as the applicable object types for this
+policy. That list is not an association reject list: associating a policy does not check
+`supportedObjectTypes`, and object policy lookup does not filter by it. Consumers decide whether
+the policy type applies to the object they are processing. See
+[Policies](./policies.md) and the OpenAPI description of `supportedObjectTypes`. It accepts time
+triggers only; `commitTrigger=true` is rejected.
 
 ## Policy Content
 
@@ -29,17 +33,27 @@ The typed content for `system_iceberg_orphan_file_removal` supports the followin
 
 ## Generated Rules and Properties
 
-The policy content is converted to:
+Typed content fields on CREATE/GET are the REST payload. The optimizer (and other consumers)
+derive stable properties and evaluation rules from those fields. The derived keys below are
+**not** serialized as `strategy.type`, `trigger-expr`, or `job.options.*` entries on the policy
+REST `content` object.
 
-- Properties:
-  - `strategy.type=iceberg-orphan-file-removal`
-  - `job.template-name=builtin-iceberg-remove-orphan-files`
-- Rules:
-  - `trigger-expr=true`
-  - `score-expr=1`
-  - `job.options.olderThanDays=<olderThanDays>`
-  - `job.options.dryRun=<dryRun>`
-  - `job.options.location=<location>` when `location` is set
+After a GET (or create) through the Java or Python client, inspect them with
+`policy.content().properties()` and `policy.content().rules()` (for example
+`metalake.getPolicy(name).content().rules()`).
+
+Derived properties:
+
+- `strategy.type=iceberg-orphan-file-removal`
+- `job.template-name=builtin-iceberg-remove-orphan-files`
+
+Derived rules:
+
+- `trigger-expr=true`
+- `score-expr=1`
+- `job.options.olderThanDays=<olderThanDays>`
+- `job.options.dryRun=<dryRun>`
+- `job.options.location=<location>` when `location` is set
 
 The optimizer or TMS schedule decides when to submit the job. Once the Spark job starts, it
 always runs the orphan-cleanup procedure (`trigger-expr=true`); there is no extra metric gate

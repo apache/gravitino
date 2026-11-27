@@ -43,6 +43,14 @@ DEFAULT_REFRESH_SKEW_SECONDS = 60
 _TokenTuple = Union[tuple[str, str], tuple[str, str, Union[int, str]]]
 
 
+class OAuthTokenEndpointError(httpx.HTTPStatusError):
+    """The service identity's OAuth token endpoint returned an HTTP error."""
+
+
+class OAuthTokenResponseError(ValueError):
+    """The identity provider returned an unusable token response."""
+
+
 class RefreshableBearerAuth(OAuth2ClientCredentials):
     """httpx-auth client-credentials with form POST and one 401 retry."""
 
@@ -95,13 +103,10 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         self._configure_client(client)
         try:
             response = client.post(self.token_url, data=data)
-            self._log_token_http_error(response)
-            response.raise_for_status()
-            body = response.json()
+            return self._token_tuple(response)
         finally:
             if self.client is None:
                 client.close()
-        return self._token_tuple(body)
 
     async def request_new_token_async(self) -> _TokenTuple:
         """POST ``client_credentials`` without blocking the event loop."""
@@ -111,10 +116,7 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         async with httpx.AsyncClient() as client:
             client.timeout = self.timeout
             response = await client.post(self.token_url, data=data)
-            self._log_token_http_error(response)
-            response.raise_for_status()
-            body = response.json()
-        return self._token_tuple(body)
+            return self._token_tuple(response)
 
     def auth_flow(
         self, request: httpx.Request
@@ -164,17 +166,42 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         data["client_secret"] = self.client_secret
         return data
 
-    def _token_tuple(self, body: dict) -> _TokenTuple:
+    def _token_tuple(self, response: httpx.Response) -> _TokenTuple:
+        if not response.is_success:
+            message = (
+                f"OAuth token endpoint returned HTTP {response.status_code}"
+            )
+            _LOG.error("%s", message)
+            raise OAuthTokenEndpointError(
+                message, request=response.request, response=response
+            )
+        try:
+            body = response.json()
+        except ValueError as exc:
+            raise OAuthTokenResponseError(
+                "Invalid JSON in OAuth token response"
+            ) from exc
+        if not isinstance(body, dict):
+            raise OAuthTokenResponseError(
+                "OAuth token response must be a JSON object"
+            )
         token = body.get(self.token_field_name)
         if not token or not isinstance(token, str):
-            raise ValueError("OAuth token response missing access_token")
+            raise OAuthTokenResponseError(
+                "OAuth token response missing access_token"
+            )
         expires_in = body.get("expires_in")
         _LOG.info("Fetched OAuth access token")
         if expires_in:
-            return self.state, token, expires_in
+            try:
+                return self.state, token, int(expires_in)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise OAuthTokenResponseError(
+                    "Invalid expires_in in OAuth token response"
+                ) from exc
         jwt_expires_in = self._jwt_expires_in(token)
         if jwt_expires_in is None:
-            raise ValueError(
+            raise OAuthTokenResponseError(
                 "OAuth token response omitted expires_in and "
                 "access_token is not a JWT with exp"
             )
@@ -189,12 +216,12 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         try:
             padded = parts[1] + "=" * (-len(parts[1]) % 4)
             payload = json.loads(base64.urlsafe_b64decode(padded))
-            exp = payload.get("exp")
+            exp = payload.get("exp") if isinstance(payload, dict) else None
             if not RefreshableBearerAuth._is_numeric_date(exp):
                 return None
             expires_at = int(float(exp))
             return max(expires_at - int(time.time()), 1)
-        except (ValueError, json.JSONDecodeError, TypeError):
+        except (ValueError, OverflowError, TypeError):
             return None
 
     @staticmethod
@@ -211,13 +238,6 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
             except ValueError:
                 return False
         return False
-
-    @staticmethod
-    def _log_token_http_error(response: httpx.Response) -> None:
-        if response.status_code >= 400:
-            _LOG.error(
-                "OAuth token request failed: HTTP %s", response.status_code
-            )
 
     def _cached_bearer(self) -> Optional[str]:
         try:

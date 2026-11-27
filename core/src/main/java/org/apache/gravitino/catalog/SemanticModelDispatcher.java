@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
@@ -39,6 +40,8 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 
 /** Dispatches Semantic Model operations through the server pipeline. */
@@ -89,6 +92,29 @@ public interface SemanticModelDispatcher {
    * @throws NoSuchSemanticModelException If the Semantic Model does not exist.
    */
   SemanticModel loadSemanticModel(NameIdentifier ident) throws NoSuchSemanticModelException;
+
+  /** Loads a selected revision for an internal caller. */
+  default SemanticModel loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector) {
+    return loadSemanticModelRevision(ident, selector, ignored -> {});
+  }
+
+  /** Loads a selected revision and checks its visibility before returning it. */
+  SemanticModel loadSemanticModelRevision(
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      Consumer<SemanticModelRevision> checkVisibility);
+
+  /** Lists retained revision metadata for a model. The caller applies visibility rules. */
+  SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident);
+
+  /**
+   * Publishes the latest revision using the supplied principal.
+   *
+   * <p>The extension entry point must verify that the authenticated principal can modify the target
+   * model before calling this method. It must pass that same principal for auditing.
+   */
+  SemanticModel publishSemanticModelRevision(NameIdentifier ident, int revision, String principal);
 
   /**
    * Returns whether a Semantic Model exists.
@@ -192,7 +218,20 @@ public interface SemanticModelDispatcher {
    * @throws NoSuchSemanticModelException If the Semantic Model does not exist.
    * @throws IllegalSemanticModelException If the model cannot be represented as an Ossie document.
    */
-  OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format);
+  default OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
+    return exportSemanticModel(ident, SemanticModelRevisionSelector.ACTIVE, format, ignored -> {})
+        .document();
+  }
+
+  /** Exports the same snapshot checked by the caller's visibility rule. */
+  SemanticModelExport exportSemanticModel(
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      OssieFormat format,
+      Consumer<SemanticModelRevision> checkVisibility);
+
+  /** An exported document and the exact revision used to serialize it. */
+  record SemanticModelExport(OssieDocument document, int revision) {}
 
   /**
    * Applies changes atomically to a Semantic Model.
@@ -207,10 +246,19 @@ public interface SemanticModelDispatcher {
    *     Model.
    * @throws IllegalSemanticModelException If a change or the resulting Semantic Model is invalid.
    */
+  default SemanticModel alterSemanticModel(
+      NameIdentifier ident,
+      SemanticModelSourceUpdate sourceUpdate,
+      SemanticModelChange... changes) {
+    return alterSemanticModel(ident, null, sourceUpdate, changes);
+  }
+
+  /** Applies changes to latest, optionally requiring the caller's expected revision. */
   SemanticModel alterSemanticModel(
-      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
-      throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
-          IllegalSemanticModelException;
+      NameIdentifier ident,
+      @Nullable Integer expectedRevision,
+      SemanticModelSourceUpdate sourceUpdate,
+      SemanticModelChange... changes);
 
   /**
    * Drops a Semantic Model.

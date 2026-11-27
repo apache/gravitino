@@ -44,7 +44,7 @@ public class JdbcConnectionConfig extends Config {
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .createWithDefault(JdbcMetricsRepository.DEFAULT_USER);
+          .create();
 
   public static final ConfigEntry<String> JDBC_PASSWORD_CONFIG =
       new ConfigBuilder(GenericJdbcMetricsRepository.JDBC_PASSWORD)

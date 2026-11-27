@@ -169,6 +169,14 @@ public abstract class AbstractGravitinoOptimizerEnvIT extends BaseIT {
         jdbcUrl,
         OptimizerConfig.OPTIMIZER_PREFIX
             + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
+            + GenericJdbcMetricsRepository.JDBC_USER,
+        "sa",
+        OptimizerConfig.OPTIMIZER_PREFIX
+            + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
+            + GenericJdbcMetricsRepository.JDBC_PASSWORD,
+        "",
+        OptimizerConfig.OPTIMIZER_PREFIX
+            + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
             + GenericJdbcMetricsRepository.JDBC_DRIVER,
         "org.h2.Driver");
   }

@@ -254,9 +254,8 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
     GravitinoMetalake bobMetalake = bobClient.loadMetalake(METALAKE);
     Catalog catalog = bobMetalake.loadCatalog(CATALOG);
     Assertions.assertNotNull(catalog);
-    // Metadata visibility does not grant Bob the source account's credentials.
-    Assertions.assertThrows(
-        ForbiddenException.class, () -> catalog.supportsCredentials().getCredentials());
+    // Metadata visibility does not grant Bob static catalog credentials (soft-filtered to empty).
+    Assertions.assertEquals(0, catalog.supportsCredentials().getCredentials().length);
 
     boolean tableExists =
         catalog.asTableCatalog().tableExists(NameIdentifier.of(SCHEMA, ALICE_TABLE));

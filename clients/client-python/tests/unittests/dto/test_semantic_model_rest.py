@@ -72,9 +72,10 @@ class TestSemanticModelREST(unittest.TestCase):
         update = SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
             _definition=self.dto
         )
-        request = SemanticModelUpdatesRequest(_updates=[update])
+        request = SemanticModelUpdatesRequest(_updates=[update], _expected_revision=3)
         request.validate()
         payload = json.loads(request.to_json(), parse_float=Decimal)
+        self.assertEqual(3, payload["expectedRevision"])
         self.assertEqual("replaceDefinition", payload["updates"][0]["@type"])
         restored = SemanticModelDefinitionDTO.from_dict(
             payload["updates"][0]["definition"]

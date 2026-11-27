@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -36,6 +37,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,17 +62,61 @@ import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelPublicationPolicy;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
+import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InOrder;
 
 public class TestManagedSemanticModelOperations {
 
   private static final Namespace NAMESPACE = Namespace.of("metalake", "catalog", "schema");
   private static final NameIdentifier IDENT = NameIdentifier.of(NAMESPACE, "sales_model");
+
+  @Test
+  void testConstructorRejectsNullPublicationPolicy() {
+    EntityStore store = mock(EntityStore.class);
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new ManagedSemanticModelOperations(store, () -> 1L, (ident, definition) -> {}, null));
+  }
+
+  @Test
+  void testConstructorReportsDuplicatePublicationPolicies(@TempDir Path resources)
+      throws Exception {
+    Path services = Files.createDirectories(resources.resolve("META-INF/services"));
+    Files.write(
+        services.resolve(SemanticModelPublicationPolicy.class.getName()),
+        List.of(FirstPolicy.class.getName(), SecondPolicy.class.getName()));
+
+    // A fresh copy of the operations class has its own policy cache, as at server startup.
+    String operationsClass = ManagedSemanticModelOperations.class.getName();
+    try (IsolatedClassLoader isolated =
+        new IsolatedClassLoader(
+            List.of(resources.toUri().toURL()), List.of(), List.of(operationsClass))) {
+      EntityStore store = mock(EntityStore.class);
+      BiConsumer<NameIdentifier, SemanticModelDefinition> validator = (ident, definition) -> {};
+      InvocationTargetException failure =
+          assertThrows(
+              InvocationTargetException.class,
+              () ->
+                  isolated.withClassLoader(
+                      loader ->
+                          loader
+                              .loadClass(operationsClass)
+                              .getConstructor(
+                                  EntityStore.class, IdGenerator.class, BiConsumer.class)
+                              .newInstance(store, RandomIdGenerator.INSTANCE, validator)));
+      IllegalStateException cause =
+          assertInstanceOf(IllegalStateException.class, failure.getCause());
+      assertEquals(
+          "Multiple Semantic Model publication policies are registered", cause.getMessage());
+    }
+  }
 
   @Test
   public void testCreateThenLoadFromMemoryStore() {
@@ -141,6 +189,7 @@ public class TestManagedSemanticModelOperations {
             operations.alterSemanticModel(
                 IDENT,
                 missing,
+                1,
                 SemanticModelChange.updateComment("Must not persist"),
                 SemanticModelChange.replaceDefinition(definition)));
     assertSame(original, operations.loadSemanticModel(IDENT));
@@ -238,11 +287,15 @@ public class TestManagedSemanticModelOperations {
 
     NameIdentifier renamedIdent = NameIdentifier.of(NAMESPACE, "renamed_sales_model");
     SemanticModelDefinition replacement = definition("invoices");
+    operations.alterSemanticModel(
+        IDENT,
+        SemanticModelSourceUpdate.preserve(),
+        SemanticModelChange.rename(renamedIdent.name()));
     SemanticModel altered =
         operations.alterSemanticModel(
-            IDENT,
+            renamedIdent,
             sources(replacement),
-            SemanticModelChange.rename(renamedIdent.name()),
+            1,
             SemanticModelChange.updateComment("Updated"),
             SemanticModelChange.setProperty("tier", "gold"),
             SemanticModelChange.removeProperty("domain"),
@@ -298,7 +351,7 @@ public class TestManagedSemanticModelOperations {
 
     SemanticModelDefinition accepted = definition("accepted");
     operations.alterSemanticModel(
-        IDENT, sources(accepted), SemanticModelChange.replaceDefinition(accepted));
+        IDENT, sources(accepted), 3, SemanticModelChange.replaceDefinition(accepted));
     assertEquals(2, writeValidationCount.get());
 
     SemanticModelDefinition duplicateDatasets =
@@ -311,6 +364,7 @@ public class TestManagedSemanticModelOperations {
             operations.alterSemanticModel(
                 IDENT,
                 sources(duplicateDatasets),
+                4,
                 SemanticModelChange.replaceDefinition(duplicateDatasets)));
     assertEquals(2, writeValidationCount.get());
     assertEquals(accepted, operations.loadSemanticModel(IDENT).definition());
@@ -323,6 +377,7 @@ public class TestManagedSemanticModelOperations {
                 operations.alterSemanticModel(
                     IDENT,
                     sources(definition("blocked")),
+                    4,
                     SemanticModelChange.replaceDefinition(definition("blocked")))));
     assertEquals(3, writeValidationCount.get());
     assertEquals(accepted, operations.loadSemanticModel(IDENT).definition());
@@ -402,6 +457,7 @@ public class TestManagedSemanticModelOperations {
         operations.alterSemanticModel(
             IDENT,
             sources(second),
+            1,
             SemanticModelChange.replaceDefinition(first),
             SemanticModelChange.replaceDefinition(second));
     assertEquals(second, altered.definition());
@@ -419,6 +475,7 @@ public class TestManagedSemanticModelOperations {
             operations.alterSemanticModel(
                 IDENT,
                 sources(second),
+                altered.revision(),
                 SemanticModelChange.replaceDefinition(invalid),
                 SemanticModelChange.replaceDefinition(definition("orders"))));
     assertEquals(3, writeValidationCount.get());
@@ -444,14 +501,18 @@ public class TestManagedSemanticModelOperations {
     SemanticModelDefinition replacement = definition("invoices");
     NameIdentifier renamedIdent = NameIdentifier.of(NAMESPACE, "validated_after_replace");
 
+    operations.alterSemanticModel(
+        IDENT,
+        SemanticModelSourceUpdate.preserve(),
+        SemanticModelChange.rename(renamedIdent.name()));
     SemanticModel altered =
         operations.alterSemanticModel(
-            IDENT,
+            renamedIdent,
             sources(replacement),
+            1,
             SemanticModelChange.replaceDefinition(replacement),
             SemanticModelChange.setProperty("owner", "analytics"),
-            SemanticModelChange.updateComment("Updated after replacement"),
-            SemanticModelChange.rename(renamedIdent.name()));
+            SemanticModelChange.updateComment("Updated after replacement"));
 
     assertEquals(2, writeValidationCount.get());
     assertEquals(renamedIdent, validatedIdent.get());
@@ -571,8 +632,7 @@ public class TestManagedSemanticModelOperations {
 
     doThrow(new NoSuchEntityException("Missing model"))
         .when(store)
-        .update(
-            eq(IDENT), eq(SemanticModelEntity.class), eq(Entity.EntityType.SEMANTIC_MODEL), any());
+        .updateSemanticModel(eq(IDENT), eq(null), anyBoolean(), any());
     assertThrows(
         NoSuchSemanticModelException.class,
         () ->
@@ -582,8 +642,7 @@ public class TestManagedSemanticModelOperations {
                 SemanticModelChange.setProperty("key", "value")));
     doThrow(new EntityAlreadyExistsException("Rename conflict"))
         .when(store)
-        .update(
-            eq(IDENT), eq(SemanticModelEntity.class), eq(Entity.EntityType.SEMANTIC_MODEL), any());
+        .updateSemanticModel(eq(IDENT), eq(null), anyBoolean(), any());
     assertThrows(
         SemanticModelAlreadyExistsException.class,
         () ->
@@ -594,8 +653,7 @@ public class TestManagedSemanticModelOperations {
     IOException updateFailure = new IOException("Update failed");
     doThrow(updateFailure)
         .when(store)
-        .update(
-            eq(IDENT), eq(SemanticModelEntity.class), eq(Entity.EntityType.SEMANTIC_MODEL), any());
+        .updateSemanticModel(eq(IDENT), eq(null), anyBoolean(), any());
     assertSame(
         updateFailure,
         assertThrows(
@@ -667,4 +725,15 @@ public class TestManagedSemanticModelOperations {
         .withSource(NameIdentifier.of("sales", "mart", name))
         .build();
   }
+
+  /** First service provider registered by the duplicate-policy test. */
+  public static class FirstPolicy implements SemanticModelPublicationPolicy {
+    @Override
+    public boolean publishOnSave(NameIdentifier semanticModel) {
+      return true;
+    }
+  }
+
+  /** Second service provider registered by the duplicate-policy test. */
+  public static class SecondPolicy extends FirstPolicy {}
 }

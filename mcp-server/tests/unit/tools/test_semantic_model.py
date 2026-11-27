@@ -548,23 +548,66 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                     {**required, **expected},
                 )
 
+    async def test_revision_reads_and_history(self):
+        self.model.update(
+            revision=2,
+            status="PUBLISHED",
+            publishedBy="reviewer",
+            publishedAt="2026-01-02T00:00:00Z",
+        )
+        for revision in (2, "latest"):
+            result = await self._call(
+                "load_semantic_model", {**_MODEL_ARGS, "revision": revision}
+            )
+            self.assertEqual(result, self.model)
+            self._assert_request(
+                "GET", f"{_MODELS_PATH}/sales_model/revisions/{revision}"
+            )
+
+        revisions = [
+            {
+                "revision": 2,
+                "status": "PUBLISHED",
+                "audit": {"creator": "writer"},
+            }
+        ]
+        self.response = {"code": 0, "revisions": revisions}
+        result = await self._call("list_semantic_model_revisions", _MODEL_ARGS)
+        self.assertEqual(revisions, result)
+        self._assert_request("GET", f"{_MODELS_PATH}/sales_model/revisions")
+
     async def test_alter_semantic_model_preserves_order_and_null_comment(self):
         updates = [
-            {"@type": "rename", "newName": "sales_model_v2"},
             {"@type": "updateComment", "newComment": None},
             {"@type": "setProperty", "property": "domain", "value": "sales"},
             {"@type": "removeProperty", "property": "legacy"},
             {"@type": "replaceDefinition", "definition": self.definition},
         ]
-        self.model["name"] = "sales_model_v2"
         self.model["comment"] = None
         result = await self._call(
-            "alter_semantic_model", {**_MODEL_ARGS, "updates": updates}
+            "alter_semantic_model",
+            {**_MODEL_ARGS, "updates": updates, "expected_revision": 7},
         )
         self.assertEqual(result, self.model)
         self._assert_request(
-            "PUT", f"{_MODELS_PATH}/sales_model", {"updates": updates}
+            "PUT",
+            f"{_MODELS_PATH}/sales_model",
+            {"updates": updates, "expectedRevision": 7},
         )
+
+    async def test_alter_rejects_non_integer_expected_revision(self):
+        updates = [{"@type": "updateComment", "newComment": "edit"}]
+        for revision in ("1", 1.0, True):
+            with self.subTest(revision=revision), self.assertRaises(ToolError):
+                await self._call(
+                    "alter_semantic_model",
+                    {
+                        **_MODEL_ARGS,
+                        "updates": updates,
+                        "expected_revision": revision,
+                    },
+                )
+        self.assertFalse(self.requests)
 
     async def test_drop_semantic_model(self):
         for dropped in (True, False):
@@ -740,6 +783,7 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                 "list_metric_infos",
                 "list_semantic_model_datasets",
                 "load_semantic_model",
+                "list_semantic_model_revisions",
                 "create_semantic_model",
                 "alter_semantic_model",
                 "drop_semantic_model",

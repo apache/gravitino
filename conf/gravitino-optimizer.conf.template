@@ -44,7 +44,7 @@ gravitino.optimizer.recommender.jobSubmitter = noop-job-submitter
 gravitino.optimizer.updater.statisticsUpdater = gravitino-statistics-updater
 # The metrics updater for the recommender/append-metrics tool.
 gravitino.optimizer.updater.metricsUpdater = gravitino-metrics-updater
-# Optional: configure JDBC metrics storage (H2 is used by default when omitted).
+# JDBC metrics storage (jdbcUrl, jdbcUser, and jdbcDriver are required; jdbcPassword may be empty).
 # gravitino.optimizer.jdbcMetrics.jdbcUrl = jdbc:postgresql://localhost:5432/optimizer
 # gravitino.optimizer.jdbcMetrics.jdbcUser = postgres
 # gravitino.optimizer.jdbcMetrics.jdbcPassword = postgres

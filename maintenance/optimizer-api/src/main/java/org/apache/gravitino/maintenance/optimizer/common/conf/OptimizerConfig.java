@@ -65,6 +65,35 @@ public class OptimizerConfig extends Config {
   public static final String UPDATER_PREFIX = OPTIMIZER_PREFIX + "updater.";
   private static final String STATISTICS_UPDATER = UPDATER_PREFIX + "statisticsUpdater";
   private static final String METRICS_UPDATER = UPDATER_PREFIX + "metricsUpdater";
+
+  /** Prefix for JDBC metrics storage keys under {@code updater-options} / optimizer config. */
+  public static final String JDBC_METRICS_PREFIX = OPTIMIZER_PREFIX + "jdbcMetrics.";
+
+  /** Canonical JDBC URL for metrics storage ({@code jdbcMetrics.jdbcUrl}). */
+  public static final String JDBC_METRICS_JDBC_URL = JDBC_METRICS_PREFIX + "jdbcUrl";
+
+  /** Canonical JDBC username for metrics storage ({@code jdbcMetrics.jdbcUser}). */
+  public static final String JDBC_METRICS_JDBC_USER = JDBC_METRICS_PREFIX + "jdbcUser";
+
+  /** Canonical JDBC password for metrics storage ({@code jdbcMetrics.jdbcPassword}). */
+  public static final String JDBC_METRICS_JDBC_PASSWORD = JDBC_METRICS_PREFIX + "jdbcPassword";
+
+  /** Canonical JDBC driver class for metrics storage ({@code jdbcMetrics.jdbcDriver}). */
+  public static final String JDBC_METRICS_JDBC_DRIVER = JDBC_METRICS_PREFIX + "jdbcDriver";
+
+  /** Canonical JDBC pool max size ({@code jdbcMetrics.poolMaxSize}). */
+  public static final String JDBC_METRICS_POOL_MAX_SIZE = JDBC_METRICS_PREFIX + "poolMaxSize";
+
+  /** Canonical JDBC pool min idle ({@code jdbcMetrics.poolMinIdle}). */
+  public static final String JDBC_METRICS_POOL_MIN_IDLE = JDBC_METRICS_PREFIX + "poolMinIdle";
+
+  /** Canonical JDBC connection timeout in ms ({@code jdbcMetrics.connectionTimeoutMs}). */
+  public static final String JDBC_METRICS_CONNECTION_TIMEOUT_MS =
+      JDBC_METRICS_PREFIX + "connectionTimeoutMs";
+
+  /** Canonical JDBC test-on-borrow flag ({@code jdbcMetrics.testOnBorrow}). */
+  public static final String JDBC_METRICS_TEST_ON_BORROW = JDBC_METRICS_PREFIX + "testOnBorrow";
+
   public static final String MONITOR_PREFIX = OPTIMIZER_PREFIX + "monitor.";
   private static final String METRICS_PROVIDER = MONITOR_PREFIX + "metricsProvider";
   private static final String TABLE_JOB_RELATION_PROVIDER =

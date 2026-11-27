@@ -79,7 +79,7 @@ commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
 commons-lang = "2.6"
 commons-logging = "1.3.5"
-commons-io = "2.18.0"
+commons-io = "2.22.0"
 commons-collections4 = "4.4"
 commons-collections3 = "3.2.2"
 commons-beanutils = "1.11.0"
@@ -239,6 +239,7 @@ reactor-netty-http = {group = "io.projectreactor.netty", name = "reactor-netty-h
 reactor-netty-core = {group = "io.projectreactor.netty", name = "reactor-netty-core", version.ref = "reactor-netty-core"}
 jackson-bom-v218 = { group = "com.fasterxml.jackson", name = "jackson-bom", version.ref = "jackson218" }
 jackson-bom-v221 = { group = "com.fasterxml.jackson", name = "jackson-bom", version.ref = "jackson221" }
+json-schema-validator = { group = "com.networknt", name = "json-schema-validator", version = "1.5.9" }
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jackson" }
 jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }

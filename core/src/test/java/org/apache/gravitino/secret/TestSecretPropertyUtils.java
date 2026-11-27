@@ -29,6 +29,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -293,6 +294,123 @@ public class TestSecretPropertyUtils {
     Assertions.assertEquals("override", merged.get("a"));
     Assertions.assertEquals("2", merged.get("b"));
     Assertions.assertTrue(SecretPropertyUtils.mergeProperties(null, null).isEmpty());
+  }
+
+  @Test
+  void testOmitStaticCredentialSecretsScopedByMetadata() {
+    PropertiesMetadata jdbcMetadata =
+        () ->
+            Map.of(
+                "jdbc-user",
+                PropertyEntry.stringOptionalPropertyEntry("jdbc-user", "doc", false, null, false),
+                "jdbc-password",
+                PropertyEntry.stringOptionalPropertyEntry(
+                    "jdbc-password", "doc", false, null, true));
+    PropertiesMetadata hiveMetadata = () -> Map.of();
+
+    Map<String, String> secrets =
+        Map.of(
+            "jdbc-user",
+            "db-user",
+            "jdbc-password",
+            "db-pass",
+            "custom-secret",
+            "keep",
+            "s3-access-key-id",
+            "AKIA");
+
+    Map<String, String> jdbcFiltered =
+        SecretPropertyUtils.omitStaticCredentialSecrets(secrets, jdbcMetadata, null);
+    Assertions.assertEquals("keep", jdbcFiltered.get("custom-secret"));
+    Assertions.assertEquals("AKIA", jdbcFiltered.get("s3-access-key-id"));
+    Assertions.assertFalse(jdbcFiltered.containsKey("jdbc-user"));
+    Assertions.assertFalse(jdbcFiltered.containsKey("jdbc-password"));
+
+    Map<String, String> hiveFiltered =
+        SecretPropertyUtils.omitStaticCredentialSecrets(secrets, hiveMetadata, null);
+    Assertions.assertEquals("db-user", hiveFiltered.get("jdbc-user"));
+    Assertions.assertEquals("db-pass", hiveFiltered.get("jdbc-password"));
+    Assertions.assertEquals("keep", hiveFiltered.get("custom-secret"));
+    Assertions.assertEquals("AKIA", hiveFiltered.get("s3-access-key-id"));
+  }
+
+  @Test
+  void testOmitStaticCredentialSecretsFromCredentialProviders() {
+    PropertiesMetadata emptyMetadata = () -> Map.of();
+    Map<String, String> secrets =
+        Map.of("jdbc-user", "u", "jdbc-password", "p", "custom-secret", "keep");
+    Map<String, String> raw =
+        Map.of(CredentialConstants.CREDENTIAL_PROVIDERS, "jdbc-user-password,s3-token");
+
+    Map<String, String> filtered =
+        SecretPropertyUtils.omitStaticCredentialSecrets(secrets, emptyMetadata, raw);
+    Assertions.assertEquals("keep", filtered.get("custom-secret"));
+    Assertions.assertFalse(filtered.containsKey("jdbc-user"));
+    Assertions.assertFalse(filtered.containsKey("jdbc-password"));
+  }
+
+  /** Mixed token + static providers: only static provider keys are omitted. */
+  @Test
+  void testOmitStaticCredentialSecretsWithMixedTokenAndStaticProviders() {
+    PropertiesMetadata emptyMetadata = () -> Map.of();
+    Map<String, String> secrets =
+        Map.of(
+            "s3-access-key-id", "AKIA", "s3-secret-access-key", "secret", "custom-secret", "keep");
+    Map<String, String> raw =
+        Map.of(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-token,s3-secret-key");
+
+    Map<String, String> filtered =
+        SecretPropertyUtils.omitStaticCredentialSecrets(secrets, emptyMetadata, raw);
+    Assertions.assertEquals("keep", filtered.get("custom-secret"));
+    Assertions.assertFalse(filtered.containsKey("s3-access-key-id"));
+    Assertions.assertFalse(filtered.containsKey("s3-secret-access-key"));
+  }
+
+  /**
+   * When metadata does not declare S3 keys, omit still drops the pair if those keys are present on
+   * the property map (inferred providers or leftover static pairs beside a token-only list).
+   */
+  @Test
+  void testOmitStaticCredentialSecretsWhenStaticKeysPresentOnProperties() {
+    PropertiesMetadata emptyMetadata = () -> Map.of();
+    Map<String, String> secrets =
+        Map.of(
+            "s3-access-key-id", "AKIA", "s3-secret-access-key", "secret", "custom-secret", "keep");
+
+    Map<String, String> entityRawWithoutProviders =
+        Map.of("s3-access-key-id", "AKIA", "s3-secret-access-key", "secret");
+    Map<String, String> fromPresence =
+        SecretPropertyUtils.omitStaticCredentialSecrets(
+            secrets, emptyMetadata, entityRawWithoutProviders);
+    Assertions.assertEquals("keep", fromPresence.get("custom-secret"));
+    Assertions.assertFalse(fromPresence.containsKey("s3-access-key-id"));
+    Assertions.assertFalse(fromPresence.containsKey("s3-secret-access-key"));
+
+    Map<String, String> tokenOnlyWithLeftoverStatic =
+        Map.of(
+            "s3-access-key-id",
+            "AKIA",
+            "s3-secret-access-key",
+            "secret",
+            CredentialConstants.CREDENTIAL_PROVIDERS,
+            "s3-token");
+    Map<String, String> filtered =
+        SecretPropertyUtils.omitStaticCredentialSecrets(
+            secrets, emptyMetadata, tokenOnlyWithLeftoverStatic);
+    Assertions.assertEquals("keep", filtered.get("custom-secret"));
+    Assertions.assertFalse(filtered.containsKey("s3-access-key-id"));
+    Assertions.assertFalse(filtered.containsKey("s3-secret-access-key"));
+  }
+
+  @Test
+  void testIsStaticCredentialType() {
+    Assertions.assertTrue(StaticCredentialSecretKeys.isStaticCredentialType("s3-secret-key"));
+    Assertions.assertTrue(StaticCredentialSecretKeys.isStaticCredentialType("S3-SECRET-KEY"));
+    Assertions.assertTrue(StaticCredentialSecretKeys.isStaticCredentialType("jdbc-user-password"));
+    Assertions.assertFalse(StaticCredentialSecretKeys.isStaticCredentialType("s3-token"));
+    Assertions.assertFalse(StaticCredentialSecretKeys.isStaticCredentialType("aws-irsa"));
+    Assertions.assertFalse(StaticCredentialSecretKeys.isStaticCredentialType(null));
+    Assertions.assertFalse(StaticCredentialSecretKeys.isStaticCredentialType(""));
   }
 
   @Test
