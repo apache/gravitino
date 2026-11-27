@@ -49,16 +49,17 @@ supports versioned writes, or `CatalogChange.setSecretReference` (REST update ty
 
 The server start script `bin/gravitino.sh` also sets the Kafka client JVM properties
 `org.apache.kafka.automatic.config.providers=none` and an empty
-`org.apache.kafka.sasl.oauthbearer.allowed.urls`. Kafka's built-in OAUTHBEARER login callback
-handler, `org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler`, fetches a
-token from `sasl.oauthbearer.token.endpoint.url` and refuses any URL that is not in the allow list.
-With the empty list, a Kafka catalog cannot make the server read a `file://` URL or call an internal
-HTTP endpoint through that property. A catalog that uses this handler needs its token endpoint URL
-in the list, for example
+`org.apache.kafka.sasl.oauthbearer.allowed.urls`. Kafka's OAUTHBEARER login callback handler,
+`org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler`, fetches a token from
+`sasl.oauthbearer.token.endpoint.url` and refuses any URL that is not in the allow list. The legacy
+class name `org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerLoginCallbackHandler`
+is a subclass and behaves the same. With the empty list, a Kafka catalog cannot make the server read
+a `file://` URL or call an internal HTTP endpoint through that property. A catalog that uses either
+class needs its token endpoint URL in the list, for example
 `-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp.example.com/oauth2/token`. Login
 handlers that create the token themselves, such as the AWS MSK IAM handler, do not read the token
-endpoint and work with the empty list. The script keeps a value that is already set in `JAVA_OPTS`,
-`JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS` or `_JAVA_OPTIONS`.
+endpoint and work with the empty list. The script sets these as defaults: a value set in
+`JAVA_OPTS`, `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS` or `_JAVA_OPTIONS` replaces them.
 
 See [Kafka catalog client upgrade](./migration-guide.md#kafka-catalog-client-upgrade) for how to
 migrate catalogs that used config providers or `LdapLoginModule`.

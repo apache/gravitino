@@ -110,28 +110,13 @@ function addDirToClasspath(){
 # Rotate a launch script's .out file before the process starts, so the file does not grow across
 # restarts. The previous files are kept as <file>.1 (newest) to <file>.N (oldest), where N is
 # GRAVITINO_OUT_FILE_KEEP (default 5). Set it to 0 to keep no previous file.
-# Returns 0 when the JVM system property named by $1 is set in JAVA_OPTS or in one of the option
-# variables that the java launcher reads itself (JAVA_TOOL_OPTIONS, JDK_JAVA_OPTIONS and
-# _JAVA_OPTIONS). Both -Dname=value and -Dname, with or without surrounding double quotes, count.
-function has_jvm_system_property() {
-  local name="${1//./\\.}"
-  local pattern="(^|[[:space:]]|\")-D${name}(=|[[:space:]]|\"|$)"
-  local opts
-  for opts in "${JAVA_OPTS:-}" "${JAVA_TOOL_OPTIONS:-}" "${JDK_JAVA_OPTIONS:-}" "${_JAVA_OPTIONS:-}"; do
-    if [[ "${opts}" =~ ${pattern} ]]; then
-      return 0
-    fi
-  done
-  return 1
-}
-
-# Appends -D$1=$2 to JAVA_OPTS unless the property is already set (see has_jvm_system_property).
-# The launcher passes JAVA_OPTS on the command line, which overrides JAVA_TOOL_OPTIONS and
-# JDK_JAVA_OPTIONS, so a default added here would otherwise replace the operator's value.
+# Sets a default for the JVM system property $1 by prepending -D$1=$2 to JAVA_TOOL_OPTIONS, which
+# the JVM reads before every other source. Any value an operator sets for the same property wins,
+# in JAVA_TOOL_OPTIONS (it comes later), JDK_JAVA_OPTIONS (including @argfiles), the command line
+# (JAVA_OPTS) or _JAVA_OPTIONS. The launcher does not need to parse those variables, so quoting and
+# @argfile syntax cannot make the default replace a configured value.
 function add_default_jvm_system_property() {
-  if ! has_jvm_system_property "$1"; then
-    JAVA_OPTS+=" -D$1=$2"
-  fi
+  export JAVA_TOOL_OPTIONS="-D$1=$2${JAVA_TOOL_OPTIONS:+ ${JAVA_TOOL_OPTIONS}}"
 }
 
 function rotate_out_file() {
