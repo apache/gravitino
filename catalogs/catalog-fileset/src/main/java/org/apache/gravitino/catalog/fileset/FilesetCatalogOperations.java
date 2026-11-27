@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.CONFIG_RESOURCES;
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.SCHEME_HDFS;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
@@ -30,7 +31,7 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
 import static org.apache.gravitino.metrics.MetricNames.FILESYSTEM_CACHE;
 
 import com.codahale.metrics.caffeine.MetricsStatsCounter;
-import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
@@ -38,6 +39,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -55,12 +57,25 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -86,6 +101,7 @@ import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
+import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProxy;
 import org.apache.gravitino.catalog.hadoop.fs.InMemoryFileSystemCredentialsProvider;
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
 import org.apache.gravitino.connector.CatalogInfo;
@@ -134,6 +150,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.util.ShutdownHookManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -178,7 +195,29 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   // TODO: Move the file system cache to the module of hadoop-common and reuse it in the
   // BaseGVFSOperations
-  @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
+  // The caches load their entries on a pool, so that a caller waits for an entry being loaded only
+  // until its own deadline.
+  @VisibleForTesting AsyncCache<FileSystemCacheKey, FileSystem> fileSystemCache;
+
+  // Resolving the HDFS login settings parses XML, so the settings are cached.
+  // Expiring after write lets edits to the config.resources files reach the key within about an
+  // hour.
+  // Settings that expand no Hadoop variable are the same for configurations that differ only in
+  // their identifier, so they are cached by the configuration without it. Otherwise that entry is
+  // empty, and the settings are cached by the whole configuration.
+  @VisibleForTesting
+  final AsyncCache<ConfKey, Optional<Map<String, String>>> sharedHdfsLoginSettingsCache =
+      Caffeine.newBuilder().maximumSize(1000).expireAfterWrite(1, TimeUnit.HOURS).buildAsync();
+
+  @VisibleForTesting
+  final AsyncCache<ConfKey, Map<String, String>> hdfsLoginSettingsCache =
+      Caffeine.newBuilder().maximumSize(1000).expireAfterWrite(1, TimeUnit.HOURS).buildAsync();
+
+  // The pool threads running a task, which close() interrupts on threads of their own.
+  @VisibleForTesting final Set<Thread> runningWorkers = ConcurrentHashMap.newKeySet();
+
+  // Set first by close(), so that a file system created afterwards is not cached.
+  private volatile boolean closed;
 
   @VisibleForTesting
   final ThreadPoolExecutor fileSystemExecutor =
@@ -196,7 +235,54 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         {
           allowCoreThreadTimeOut(true);
         }
+
+        @Override
+        protected void beforeExecute(Thread thread, Runnable task) {
+          startTask(thread);
+        }
+
+        @Override
+        protected void afterExecute(Runnable task, Throwable failure) {
+          runningWorkers.remove(Thread.currentThread());
+        }
       };
+
+  // A pool of its own, so that resolving login settings, which only reads files, does not wait
+  // behind file system creations and logins that may hang.
+  @VisibleForTesting
+  final ThreadPoolExecutor loginSettingsExecutor =
+      new ThreadPoolExecutor(
+          Math.max(2, Math.min(Runtime.getRuntime().availableProcessors(), 4)),
+          Math.max(2, Math.min(Runtime.getRuntime().availableProcessors(), 4)),
+          5L,
+          TimeUnit.SECONDS,
+          new ArrayBlockingQueue<>(1000),
+          new ThreadFactoryBuilder()
+              .setDaemon(true)
+              .setNameFormat("fileset-login-settings-pool-%d")
+              .build(),
+          new ThreadPoolExecutor.AbortPolicy()) {
+        {
+          allowCoreThreadTimeOut(true);
+        }
+
+        @Override
+        protected void beforeExecute(Thread thread, Runnable task) {
+          startTask(thread);
+        }
+
+        @Override
+        protected void afterExecute(Runnable task, Throwable failure) {
+          runningWorkers.remove(Thread.currentThread());
+        }
+      };
+
+  // Closes the file systems that nobody will use, those that tasks return after their callers
+  // stopped waiting and those created after the catalog closed, off the worker that an interrupt
+  // may still reach. With all its threads busy, the thread that hands one over closes it, mostly
+  // the worker that created it, so that a close that hangs holds that thread rather than a new one;
+  // on a worker, an interrupt may then reach that close.
+  @VisibleForTesting final ThreadPoolExecutor resultCloser = newResultCloser();
 
   FilesetCatalogOperations(EntityStore store, SecretManager secretManager) {
     this(store, secretManager, null);
@@ -223,18 +309,21 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
      * When the path is a path without scheme such as 'file','hdfs', etc., then the scheme and
      * authority are both null
      *
-     * <p>NOTE: The filesystem cache key includes the schema, authority, and current user. Changes
-     * to the configuration of the fileset will not affect the cached filesystem.
+     * <p>NOTE: The filesystem cache key includes the scheme, authority, current user and, for HDFS,
+     * the login settings of the configuration. Changes to other configuration of the fileset will
+     * not affect the cached filesystem.
      */
     @Nullable private final String scheme;
 
     @Nullable private final String authority;
     private final String currentUser;
+    private final Map<String, String> loginSettings;
 
-    FileSystemCacheKey(String scheme, String authority) {
+    FileSystemCacheKey(String scheme, String authority, Map<String, String> loginSettings) {
       this.scheme = scheme;
       this.authority = authority;
       this.currentUser = PrincipalUtils.getCurrentUserName();
+      this.loginSettings = loginSettings;
     }
 
     @Override
@@ -248,7 +337,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       FileSystemCacheKey that = (FileSystemCacheKey) o;
       return Objects.equals(scheme, that.scheme)
           && Objects.equals(authority, that.authority)
-          && Objects.equals(currentUser, that.currentUser);
+          && Objects.equals(currentUser, that.currentUser)
+          && loginSettings.equals(that.loginSettings);
     }
 
     @Override
@@ -256,7 +346,311 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       int result = 31 * (scheme == null ? 0 : scheme.hashCode());
       result = 31 * result + (authority == null ? 0 : authority.hashCode());
       result = 31 * result + currentUser.hashCode();
+      result = 31 * result + loginSettings.hashCode();
       return result;
+    }
+  }
+
+  /**
+   * The configuration a file system logs in with, its settings, and whether they expand variables.
+   */
+  static class HdfsLogin {
+    final Configuration configuration;
+    final Map<String, String> settings;
+    final boolean expandsVariables;
+
+    HdfsLogin(Configuration configuration, Map<String, String> settings, boolean expandsVariables) {
+      this.configuration = configuration;
+      this.settings = settings;
+      this.expandsVariables = expandsVariables;
+    }
+  }
+
+  /**
+   * A configuration as a key of the login settings caches, without the identifier of its entity if
+   * asked to. It wraps the configuration as it is, so a lookup copies nothing; a key that a cache
+   * keeps holds a copy.
+   */
+  static final class ConfKey {
+    private final Map<String, String> conf;
+    private final boolean withoutIdentifier;
+    private final int hashCode;
+
+    private ConfKey(Map<String, String> conf, boolean withoutIdentifier) {
+      this.conf = conf;
+      this.withoutIdentifier = withoutIdentifier;
+      int hash = conf.hashCode();
+      if (withoutIdentifier && conf.containsKey(StringIdentifier.ID_KEY)) {
+        // The hash code of a map is the sum of those of its entries.
+        hash -=
+            StringIdentifier.ID_KEY.hashCode()
+                ^ Objects.hashCode(conf.get(StringIdentifier.ID_KEY));
+      }
+      this.hashCode = hash;
+    }
+
+    static ConfKey of(Map<String, String> conf) {
+      return new ConfKey(conf, false);
+    }
+
+    // Filesets that inherit all other properties have configurations that differ only in their
+    // identifiers.
+    static ConfKey withoutIdentifier(Map<String, String> conf) {
+      return new ConfKey(conf, true);
+    }
+
+    ConfKey copy() {
+      return new ConfKey(Collections.unmodifiableMap(new HashMap<>(conf)), withoutIdentifier);
+    }
+
+    private boolean ignores(String key) {
+      return withoutIdentifier && StringIdentifier.ID_KEY.equals(key);
+    }
+
+    private int size() {
+      return withoutIdentifier && conf.containsKey(StringIdentifier.ID_KEY)
+          ? conf.size() - 1
+          : conf.size();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof ConfKey)) {
+        return false;
+      }
+      ConfKey that = (ConfKey) o;
+      if (withoutIdentifier != that.withoutIdentifier
+          || hashCode != that.hashCode
+          || size() != that.size()) {
+        return false;
+      }
+      for (Map.Entry<String, String> entry : conf.entrySet()) {
+        if (ignores(entry.getKey())) {
+          continue;
+        }
+        String value = that.conf.get(entry.getKey());
+        if (!Objects.equals(entry.getValue(), value)
+            || (value == null && !that.conf.containsKey(entry.getKey()))) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      return hashCode;
+    }
+  }
+
+  /**
+   * The result of a task on a pool, which fails at a deadline. Caffeine logs every entry whose load
+   * fails with an exception other than a timeout, so a task that fails completes with null, which
+   * removes an entry silently, and keeps its failure here.
+   */
+  static class TimedTask<T> extends CompletableFuture<T> {
+    private final long deadlineNanos;
+    @Nullable private volatile Throwable failure;
+
+    private TimedTask(long deadlineNanos) {
+      this.deadlineNanos = deadlineNanos;
+    }
+
+    // When the deadline passes first, the task leaves the queue or, if a thread can be started for
+    // that, is interrupted, and a result that it returns later is closed. A login can ignore
+    // interrupts. The timer is the catalog's, whose thread close() stops: the JVM-wide timer of
+    // orTimeout keeps the class loader of the catalog that first starts it.
+    static <T> TimedTask<T> start(
+        ExecutorService executor,
+        ScheduledExecutorService timer,
+        Executor closer,
+        Callable<T> task,
+        long deadlineNanos) {
+      TimedTask<T> timed = new TimedTask<>(deadlineNanos);
+      long timeoutNanos = deadlineNanos - System.nanoTime();
+      if (timeoutNanos <= 0) {
+        // The caller has no time left, so it starts no task that it would not wait for.
+        timed.completeExceptionally(new TimeoutException());
+        return timed;
+      }
+      // Timed before it is submitted, so that a call made after close() has stopped the timer
+      // submits no task.
+      ScheduledFuture<?> timeout =
+          timer.schedule(
+              () -> timed.completeExceptionally(new TimeoutException()),
+              timeoutNanos,
+              TimeUnit.NANOSECONDS);
+      Future<?> running;
+      try {
+        running =
+            executor.submit(
+                () -> {
+                  T result;
+                  try {
+                    result = task.call();
+                  } catch (Throwable t) {
+                    timed.failure = t;
+                    timed.complete(null);
+                    return;
+                  }
+                  // close() may have interrupted this thread, and completing runs the stages that
+                  // close the result after close().
+                  Thread.interrupted();
+                  if (!timed.complete(result)) {
+                    closeLater(closer, result);
+                  }
+                });
+      } catch (RejectedExecutionException | Error e) {
+        // An Error may come after the pool queued the task, which then closes its result once it
+        // returns.
+        timed.completeExceptionally(e);
+        timeout.cancel(false);
+        throw e;
+      }
+      timed.whenComplete(
+          (result, e) -> {
+            if (e == null) {
+              return;
+            }
+            // A task that has not started leaves the queue, so that it takes no room from others.
+            if (executor instanceof ThreadPoolExecutor
+                && ((ThreadPoolExecutor) executor).getQueue().remove(running)) {
+              return;
+            }
+            // Interrupting a thread that reads a file through an interruptible channel waits until
+            // the read returns, so neither the caller nor the timer does it. Without a thread, the
+            // task is not interrupted, and its result is closed once it returns.
+            startInterrupter("gravitino-fileset-task-canceller", () -> running.cancel(true));
+          });
+      timed.whenComplete((result, e) -> timeout.cancel(false));
+      return timed;
+    }
+
+    // An interrupt may still reach the thread that returned the result, so the result is closed on
+    // a thread of the closer, or on this one if none is free or starts.
+    static void closeLater(Executor closer, @Nullable Object result) {
+      if (result instanceof Closeable) {
+        Runnable close = () -> closeQuietly(result);
+        try {
+          closer.execute(close);
+        } catch (Throwable t) {
+          LOG.warn("Failed to hand over a result to close", t);
+          close.run();
+        }
+      }
+    }
+
+    // Releasing the catalog class loader interrupts, on the releasing thread, each thread whose
+    // context class loader is the catalog's, or whose class or Runnable is defined by it, and waits
+    // up to 500 ms for it. An interrupter may wait for the read it interrupts, so its Runnable is a
+    // JDK FutureTask and it has no context class loader.
+    static boolean startInterrupter(String name, Runnable interrupt) {
+      Runnable logged =
+          () -> {
+            try {
+              interrupt.run();
+            } catch (Throwable t) {
+              LOG.warn("Failed to interrupt in the thread {}", name, t);
+            }
+          };
+      try {
+        Thread thread = new Thread(new FutureTask<>(logged, null), name);
+        thread.setDaemon(true);
+        thread.setContextClassLoader(null);
+        thread.start();
+        return true;
+      } catch (Throwable t) {
+        LOG.warn("Failed to start the thread {}", name, t);
+        return false;
+      }
+    }
+
+    // Waits for the result until the deadline. A task that failed at the deadline of the caller
+    // that started it fails with a timeout here too.
+    @Nullable
+    static <T> T await(CompletableFuture<T> future, long deadlineNanos)
+        throws InterruptedException, ExecutionException, TimeoutException {
+      T result;
+      try {
+        result = future.get(Math.max(0, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS);
+      } catch (TimeoutException e) {
+        // The task is due too when this caller started it. Failing it now, rather than when its
+        // timer fires, closes a result that comes after this caller gave up instead of caching it.
+        if (future instanceof TimedTask && ((TimedTask<?>) future).deadlineNanos == deadlineNanos) {
+          future.completeExceptionally(new TimeoutException());
+        }
+        throw e;
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw e;
+      } catch (ExecutionException e) {
+        if (e.getCause() instanceof TimeoutException) {
+          throw (TimeoutException) e.getCause();
+        }
+        throw e;
+      }
+      Throwable failure = future instanceof TimedTask ? ((TimedTask<?>) future).failure : null;
+      if (failure != null) {
+        throw new ExecutionException(failure);
+      }
+      return result;
+    }
+
+    // Gets the entry, loading it on a miss, and waits for it until the deadline. An entry that
+    // fails at the earlier deadline of the caller that started it is loaded again with the time
+    // this caller has left. A caller whose wait ends with the failure of a load another caller
+    // started, with that caller's configuration, loads again until it gets a result or its own
+    // failure, as each caller does with a synchronous cache. A load that returns null is not loaded
+    // again: the caller gets null, which only a file system creation returns.
+    @Nullable
+    static <K, V> V awaitEntry(
+        AsyncCache<K, V> cache,
+        K key,
+        BiFunction<? super K, Executor, CompletableFuture<V>> load,
+        long deadlineNanos)
+        throws InterruptedException, ExecutionException, TimeoutException {
+      return awaitEntry(cache, key, null, load, deadlineNanos);
+    }
+
+    // As above, but a miss inserts the key that storedKey returns, which equals the given key, and
+    // passes it to load.
+    @Nullable
+    static <K, V> V awaitEntry(
+        AsyncCache<K, V> cache,
+        K key,
+        @Nullable Supplier<K> storedKey,
+        BiFunction<? super K, Executor, CompletableFuture<V>> load,
+        long deadlineNanos)
+        throws InterruptedException, ExecutionException, TimeoutException {
+      while (true) {
+        AtomicBoolean started = new AtomicBoolean();
+        CompletableFuture<V> entry = storedKey == null ? null : cache.getIfPresent(key);
+        if (entry == null) {
+          entry =
+              cache.get(
+                  storedKey == null ? key : storedKey.get(),
+                  (k, executor) -> {
+                    started.set(true);
+                    return load.apply(k, executor);
+                  });
+        }
+        try {
+          return await(entry, deadlineNanos);
+        } catch (TimeoutException e) {
+          if (!entry.isCompletedExceptionally() || deadlineNanos - System.nanoTime() <= 0) {
+            throw e;
+          }
+        } catch (ExecutionException e) {
+          if (started.get() || deadlineNanos - System.nanoTime() <= 0) {
+            throw e;
+          }
+        }
+        // Caffeine removes a failed entry once it completes, maybe after this caller wakes up.
+        cache.asMap().remove(key, entry);
+      }
     }
   }
 
@@ -300,6 +694,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     if (!disableFSOps) {
+      // Hadoop adds its shutdown hook on the thread that first uses it, with that thread's context
+      // class loader, by which the class loader cleaner removes the hook when the catalog is
+      // released. close() gives the pool threads another one, so the hook is added here.
+      if (Thread.currentThread().getContextClassLoader()
+          == ShutdownHookManager.class.getClassLoader()) {
+        ShutdownHookManager.get();
+      }
+
       this.fileSystemProvidersMap =
           ImmutableMap.<String, FileSystemProvider>builder()
               .putAll(FileSystemUtils.getFileSystemProviders())
@@ -321,6 +723,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                   .setDaemon(true)
                   .setNameFormat("file-system-cache-for-fileset" + "-%d")
                   .build());
+      // It also times the tasks on the pools, whose timeouts are cancelled once they complete.
+      scheduler.setRemoveOnCancelPolicy(true);
 
       Caffeine<Object, Object> cacheBuilder =
           Caffeine.newBuilder()
@@ -334,10 +738,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                         cacheKey == null ? null : cacheKey.authority,
                         cacheKey == null ? null : cacheKey.currentUser,
                         cause);
+                    if (value == null) {
+                      return;
+                    }
+                    // Runs in a stage that nothing reads, so a failure is only logged here.
                     try {
                       ((FileSystem) value).close();
-                    } catch (IOException e) {
-                      LOG.warn("Failed to close FileSystem instance in cache", e);
+                    } catch (Throwable t) {
+                      LOG.warn("Failed to close FileSystem instance in cache", t);
                     }
                   })
               .scheduler(Scheduler.forScheduledExecutorService(scheduler));
@@ -349,10 +757,21 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 new MetricsStatsCounter(
                     catalogMetricsSource.getMetricRegistry(), FILESYSTEM_CACHE));
       }
-      this.fileSystemCache = cacheBuilder.build();
+      this.fileSystemCache = cacheBuilder.buildAsync();
     }
 
-    this.catalogStorageLocations = getAndCheckCatalogStorageLocations(config);
+    try {
+      this.catalogStorageLocations = getAndCheckCatalogStorageLocations(config);
+    } catch (RuntimeException | Error e) {
+      // A catalog keeps no operations whose initialization failed, so nothing else closes the file
+      // systems created to check the locations.
+      try {
+        close();
+      } catch (IOException | RuntimeException closeFailure) {
+        e.addSuppressed(closeFailure);
+      }
+      throw e;
+    }
 
     // Metrics System could be null in UT.
     if (metricsSystem != null) {
@@ -1037,34 +1456,108 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   @Override
   public void close() throws IOException {
-    // do nothing
+    closed = true;
     if (scheduler != null) {
       scheduler.shutdownNow();
     }
 
-    if (!fileSystemExecutor.isShutdown()) {
-      fileSystemExecutor.shutdownNow();
+    // Interrupting a thread that reads a file through an interruptible channel waits until the read
+    // returns, so the running tasks are interrupted on threads of their own. Queued tasks are
+    // dropped, and a task taken but not started yet is interrupted by its own thread.
+    fileSystemExecutor.shutdown();
+    loginSettingsExecutor.shutdown();
+    fileSystemExecutor.getQueue().clear();
+    loginSettingsExecutor.getQueue().clear();
+    for (Thread worker : runningWorkers) {
+      releaseFromCatalog(worker);
+      TimedTask.startInterrupter("gravitino-fileset-close-interrupter", worker::interrupt);
     }
 
     if (fileSystemCache != null) {
+      // Also closes the file systems still being created, once they are.
       fileSystemCache
           .asMap()
+          .values()
           .forEach(
-              (k, v) -> {
-                try {
-                  v.close();
-                } catch (IOException e) {
-                  LOG.warn("Failed to close FileSystem instance in cache", e);
-                }
+              entry -> {
+                // A file system created later is closed off the thread that created it, which an
+                // interrupter may still interrupt.
+                boolean created = entry.isDone();
+                entry.thenAccept(
+                    fs -> {
+                      if (fs == null) {
+                        return;
+                      }
+                      if (!created) {
+                        TimedTask.closeLater(resultCloser, fs);
+                        return;
+                      }
+                      // Runs in a stage that nothing reads, so a failure is only logged here.
+                      try {
+                        fs.close();
+                      } catch (Throwable t) {
+                        LOG.warn("Failed to close FileSystem instance in cache", t);
+                      }
+                    });
               });
-      fileSystemCache.cleanUp();
+      fileSystemCache.synchronous().cleanUp();
     }
+    // The keys hold the merged configuration, which may carry resolved secrets.
+    sharedHdfsLoginSettingsCache.synchronous().invalidateAll();
+    hdfsLoginSettingsCache.synchronous().invalidateAll();
 
     // Metrics System could be null in UT.
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     if (metricsSystem != null) {
       metricsSystem.unregister(catalogMetricsSource);
     }
+  }
+
+  // Either close() sees the thread among the running workers, or the thread sees closed.
+  private void startTask(Thread thread) {
+    runningWorkers.add(thread);
+    if (closed) {
+      releaseFromCatalog(thread);
+      // Interrupting itself waits for no read.
+      thread.interrupt();
+    }
+  }
+
+  // Releasing the catalog class loader interrupts, on the releasing thread, each thread whose
+  // context class loader is the catalog's. A child loader is not, and finds the same classes and
+  // services, such as the file systems that Hadoop looks up once, through the context class loader
+  // of the first thread that needs them.
+  private static void releaseFromCatalog(Thread worker) {
+    ClassLoader loader = worker.getContextClassLoader();
+    if (loader != null) {
+      worker.setContextClassLoader(new ClassLoader(loader) {});
+    }
+  }
+
+  // Static, so that a closer thread does not keep the operations reachable.
+  private static ThreadPoolExecutor newResultCloser() {
+    int threads = Math.max(2, Math.min(Runtime.getRuntime().availableProcessors(), 4));
+    ThreadPoolExecutor closer =
+        new ThreadPoolExecutor(
+            threads,
+            threads,
+            5L,
+            TimeUnit.SECONDS,
+            new SynchronousQueue<>(),
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("gravitino-fileset-late-result-closer-%d")
+                .setThreadFactory(
+                    task -> {
+                      Thread thread = new Thread(task);
+                      // Not interrupted and waited for when the catalog class loader is released.
+                      releaseFromCatalog(thread);
+                      return thread;
+                    })
+                .build(),
+            (task, executor) -> task.run());
+    closer.allowCoreThreadTimeOut(true);
+    return closer;
   }
 
   private void deleteEmptySchemaLocations(NameIdentifier ident, SchemaEntity schemaEntity)
@@ -1481,17 +1974,196 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
     String authority =
         provider != null ? provider.getFullAuthority(path, conf) : path.toUri().getAuthority();
-    return fileSystemCache.get(
-        new FileSystemCacheKey(scheme, authority),
-        cacheKey -> {
-          try {
+    // Resolving the settings and creating the file system share one connection timeout.
+    long deadlineNanos =
+        System.nanoTime() + TimeUnit.SECONDS.toNanos(connectionTimeoutSeconds(conf));
+    // Only an HDFS file system logs in with the settings of the configuration, see
+    // createFileSystem.
+    String fsScheme = scheme != null ? scheme : defaultFileSystemProvider.scheme();
+    if (!SCHEME_HDFS.equals(fsScheme)) {
+      return cachedFileSystem(
+          path,
+          conf,
+          new FileSystemCacheKey(scheme, authority, Collections.emptyMap()),
+          null,
+          deadlineNanos);
+    }
+
+    FileSystem fs = getHdfsFileSystemWithCache(path, conf, scheme, authority, deadlineNanos);
+    if (fs == null) {
+      // The config.resources files changed after their login settings were cached.
+      sharedHdfsLoginSettingsCache.synchronous().invalidate(ConfKey.withoutIdentifier(conf));
+      hdfsLoginSettingsCache.synchronous().invalidate(ConfKey.of(conf));
+      fs = getHdfsFileSystemWithCache(path, conf, scheme, authority, deadlineNanos);
+    }
+    if (fs == null) {
+      throw new GravitinoRuntimeException(
+          "The login settings in config.resources changed while getting FileSystem for fileset:"
+              + " path: %s",
+          path);
+    }
+    return fs;
+  }
+
+  // Returns null if the config.resources files no longer resolve to the cached login settings: a
+  // file system is cached only under the settings of the configuration it is created with.
+  @Nullable
+  private FileSystem getHdfsFileSystemWithCache(
+      Path path,
+      Map<String, String> conf,
+      @Nullable String scheme,
+      @Nullable String authority,
+      long deadlineNanos) {
+    Map<String, String> settings = hdfsLoginSettings(path, conf, deadlineNanos);
+    return cachedFileSystem(
+        path, conf, new FileSystemCacheKey(scheme, authority, settings), settings, deadlineNanos);
+  }
+
+  // A miss creates the file system on the pool, under the deadline of this caller. Callers that
+  // find it being created wait for it until their own deadlines.
+  @Nullable
+  private FileSystem cachedFileSystem(
+      Path path,
+      Map<String, String> conf,
+      FileSystemCacheKey key,
+      @Nullable Map<String, String> expectedSettings,
+      long deadlineNanos) {
+    // A null result caches nothing; the cache statistics count it as a failed load.
+    try {
+      return TimedTask.awaitEntry(
+          fileSystemCache,
+          key,
+          (cacheKey, executor) -> {
+            fileSystemProvider(path);
+            // The creation may outlive this caller, whose configuration is not copied on a hit.
+            Map<String, String> keptConf = new HashMap<>(conf);
             // Create the file system for the user it is cached under.
-            return getFileSystem(path, conf, cacheKey.currentUser);
-          } catch (IOException e) {
-            throw new GravitinoRuntimeException(
-                e, "Failed to get FileSystem for fileset: path: %s", path);
-          }
-        });
+            return TimedTask.start(
+                fileSystemExecutor,
+                scheduler,
+                resultCloser,
+                () -> {
+                  FileSystem fs =
+                      getFileSystem(path, keptConf, cacheKey.currentUser, expectedSettings);
+                  if (fs != null && closed) {
+                    // close() may have gone through the cache before this entry was in it.
+                    TimedTask.closeLater(resultCloser, fs);
+                    throw new IOException("The catalog is closed");
+                  }
+                  return fs;
+                },
+                deadlineNanos);
+          },
+          deadlineNanos);
+    } catch (TimeoutException
+        | InterruptedException
+        | RejectedExecutionException
+        | ExecutionException e) {
+      throw new GravitinoRuntimeException(
+          fileSystemFailure(path, conf, e), "Failed to get FileSystem for fileset: path: %s", path);
+    }
+  }
+
+  private Map<String, String> hdfsLoginSettings(
+      Path path, Map<String, String> conf, long deadlineNanos) {
+    // Settings resolved for the shared entry that expand variables, returned to this caller only:
+    // they may be older than what another caller has cached for this configuration since.
+    AtomicReference<Map<String, String>> resolved = new AtomicReference<>();
+    Optional<Map<String, String>> shared =
+        awaitLoginSettings(
+            path,
+            conf,
+            sharedHdfsLoginSettingsCache,
+            ConfKey.withoutIdentifier(conf),
+            keptConf -> {
+              HdfsLogin login = resolveHdfsLogin(keptConf);
+              if (login.expandsVariables) {
+                resolved.set(login.settings);
+                return Optional.empty();
+              }
+              return Optional.of(login.settings);
+            },
+            deadlineNanos);
+    if (shared.isPresent()) {
+      return shared.get();
+    }
+    if (resolved.get() != null) {
+      return resolved.get();
+    }
+    return awaitLoginSettings(
+        path,
+        conf,
+        hdfsLoginSettingsCache,
+        ConfKey.of(conf),
+        keptConf -> resolveHdfsLogin(keptConf).settings,
+        deadlineNanos);
+  }
+
+  // Reading the config.resources files may hang, so the login is resolved on a pool under the
+  // timeout.
+  private <T> T awaitLoginSettings(
+      Path path,
+      Map<String, String> conf,
+      AsyncCache<ConfKey, T> cache,
+      ConfKey key,
+      Function<Map<String, String>, T> resolve,
+      long deadlineNanos) {
+    try {
+      // The load resolves a copy of the configuration, never the caller's map.
+      return TimedTask.awaitEntry(
+          cache,
+          key,
+          key::copy,
+          (keptKey, executor) ->
+              TimedTask.start(
+                  loginSettingsExecutor,
+                  scheduler,
+                  resultCloser,
+                  () -> resolve.apply(keptKey.conf),
+                  deadlineNanos),
+          deadlineNanos);
+    } catch (RejectedExecutionException e) {
+      // The pool is full, or the catalog is closed.
+      throw new GravitinoRuntimeException(
+          e, "Failed to start resolving the login settings for path: %s", path);
+    } catch (TimeoutException e) {
+      int timeoutSeconds = connectionTimeoutSeconds(conf);
+      LOG.warn(
+          "Timeout when resolving the login settings for path: {} within {} seconds",
+          path,
+          timeoutSeconds,
+          e);
+      throw new GravitinoRuntimeException(
+          e,
+          "Failed to resolve the login settings for path: %s within %s seconds, please check the "
+              + "config.resources files or increase the file system connection timeout time by "
+              + "setting catalog property: %s",
+          path,
+          timeoutSeconds,
+          FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
+    } catch (InterruptedException e) {
+      throw ExceptionMessages.wrap("Interrupted when getting FileSystem for path: " + path, e);
+    } catch (ExecutionException e) {
+      // Other filesets may share the settings, so each caller reports its own path.
+      throw new GravitinoRuntimeException(
+          e.getCause(), "Failed to get FileSystem for fileset: path: %s", path);
+    }
+  }
+
+  // Builds the Hadoop configuration from the config.resources files, and resolves its login
+  // settings. Reading the files and expanding Hadoop variables can fail; the callers report the
+  // path.
+  @VisibleForTesting
+  HdfsLogin resolveHdfsLogin(Map<String, String> conf) {
+    Configuration hadoopConf = HDFSFileSystemProxy.hadoopConfiguration(conf);
+    Map<String, String> settings =
+        new HashMap<>(HDFSFileSystemProxy.loginSettings(conf, hadoopConf));
+    // Other settings in these files, such as HA name services, decide which cluster is reached.
+    settings.put(CONFIG_RESOURCES, conf.getOrDefault(CONFIG_RESOURCES, ""));
+    return new HdfsLogin(
+        hadoopConf,
+        Collections.unmodifiableMap(settings),
+        HDFSFileSystemProxy.loginSettingsExpandVariables(hadoopConf));
   }
 
   private String buildGVFSFilePath(
@@ -1504,10 +2176,49 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     // Read the user here: a pool thread keeps the Subject of the request that started it.
-    return getFileSystem(path, config, PrincipalUtils.getCurrentUserName());
+    String user = PrincipalUtils.getCurrentUserName();
+    fileSystemProvider(path);
+    try {
+      return executeFileSystemTask(
+          fileSystemExecutor,
+          () -> getFileSystem(path, config, user, null),
+          TimeUnit.SECONDS.toNanos(connectionTimeoutSeconds(config)));
+    } catch (TimeoutException
+        | InterruptedException
+        | RejectedExecutionException
+        | ExecutionException e) {
+      throw fileSystemFailure(path, config, e);
+    }
   }
 
-  FileSystem getFileSystem(Path path, Map<String, String> config, String user) throws IOException {
+  // Creates the file system on this thread. With expected login settings, returns null if the
+  // configuration no longer resolves to them.
+  @Nullable
+  FileSystem getFileSystem(
+      Path path,
+      Map<String, String> config,
+      String user,
+      @Nullable Map<String, String> expectedSettings)
+      throws IOException {
+    FileSystemProvider provider = fileSystemProvider(path);
+    String scheme =
+        path.toUri().getScheme() != null
+            ? path.toUri().getScheme()
+            : defaultFileSystemProvider.scheme();
+    Configuration loginConf = null;
+    if (expectedSettings != null) {
+      // Resolved here, so that reading the config.resources files is under the timeout too. The
+      // file system logs in with the configuration that was checked.
+      HdfsLogin login = resolveHdfsLogin(config);
+      if (!login.settings.equals(expectedSettings)) {
+        return null;
+      }
+      loginConf = login.configuration;
+    }
+    return createFileSystem(path, config, scheme, provider, user, loginConf);
+  }
+
+  private FileSystemProvider fileSystemProvider(Path path) {
     if (path == null) {
       throw new IllegalArgumentException("Path should not be null");
     }
@@ -1524,18 +2235,18 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               "Unsupported scheme: %s, path: %s, all supported schemes: %s and providers: %s",
               scheme, path, fileSystemProvidersMap.keySet(), fileSystemProvidersMap.values()));
     }
+    return provider;
+  }
 
-    int timeoutSeconds =
-        (int)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(
-                    config, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
-
-    try {
-      return executeFileSystemTask(
-          () -> createFileSystem(path, config, scheme, provider, user), timeoutSeconds);
-    } catch (TimeoutException e) {
+  // Returns the failure to report for a file system that was not created in time, or throws it.
+  private IOException fileSystemFailure(Path path, Map<String, String> config, Exception e) {
+    String scheme =
+        path.toUri().getScheme() != null
+            ? path.toUri().getScheme()
+            : defaultFileSystemProvider.scheme();
+    FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
+    int timeoutSeconds = connectionTimeoutSeconds(config);
+    if (e instanceof TimeoutException) {
       LOG.warn(
           "Timeout when getting FileSystem for path: {}, scheme: {}, provider: {} within {} seconds",
           path,
@@ -1544,7 +2255,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           timeoutSeconds,
           e);
 
-      throw new IOException(
+      return new IOException(
           String.format(
               "Failed to get FileSystem for path: %s, scheme: %s, provider: %s within %s "
                   + "seconds, please check the configuration or increase the "
@@ -1555,32 +2266,57 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               timeoutSeconds,
               FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS),
           e);
-    } catch (InterruptedException e) {
+    }
+    if (e instanceof InterruptedException) {
       LOG.warn(
           "Interrupted when getting FileSystem for path: {}, possibly the server is"
               + " shutting down or catalog is been dropped",
           path);
       throw ExceptionMessages.wrap("Interrupted when getting FileSystem for path: " + path, e);
-    } catch (ExecutionException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof IOException) {
-        throw (IOException) cause;
+    }
+    if (e instanceof RejectedExecutionException) {
+      // The pool is full, or the catalog is closed.
+      return new IOException("Failed to start creating FileSystem for path: " + path, e);
+    }
+    Throwable cause = e.getCause();
+    if (cause instanceof IOException) {
+      return (IOException) cause;
+    }
+    return new IOException("Failed to create FileSystem", cause);
+  }
+
+  private int connectionTimeoutSeconds(Map<String, String> conf) {
+    return (int)
+        propertiesMetadata
+            .catalogPropertiesMetadata()
+            .getOrDefault(
+                conf, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
+  }
+
+  @Nullable
+  private <T> T executeFileSystemTask(ExecutorService executor, Callable<T> task, long timeoutNanos)
+      throws InterruptedException, ExecutionException, TimeoutException {
+    long deadlineNanos = System.nanoTime() + timeoutNanos;
+    TimedTask<T> timed = TimedTask.start(executor, scheduler, resultCloser, task, deadlineNanos);
+    try {
+      return TimedTask.await(timed, deadlineNanos);
+    } catch (TimeoutException | InterruptedException e) {
+      // Nobody else waits for the result. A task that has just returned it hands it over here.
+      if (!timed.cancel(false) && !timed.isCompletedExceptionally()) {
+        TimedTask.closeLater(resultCloser, timed.join());
       }
-      throw new IOException("Failed to create FileSystem", cause);
+      throw e;
     }
   }
 
-  private <T> T executeFileSystemTask(Callable<T> task, int timeoutSeconds)
-      throws InterruptedException, ExecutionException, TimeoutException {
-    Future<T> future = fileSystemExecutor.submit(task);
-    try {
-      return future.get(timeoutSeconds, TimeUnit.SECONDS);
-    } catch (TimeoutException e) {
-      future.cancel(true);
-      throw e;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw e;
+  private static void closeQuietly(@Nullable Object result) {
+    if (result instanceof Closeable) {
+      // May run on a thread of its own, where nobody sees what it throws.
+      try {
+        ((Closeable) result).close();
+      } catch (Throwable t) {
+        LOG.warn("Failed to close a file system that its caller stopped waiting for", t);
+      }
     }
   }
 
@@ -1643,14 +2379,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     String credentialHandle = null;
     try {
       credentialHandle = addVendedCredential(path, scheme, fileSystemProvider, probeConf);
-      int timeoutSeconds =
-          (int)
-              propertiesMetadata
-                  .catalogPropertiesMetadata()
-                  .getOrDefault(
-                      probeConf,
-                      FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
       executeFileSystemTask(
+          fileSystemExecutor,
           () -> {
             try (FileSystem fileSystem =
                 createProbeFileSystem(path, probeConf, scheme, fileSystemProvider, user)) {
@@ -1671,7 +2401,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               return null;
             }
           },
-          timeoutSeconds);
+          TimeUnit.SECONDS.toNanos(connectionTimeoutSeconds(probeConf)));
     } catch (TimeoutException e) {
       throw new IOException("Filesystem connection probe timed out", e);
     } catch (InterruptedException e) {
@@ -1762,10 +2492,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       Map<String, String> config,
       String scheme,
       FileSystemProvider provider,
-      String user)
+      String user,
+      @Nullable Configuration hadoopConf)
       throws IOException {
     if (scheme.equals(SCHEME_HDFS)) {
-      return new ImpersonationHDFSFileSystemProxy(path, config, () -> user).getProxy();
+      return new ImpersonationHDFSFileSystemProxy(path, config, hadoopConf, () -> user).getProxy();
     }
     return provider.getFileSystem(path, config);
   }
@@ -1778,7 +2509,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       String user)
       throws IOException {
     try {
-      return createFileSystem(path, config, scheme, provider, user);
+      return createFileSystem(path, config, scheme, provider, user, null);
     } catch (Exception e) {
       throw new ProbeInitializationException(e);
     }
