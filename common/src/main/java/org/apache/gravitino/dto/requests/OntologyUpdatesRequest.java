@@ -32,9 +32,11 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.dto.ontology.OntologyDefinitionDeserializer;
 import org.apache.gravitino.ontology.OntologyChange;
 import org.apache.gravitino.ontology.OntologyDefinition;
+import org.apache.gravitino.ontology.OntologyMappingChange;
+import org.apache.gravitino.ontology.OntologyMappingDefinition;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** An ordered batch of ontology updates. */
+/** An ordered batch of ontology or mapping updates. */
 public final class OntologyUpdatesRequest implements RESTRequest {
   @JsonProperty("updates")
   private final List<Update> updates;
@@ -66,10 +68,30 @@ public final class OntologyUpdatesRequest implements RESTRequest {
   }
 
   /**
+   * Converts native mapping changes to the wire format.
+   *
+   * @param changes The mapping changes.
+   * @return The corresponding request.
+   */
+  public static OntologyUpdatesRequest fromMappingChanges(OntologyMappingChange... changes) {
+    return new OntologyUpdatesRequest(
+        Arrays.stream(changes)
+            .map(Update::fromMappingChange)
+            .collect(ImmutableList.toImmutableList()));
+  }
+
+  /**
    * @return The ordered ontology changes.
    */
   public OntologyChange[] ontologyChanges() {
     return updates.stream().map(Update::ontologyChange).toArray(OntologyChange[]::new);
+  }
+
+  /**
+   * @return The ordered mapping changes.
+   */
+  public OntologyMappingChange[] mappingChanges() {
+    return updates.stream().map(Update::mappingChange).toArray(OntologyMappingChange[]::new);
   }
 
   /** {@inheritDoc} */
@@ -174,6 +196,46 @@ public final class OntologyUpdatesRequest implements RESTRequest {
       throw new IllegalArgumentException("Unsupported ontology change: " + change);
     }
 
+    private static Update fromMappingChange(OntologyMappingChange change) {
+      if (change instanceof OntologyMappingChange.RenameOntologyMapping) {
+        return new Update(
+            RENAME,
+            ((OntologyMappingChange.RenameOntologyMapping) change).getNewName(),
+            null,
+            null,
+            null,
+            null);
+      } else if (change instanceof OntologyMappingChange.UpdateComment) {
+        return new Update(
+            UPDATE_COMMENT,
+            null,
+            ((OntologyMappingChange.UpdateComment) change).getNewComment(),
+            null,
+            null,
+            null);
+      } else if (change instanceof OntologyMappingChange.SetProperty) {
+        OntologyMappingChange.SetProperty set = (OntologyMappingChange.SetProperty) change;
+        return new Update(SET_PROPERTY, null, null, set.getProperty(), set.getValue(), null);
+      } else if (change instanceof OntologyMappingChange.RemoveProperty) {
+        return new Update(
+            REMOVE_PROPERTY,
+            null,
+            null,
+            ((OntologyMappingChange.RemoveProperty) change).getProperty(),
+            null,
+            null);
+      } else if (change instanceof OntologyMappingChange.ReplaceDefinition) {
+        return new Update(
+            REPLACE_DEFINITION,
+            null,
+            null,
+            null,
+            null,
+            ((OntologyMappingChange.ReplaceDefinition) change).getDefinition().fields());
+      }
+      throw new IllegalArgumentException("Unsupported mapping change: " + change);
+    }
+
     private OntologyChange ontologyChange() {
       switch (type) {
         case RENAME:
@@ -188,6 +250,25 @@ public final class OntologyUpdatesRequest implements RESTRequest {
         case REPLACE_DEFINITION:
           return OntologyChange.replaceDefinition(
               OntologyDefinition.of(required(definition, "definition")));
+        default:
+          throw new IllegalArgumentException("Unknown update type: " + type);
+      }
+    }
+
+    private OntologyMappingChange mappingChange() {
+      switch (type) {
+        case RENAME:
+          return OntologyMappingChange.rename(required(newName, "newName"));
+        case UPDATE_COMMENT:
+          return OntologyMappingChange.updateComment(newComment);
+        case SET_PROPERTY:
+          return OntologyMappingChange.setProperty(
+              required(property, "property"), required(value, "value"));
+        case REMOVE_PROPERTY:
+          return OntologyMappingChange.removeProperty(required(property, "property"));
+        case REPLACE_DEFINITION:
+          return OntologyMappingChange.replaceDefinition(
+              OntologyMappingDefinition.of(required(definition, "definition")));
         default:
           throw new IllegalArgumentException("Unknown update type: " + type);
       }
