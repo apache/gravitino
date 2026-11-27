@@ -21,6 +21,7 @@ import httpx
 
 from mcp_server.client import (
     CatalogOperation,
+    GlossaryOperation,
     GravitinoOperation,
     KBArticleOperation,
     MetalakeOperation,
@@ -41,6 +42,9 @@ from mcp_server.client.plain.plain_rest_client_domain_operation import (
 )
 from mcp_server.client.plain.plain_rest_client_fileset_operation import (
     PlainRESTClientFilesetOperation,
+)
+from mcp_server.client.plain.plain_rest_client_glossary_operation import (
+    PlainRESTClientGlossaryOperation,
 )
 from mcp_server.client.plain.plain_rest_client_job_operation import (
     PlainRESTClientJobOperation,
@@ -164,6 +168,9 @@ class PlainRESTClientOperation(GravitinoOperation):
         self._domain_operation = PlainRESTClientDomainOperation(
             metalake_name, _rest_client
         )
+        self._glossary_operation = PlainRESTClientGlossaryOperation(
+            metalake_name, _rest_client
+        )
         self._kb_article_operation = PlainRESTClientKBArticleOperation(
             metalake_name, _rest_client
         )
@@ -244,6 +251,9 @@ class PlainRESTClientOperation(GravitinoOperation):
 
     def as_domain_operation(self) -> DomainOperation:
         return self._domain_operation
+
+    def as_glossary_operation(self) -> GlossaryOperation:
+        return self._glossary_operation
 
     def as_kb_article_operation(self) -> KBArticleOperation:
         return self._kb_article_operation

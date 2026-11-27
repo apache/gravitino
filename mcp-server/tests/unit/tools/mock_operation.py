@@ -21,6 +21,7 @@ from unittest.mock import create_autospec
 from mcp_server.client import (
     CatalogOperation,
     DomainOperation,
+    GlossaryOperation,
     GravitinoOperation,
     ModelOperation,
     PolicyOperation,
@@ -65,6 +66,9 @@ class MockOperation(GravitinoOperation):
 
     def as_domain_operation(self) -> DomainOperation:
         return MockDomainOperation()
+
+    def as_glossary_operation(self) -> GlossaryOperation:
+        return create_autospec(GlossaryOperation, instance=True)
 
     def as_kb_article_operation(self) -> KBArticleOperation:
         return create_autospec(KBArticleOperation, instance=True)

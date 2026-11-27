@@ -20,6 +20,7 @@ from fastmcp import FastMCP
 from mcp_server.tools.catalog import load_catalog_tools
 from mcp_server.tools.domain import load_domain_tools
 from mcp_server.tools.fileset import load_fileset_tools
+from mcp_server.tools.glossary import load_glossary_tools
 from mcp_server.tools.job import load_job_tool
 from mcp_server.tools.kb_article import load_kb_article_tools
 from mcp_server.tools.metadata import load_metadata_tool
@@ -41,6 +42,7 @@ SUPPORTED_TOOL_TAGS = frozenset(
         "catalog",
         "domain",
         "fileset",
+        "glossary",
         "job",
         "kb_article",
         "metalake",
@@ -60,6 +62,7 @@ SUPPORTED_TOOL_TAGS = frozenset(
 
 def load_tools(mcp: FastMCP):
     load_domain_tools(mcp)
+    load_glossary_tools(mcp)
     load_job_tool(mcp)
     load_kb_article_tools(mcp)
     load_catalog_tools(mcp)

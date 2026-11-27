@@ -56,11 +56,17 @@ def extract_list_from_response(response, field: str) -> str:
     response.raise_for_status()
     if not isinstance(payload, dict) or "code" not in payload:
         raise GravitinoException("Invalid Gravitino response: missing code")
-    if not isinstance(payload.get(field), list):
+    return simplejson.dumps(required_array(payload, field), use_decimal=True)
+
+
+def required_array(payload: dict, field: str) -> list:
+    """Read an array, distinguishing an empty result from an invalid response."""
+    value = payload.get(field)
+    if not isinstance(value, list):
         raise GravitinoException(
             f"Invalid Gravitino response: {field} must be a JSON array"
         )
-    return simplejson.dumps(payload[field], use_decimal=True)
+    return value
 
 
 def extract_response(response) -> str:
@@ -69,7 +75,7 @@ def extract_response(response) -> str:
 
 
 def response_content(response):
-    """Read a REST response and propagate Gravitino or HTTP errors."""
+    """Parse a Gravitino response, preserving server errors and decimal values."""
     try:
         content = response.json(parse_float=Decimal)
     except ValueError:

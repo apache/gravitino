@@ -23,8 +23,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -87,7 +89,7 @@ final class ArticleTerms {
   }
 
   /** Rechecks the name, stable ID and current status while the target rows are fenced. */
-  List<CheckedEdit> check(long lake, Plan plan) {
+  Collection<CheckedEdit> check(long lake, Plan plan) {
     Map<Long, GlossaryTermPO> live = new HashMap<>();
     for (List<Long> batch : Lists.partition(List.copyOf(plan.ids().values()), BATCH_SIZE)) {
       for (var row :
@@ -97,7 +99,7 @@ final class ArticleTerms {
       }
     }
     GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorization);
-    List<CheckedEdit> checked = new ArrayList<>();
+    Map<Long, CheckedEdit> checked = new LinkedHashMap<>();
     for (Edit edit : plan.edits()) {
       for (String name : edit.names()) {
         String key = GlossaryTermNames.key(name);
@@ -105,15 +107,15 @@ final class ArticleTerms {
         if (row == null || !key.equals(row.getNameKey()) || !readable(access, row)) {
           throw missing(name);
         }
-        checked.add(new CheckedEdit(edit.add(), row));
+        checked.put(row.getTermId(), new CheckedEdit(edit.add(), row));
       }
     }
-    return checked;
+    return checked.values();
   }
 
   record CheckedEdit(boolean add, GlossaryTermPO target) {}
 
-  static Set<Binding> apply(List<CheckedEdit> checked, Set<Binding> before) {
+  static Set<Binding> apply(Collection<CheckedEdit> checked, Set<Binding> before) {
     if (checked.isEmpty()) {
       return before;
     }

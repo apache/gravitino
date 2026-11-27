@@ -29,6 +29,7 @@ import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
 import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper;
 import org.apache.gravitino.storage.relational.po.KnowledgeBaseArticlePO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.storage.relational.utils.SqlLikePattern;
 
 /** Retrieves current summary candidates from the relational store inside the caller's snapshot. */
 public final class ArticleSearchService {
@@ -53,9 +54,7 @@ public final class ArticleSearchService {
       return List.of();
     }
     String pattern =
-        filter.query() == null
-            ? null
-            : "%" + SchemaPOStorageOps.escapeLikeMetacharacters(filter.query()) + "%";
+        filter.query() == null ? null : "%" + SqlLikePattern.escapeLiteral(filter.query()) + "%";
     // PostgreSQL cannot bind a NUL in text. Preserve each substring for database-side LOWER().
     String nulPatternParts =
         pattern != null && pattern.indexOf('\0') >= 0
