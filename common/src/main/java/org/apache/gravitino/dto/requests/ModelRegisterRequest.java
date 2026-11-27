@@ -50,5 +50,6 @@ public class ModelRegisterRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
+    RequestValidation.properties(properties);
   }
 }

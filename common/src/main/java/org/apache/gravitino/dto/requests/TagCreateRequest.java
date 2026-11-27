@@ -108,6 +108,7 @@ public class TagCreateRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" is required and cannot be empty");
+    RequestValidation.properties(properties);
 
     if (allowedValues != null) {
       for (String value : allowedValues) {

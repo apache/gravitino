@@ -89,6 +89,7 @@ public class SemanticModelCreateRequest implements RESTRequest {
     Preconditions.checkArgument(
         definition != null, "\"definition\" field is required and cannot be null");
     definition.validate();
+    RequestValidation.properties(properties);
   }
 
   /**
