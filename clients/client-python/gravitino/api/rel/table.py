@@ -20,6 +20,8 @@ from typing import Optional
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.authorization.supports_roles import SupportsRoles
+from gravitino.api.domain.supports_domains import SupportsDomains
+from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
 from gravitino.api.rel.expressions.distributions.distributions import Distributions
@@ -30,9 +32,10 @@ from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.semantic.supports_semantic_models import SupportsSemanticModels
+from gravitino.api.stats.supports_partition_statistics import (
+    SupportsPartitionStatistics,
+)
 from gravitino.api.stats.supports_statistics import SupportsStatistics
-from gravitino.api.domain.supports_domains import SupportsDomains
-from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
 
@@ -152,6 +155,12 @@ class Table(Auditable):
     def supports_statistics(self) -> SupportsStatistics:
         raise UnsupportedOperationException(
             "Table does not support statistics operations."
+        )
+
+    def supports_partition_statistics(self) -> SupportsPartitionStatistics:
+        """Return queries for partition statistics held by Gravitino."""
+        raise UnsupportedOperationException(
+            "Table does not support partition statistics operations."
         )
 
     def support_secrets(self) -> SupportsSecrets:

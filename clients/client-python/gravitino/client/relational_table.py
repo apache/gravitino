@@ -19,6 +19,8 @@ from typing import Any, Optional, cast
 
 from gravitino.api.audit import Audit
 from gravitino.api.authorization.supports_roles import SupportsRoles
+from gravitino.api.domain.domain import Domain
+from gravitino.api.domain.supports_domains import SupportsDomains
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.policy.policy import Policy
@@ -33,18 +35,24 @@ from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.table import Table
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.semantic.supports_semantic_models import SupportsSemanticModels
+from gravitino.api.stats.partition_range import PartitionRange
+from gravitino.api.stats.partition_statistics import PartitionStatistics
 from gravitino.api.stats.statistic import Statistic
 from gravitino.api.stats.statistic_value import StatisticValue
-from gravitino.api.stats.supports_statistics import SupportsStatistics
-from gravitino.api.domain.domain import Domain
-from gravitino.api.domain.supports_domains import SupportsDomains
-from gravitino.client.metadata_object_domain_operations import (
-    MetadataObjectDomainOperations,
+from gravitino.api.stats.supports_partition_statistics import (
+    SupportsPartitionStatistics,
 )
+from gravitino.api.stats.supports_statistics import SupportsStatistics
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_list import TagList
 from gravitino.client.generic_column import GenericColumn
+from gravitino.client.metadata_object_domain_operations import (
+    MetadataObjectDomainOperations,
+)
+from gravitino.client.metadata_object_partition_statistics_operations import (
+    MetadataObjectPartitionStatisticsOperations,
+)
 from gravitino.client.metadata_object_policy_operations import (
     MetadataObjectPolicyOperations,
 )
@@ -83,6 +91,7 @@ class RelationalTable(
     Table,
     SupportsRoles,
     SupportsStatistics,
+    SupportsPartitionStatistics,
     SupportsTags,
     SupportsDomains,
     SupportsPolicies,
@@ -117,6 +126,11 @@ class RelationalTable(
         )
         self._object_statistics_operations = MetadataObjectStatisticsOperations(
             namespace.level(0), table_object, rest_client
+        )
+        self._partition_statistics_operations = (
+            MetadataObjectPartitionStatisticsOperations(
+                namespace.level(0), table_object, rest_client
+            )
         )
         self._object_secret_operations = MetadataObjectSecretOperations(
             namespace.level(0), table_object, rest_client
@@ -351,6 +365,16 @@ class RelationalTable(
 
     def supports_statistics(self) -> SupportsStatistics:
         return self
+
+    def supports_partition_statistics(self) -> SupportsPartitionStatistics:
+        return self
+
+    def list_partition_statistics(
+        self, partition_range: PartitionRange
+    ) -> list[PartitionStatistics]:
+        return self._partition_statistics_operations.list_partition_statistics(
+            partition_range
+        )
 
     def support_secrets(self) -> SupportsSecrets:
         return self
