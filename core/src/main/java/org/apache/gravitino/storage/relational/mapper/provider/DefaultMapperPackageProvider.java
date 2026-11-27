@@ -75,7 +75,6 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
   @Override
   public List<Class<?>> getMapperClasses() {
     return ImmutableList.of(
-        ArticleSummaryMapper.class,
         CatalogMetaMapper.class,
         DomainMemberMapper.class,
         DomainMetaMapper.class,
