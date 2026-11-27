@@ -96,6 +96,8 @@ public interface KnowledgeBaseArticleOperations {
    * @return the created article
    * @throws KnowledgeBaseArticleAlreadyExistsException if the explicit article name is already
    *     used, or every derived-name candidate conflicts during the bounded allocation retries
+   * @throws org.apache.gravitino.exceptions.UnapprovedTermException if a readable Term to bind is
+   *     not approved
    * @throws org.apache.gravitino.exceptions.NoSuchTermException if a Term to bind does not exist or
    *     is invisible to the caller
    */
@@ -126,6 +128,10 @@ public interface KnowledgeBaseArticleOperations {
    * @param expectedRevision opaque token from Article metadata or content, or null for an ordinary
    *     edit
    * @return the updated article with its editing token
+   * @throws org.apache.gravitino.exceptions.NoSuchTermException if a named Term is missing or
+   *     invisible
+   * @throws org.apache.gravitino.exceptions.UnapprovedTermException if a newly bound Term is not
+   *     approved
    * @throws ArticleRevisionConflictException if the token refers to another identity or a stale
    *     revision
    * @throws IllegalArgumentException if the token is malformed

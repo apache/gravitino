@@ -45,7 +45,7 @@ public interface GravitinoAuthorizer extends Closeable {
    * AuthorizationRequestContext#targetIdResolver(String)}. Implementations that opt in must use
    * those identities for the target and its ancestors whenever a resolver is present, including
    * when a name has been reused. An authorizer granting unconditional access can also opt in.
-   * Glossary binding operations require this capability.
+   * Glossary Term and Article asset binding operations require this capability.
    *
    * @return whether this provider can authorize a resolved binding target
    */
@@ -123,6 +123,27 @@ public interface GravitinoAuthorizer extends Closeable {
   default boolean isArticleOwner(
       Principal principal, String metalake, long articleId, AuthorizationRequestContext context) {
     return false;
+  }
+
+  /** Stable user and group IDs whose direct Article ownership the caller can exercise. */
+  record ArticleOwnerIds(@Nullable Long userId, Set<Long> groupIds) {
+    /** An ownership scope that grants no access to drafts. */
+    public static final ArticleOwnerIds NONE = new ArticleOwnerIds(null, Set.of());
+
+    /** Creates an immutable ownership scope. */
+    public ArticleOwnerIds {
+      groupIds = Set.copyOf(groupIds);
+    }
+  }
+
+  /**
+   * Resolves the direct owner identities used to filter readable drafts before list pagination. IDs
+   * must identify the same user and groups as {@link #isArticleOwner} for this request. Providers
+   * that do not supply identities grant no ownership-based access through Article lists.
+   */
+  default ArticleOwnerIds articleOwnerIds(
+      Principal principal, String metalake, AuthorizationRequestContext context) {
+    return ArticleOwnerIds.NONE;
   }
 
   /**
