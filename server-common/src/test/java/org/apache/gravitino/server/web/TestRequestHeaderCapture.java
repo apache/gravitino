@@ -115,4 +115,34 @@ public class TestRequestHeaderCapture {
     assertEquals(maximum + RequestHeaderCapture.TRUNCATED_SUFFIX, result.get("x-execution-id"));
     assertThrows(UnsupportedOperationException.class, () -> result.put("other", "value"));
   }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"\u202e", "\u2066", "\u200b", "\udb40\udc01", "\ud800", "\udc00"})
+  void testSanitizesFormatCharactersAndUnpairedSurrogates(String unsafe) {
+    RequestHeaderCapture capture = new RequestHeaderCapture(Collections.singletonList("X-Job-Id"));
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getHeader("x-job-id")).thenReturn("prefix" + unsafe + "suffix");
+    assertEquals("prefix suffix", capture.capture(request).get("x-job-id"));
+  }
+
+  @Test
+  void testTruncationPreservesSupplementaryCharacters() {
+    RequestHeaderCapture capture = new RequestHeaderCapture(Collections.singletonList("X-Job-Id"));
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    String prefix =
+        String.join("", Collections.nCopies(RequestHeaderCapture.MAX_VALUE_LENGTH - 1, "x"));
+    String emoji = "\ud83d\ude00";
+    when(request.getHeader("x-job-id")).thenReturn(prefix + emoji);
+    assertEquals(
+        prefix + RequestHeaderCapture.TRUNCATED_SUFFIX, capture.capture(request).get("x-job-id"));
+
+    String exact = prefix.substring(1) + emoji;
+    when(request.getHeader("x-job-id")).thenReturn(exact);
+    assertEquals(exact, capture.capture(request).get("x-job-id"));
+    when(request.getHeader("x-job-id")).thenReturn(exact + "tail");
+    assertEquals(
+        exact + RequestHeaderCapture.TRUNCATED_SUFFIX, capture.capture(request).get("x-job-id"));
+    when(request.getHeader("x-job-id")).thenReturn("before" + emoji + "after");
+    assertEquals("before" + emoji + "after", capture.capture(request).get("x-job-id"));
+  }
 }

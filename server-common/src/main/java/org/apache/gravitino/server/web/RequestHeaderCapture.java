@@ -82,8 +82,9 @@ public final class RequestHeaderCapture {
   }
 
   /**
-   * Captures the first value of each present allowlisted header. Values have control characters
-   * replaced with spaces and are truncated to a fixed limit to keep log entries bounded.
+   * Captures the first value of each present allowlisted header. Values have control and Unicode
+   * format characters replaced with spaces and are truncated to a fixed limit to keep log entries
+   * bounded.
    *
    * @param request the current HTTP request
    * @return an immutable map with lowercase header names
@@ -94,12 +95,26 @@ public final class RequestHeaderCapture {
       String value = request.getHeader(name);
       if (value != null) {
         int length = Math.min(value.length(), MAX_VALUE_LENGTH);
-        StringBuilder safe = new StringBuilder(length);
-        for (int i = 0; i < length; i++) {
-          char c = value.charAt(i);
-          safe.append(Character.isISOControl(c) || c == '\u2028' || c == '\u2029' ? ' ' : c);
+        // Do not truncate between the two UTF-16 code units of a supplementary character.
+        if (length < value.length() && Character.isHighSurrogate(value.charAt(length - 1))) {
+          length--;
         }
-        if (value.length() > MAX_VALUE_LENGTH) {
+        StringBuilder safe = new StringBuilder(length);
+        for (int i = 0; i < length; ) {
+          int codePoint = value.codePointAt(i);
+          int type = Character.getType(codePoint);
+          if (Character.isISOControl(codePoint)
+              || type == Character.FORMAT
+              || type == Character.SURROGATE
+              || codePoint == '\u2028'
+              || codePoint == '\u2029') {
+            safe.append(' ');
+          } else {
+            safe.appendCodePoint(codePoint);
+          }
+          i += Character.charCount(codePoint);
+        }
+        if (value.length() > length) {
           safe.append(TRUNCATED_SUFFIX);
         }
         captured.put(name, safe.toString());
