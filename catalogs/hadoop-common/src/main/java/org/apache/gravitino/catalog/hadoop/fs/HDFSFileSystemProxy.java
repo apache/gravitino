@@ -29,6 +29,8 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.security.PrivilegedExceptionAction;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -77,22 +79,30 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   }
 
   protected void initFileSystem(Path path, Map<String, String> config) {
-    try {
-      Map<String, String> hadoopConfMap = additionalHDFSConfig(config);
-      Configuration conf =
-          FileSystemUtils.createCompatibleConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
+    initFileSystem(path, config, null);
+  }
 
-      conf.setBoolean(FS_DISABLE_CACHE, true);
-      conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
+  /**
+   * Logs in and creates the file system with the given Hadoop configuration.
+   *
+   * @param path the HDFS path
+   * @param config the configuration map of Gravitino
+   * @param hadoopConf the configuration {@link #hadoopConfiguration(Map)} built from {@code
+   *     config}, or null to build it here
+   */
+  protected void initFileSystem(
+      Path path, Map<String, String> config, @Nullable Configuration hadoopConf) {
+    try {
+      Configuration conf = hadoopConf != null ? hadoopConf : hadoopConfiguration(config);
       this.configuration = conf;
 
       AuthenticationConfig authenticationConfig = new AuthenticationConfig(config, configuration);
       this.impersonationEnabled = authenticationConfig.isImpersonationEnabled();
       String authType = authenticationConfig.getAuthType();
       if (AUTH_KERBEROS.equalsIgnoreCase(authType)) {
-        this.configuration.set(
-            HADOOP_SECURITY_AUTHENTICATION,
-            UserGroupInformation.AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
+        // Already set in a configuration that hadoopConfiguration built, maybe not in one built
+        // otherwise.
+        useKerberos(configuration);
         this.initUgi = initKerberosUgi(config, configuration);
       } else {
         this.initUgi = UserGroupInformation.getCurrentUser();
@@ -154,6 +164,59 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     return initUgi;
   }
 
+  /**
+   * Returns the settings that decide how a proxy created with the given configurations logs in: the
+   * authentication type, whether impersonation is enabled, and with Kerberos authentication the
+   * principal, keytab URI and krb5.conf. Values from {@code config.resources} files and variable
+   * expansion count.
+   *
+   * @param config the configuration map of Gravitino
+   * @param configuration the configuration {@link #hadoopConfiguration(Map)} built from {@code
+   *     config}
+   * @return the login settings, keyed by their configuration keys
+   */
+  public static Map<String, String> loginSettings(
+      Map<String, String> config, Configuration configuration) {
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(config, configuration);
+    Map<String, String> settings = new HashMap<>();
+    settings.put(AuthenticationConfig.AUTH_TYPE_KEY, authenticationConfig.getAuthType());
+    settings.put(
+        AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
+        String.valueOf(authenticationConfig.isImpersonationEnabled()));
+    if (AUTH_KERBEROS.equalsIgnoreCase(authenticationConfig.getAuthType())) {
+      // Raw values: a blank principal fails the login, not the lookup of these settings.
+      KerberosConfig kerberosConfig = new KerberosConfig(config, configuration);
+      settings.put(
+          KerberosConfig.PRINCIPAL_KEY, kerberosConfig.getRawString(KerberosConfig.PRINCIPAL_KEY));
+      settings.put(
+          KerberosConfig.KEY_TAB_URI_KEY,
+          kerberosConfig.getRawString(KerberosConfig.KEY_TAB_URI_KEY));
+      // The login applies it to the whole JVM; a changed one takes effect with a new login.
+      settings.put(Constants.HADOOP_KRB5_CONF, configuration.get(Constants.HADOOP_KRB5_CONF, ""));
+    }
+    return Collections.unmodifiableMap(settings);
+  }
+
+  /**
+   * Builds the Hadoop configuration a proxy logs in and connects with. It reads the {@code
+   * config.resources} files.
+   *
+   * @param config the configuration map of Gravitino
+   * @return the Hadoop configuration
+   */
+  public static Configuration hadoopConfiguration(Map<String, String> config) {
+    Configuration conf =
+        FileSystemUtils.createCompatibleConfiguration(
+            GRAVITINO_BYPASS, additionalHDFSConfig(config));
+    conf.setBoolean(FS_DISABLE_CACHE, true);
+    conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
+    if (AUTH_KERBEROS.equalsIgnoreCase(new AuthenticationConfig(config, conf).getAuthType())) {
+      // Set before the principal is read, as the principal may refer to this property.
+      useKerberos(conf);
+    }
+    return conf;
+  }
+
   /** Invoke the method on the underlying FileSystem using ugi.doAs. */
   protected Object invokeWithUgi(MethodProxy methodProxy, Object[] objects) throws Throwable {
     UserGroupInformation currentUgi = getRequestUser();
@@ -212,5 +275,11 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     } catch (IOException e) {
       throw ExceptionMessages.wrap("Failed to login with Kerberos", e);
     }
+  }
+
+  private static void useKerberos(Configuration conf) {
+    conf.set(
+        HADOOP_SECURITY_AUTHENTICATION,
+        UserGroupInformation.AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
   }
 }
