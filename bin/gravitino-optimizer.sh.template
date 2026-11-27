@@ -76,48 +76,46 @@ if [[ "$JVM_VERSION" -eq 17 ]]; then
   JAVA_OPTS+=" --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED"
 fi
 
-# Shared runtime jars from root libs/ (exact names). Module jars live in optimizer/libs.
-add_root_lib() {
-  local jar_path="${GRAVITINO_HOME}/libs/$1"
-  if [[ ! -f "${jar_path}" ]]; then
-    echo "ERROR: required jar not found: ${jar_path}" >&2
-    exit 1
-  fi
-  GRAVITINO_CLASSPATH="${jar_path}:${GRAVITINO_CLASSPATH}"
-}
-
-add_root_lib "commons-collections4-4.4.jar"
-add_root_lib "commons-dbcp2-2.11.0.jar"
-add_root_lib "commons-io-2.22.0.jar"
-add_root_lib "commons-lang3-3.14.0.jar"
-add_root_lib "commons-logging-1.2.jar"
-add_root_lib "commons-pool2-2.12.0.jar"
-add_root_lib "failureaccess-1.0.3.jar"
-add_root_lib "gravitino-api-${GRAVITINO_VERSION}.jar"
-add_root_lib "gravitino-catalog-common-${GRAVITINO_VERSION}.jar"
-add_root_lib "gravitino-common-${GRAVITINO_VERSION}.jar"
-add_root_lib "gravitino-core-${GRAVITINO_VERSION}.jar"
-add_root_lib "guava-33.8.0-jre.jar"
-add_root_lib "h2-2.2.224.jar"
-add_root_lib "httpclient5-5.4.4.jar"
-add_root_lib "httpcore5-5.4.4.jar"
-add_root_lib "httpcore5-h2-5.4.4.jar"
-add_root_lib "j2objc-annotations-3.1.jar"
-add_root_lib "jackson-annotations-2.15.2.jar"
-add_root_lib "jackson-core-2.15.2.jar"
-add_root_lib "jackson-databind-2.15.2.jar"
-add_root_lib "jackson-datatype-jdk8-2.15.2.jar"
-add_root_lib "jackson-datatype-jsr310-2.15.2.jar"
-add_root_lib "jakarta.transaction-api-1.3.3.jar"
-add_root_lib "jakarta.validation-api-2.0.2.jar"
-add_root_lib "jspecify-1.0.1.jar"
-add_root_lib "listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar"
-add_root_lib "log4j-1.2-api-2.25.4.jar"
-add_root_lib "log4j-api-2.25.4.jar"
-add_root_lib "log4j-core-2.25.4.jar"
-add_root_lib "log4j-layout-template-json-2.25.4.jar"
-add_root_lib "log4j-slf4j2-impl-2.25.4.jar"
-add_root_lib "slf4j-api-2.0.17.jar"
+# Shared runtime jars from root libs/ (version via -*). Module jars live in optimizer/libs.
+for jar in \
+  "${GRAVITINO_HOME}/libs"/commons-collections4-*.jar \
+  "${GRAVITINO_HOME}/libs"/commons-dbcp2-*.jar \
+  "${GRAVITINO_HOME}/libs"/commons-io-*.jar \
+  "${GRAVITINO_HOME}/libs"/commons-lang3-*.jar \
+  "${GRAVITINO_HOME}/libs"/commons-logging-*.jar \
+  "${GRAVITINO_HOME}/libs"/commons-pool2-*.jar \
+  "${GRAVITINO_HOME}/libs"/failureaccess-*.jar \
+  "${GRAVITINO_HOME}/libs"/gravitino-api-*.jar \
+  "${GRAVITINO_HOME}/libs"/gravitino-catalog-common-*.jar \
+  "${GRAVITINO_HOME}/libs"/gravitino-common-*.jar \
+  "${GRAVITINO_HOME}/libs"/gravitino-core-*.jar \
+  "${GRAVITINO_HOME}/libs"/guava-*.jar \
+  "${GRAVITINO_HOME}/libs"/h2-*.jar \
+  "${GRAVITINO_HOME}/libs"/httpclient5-*.jar \
+  "${GRAVITINO_HOME}/libs"/httpcore5-*.jar \
+  "${GRAVITINO_HOME}/libs"/j2objc-annotations-*.jar \
+  "${GRAVITINO_HOME}/libs"/jackson-annotations-*.jar \
+  "${GRAVITINO_HOME}/libs"/jackson-core-*.jar \
+  "${GRAVITINO_HOME}/libs"/jackson-databind-*.jar \
+  "${GRAVITINO_HOME}/libs"/jackson-datatype-jdk8-*.jar \
+  "${GRAVITINO_HOME}/libs"/jackson-datatype-jsr310-*.jar \
+  "${GRAVITINO_HOME}/libs"/jakarta.transaction-api-*.jar \
+  "${GRAVITINO_HOME}/libs"/jakarta.validation-api-*.jar \
+  "${GRAVITINO_HOME}/libs"/jspecify-*.jar \
+  "${GRAVITINO_HOME}/libs"/listenablefuture-*.jar \
+  "${GRAVITINO_HOME}/libs"/log4j-1.2-api-*.jar \
+  "${GRAVITINO_HOME}/libs"/log4j-api-*.jar \
+  "${GRAVITINO_HOME}/libs"/log4j-core-*.jar \
+  "${GRAVITINO_HOME}/libs"/log4j-layout-template-json-*.jar \
+  "${GRAVITINO_HOME}/libs"/log4j-slf4j2-impl-*.jar \
+  "${GRAVITINO_HOME}/libs"/slf4j-api-*.jar
+do
+  [[ -f "${jar}" ]] || continue
+  case "${jar}" in
+    *-tests.jar | *-sources.jar | *-javadoc.jar) continue ;;
+  esac
+  GRAVITINO_CLASSPATH="${jar}:${GRAVITINO_CLASSPATH}"
+done
 
 if [ -d "${GRAVITINO_HOME}/optimizer/libs" ]; then
   addJarInDir "${GRAVITINO_HOME}/optimizer/libs"
