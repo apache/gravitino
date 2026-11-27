@@ -32,24 +32,42 @@ components:
       properties:
         indexType:
           type: string
+          description: >-
+            Responses use the uppercase names below. Requests accept index types case-insensitively.
+            Support depends on the catalog. For example, MySQL supports PRIMARY_KEY and UNIQUE_KEY,
+            and the DATA_SKIPPING_* types describe ClickHouse indexes.
           enum:
-            - "primary_key"
-            - "unique_key"
-            - "data_skipping_minmax"
-            - "data_skipping_bloom_filter"
-            - "data_skipping_set"
-            - "data_skipping_ngrambfv1"
-            - "data_skipping_tokenbfv1"
-            - "data_skipping_annoy"
-            - "data_skipping_usearch"
-            - "data_skipping_text"
-            - "data_skipping_vector_similarity"
+            - "PRIMARY_KEY"
+            - "UNIQUE_KEY"
+            - "SCALAR"
+            - "BTREE"
+            - "BITMAP"
+            - "LABEL_LIST"
+            - "INVERTED"
+            - "VECTOR"
+            - "IVF_FLAT"
+            - "IVF_SQ"
+            - "IVF_PQ"
+            - "IVF_HNSW_SQ"
+            - "IVF_HNSW_PQ"
+            - "DATA_SKIPPING_MINMAX"
+            - "DATA_SKIPPING_BLOOM_FILTER"
+            - "DATA_SKIPPING_SET"
+            - "DATA_SKIPPING_NGRAMBFV1"
+            - "DATA_SKIPPING_TOKENBFV1"
+            - "DATA_SKIPPING_TEXT"
+            - "DATA_SKIPPING_VECTOR_SIMILARITY"
+            - "DATA_SKIPPING_ANNOY"
+            - "DATA_SKIPPING_USEARCH"
         name:
           type: string
           description: The name of the index
           nullable: true
         fieldNames:
-          $ref: "./tables.yaml#/components/schemas/FieldNames"
+          type: array
+          minItems: 1
+          items:
+            $ref: "./tables.yaml#/components/schemas/FieldName"
         properties:
           type: object
           additionalProperties:
