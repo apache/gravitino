@@ -103,6 +103,33 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
+/**
+ * Mirrors root [copySubprojectDependencies]: jars already shipped under distribution/package/libs
+ * via those projects' runtimeClasspath. Optimizer packaging skips them and leaves them to
+ * gravitino-optimizer.sh's addJarInDir of ${GRAVITINO_HOME}/libs.
+ */
+fun Project.publishesRuntimeJarsToRootLibs(): Boolean {
+  val parentName = parent?.name
+  return !name.startsWith("authorization") &&
+    !name.startsWith("catalog") &&
+    !name.startsWith("cli") &&
+    !name.startsWith("client") &&
+    !name.startsWith("filesystem") &&
+    !name.startsWith("flink") &&
+    !name.startsWith("iceberg") &&
+    !name.startsWith("lance") &&
+    !name.startsWith("optimizer") &&
+    !name.startsWith("spark") &&
+    !name.startsWith("hive-metastore") &&
+    !name.startsWith("trino-connector") &&
+    name != "hadoop-common" &&
+    name != "integration-test" &&
+    parentName != "bundles" &&
+    parentName != "maintenance" &&
+    parentName != "plugins" &&
+    name != "mcp-server"
+}
+
 tasks {
   val copyDepends by registering(Copy::class) {
     from(configurations.runtimeClasspath)
@@ -112,20 +139,41 @@ tasks {
     finalizedBy(copyDepends)
   }
 
-  // Same shape as idp-basic / k8s-job-executor: copyDepends fills build/libs, then
-  // copyLibs includes only the jars that stay under optimizer/libs. Shared deps are
-  // loaded from ${GRAVITINO_HOME}/libs by gravitino-optimizer.sh.
+  // copyDepends fills build/libs; copyLibs keeps only jars that are NOT already published to root
+  // libs. gravitino-optimizer.sh loads optimizer/libs then libs/ via addJarInDir — no shell
+  // allowlist to update when Gradle dependencies change.
   register("copyLibs", Copy::class) {
     dependsOn(copyDepends, "build")
-    from("build/libs") {
-      include(
-        "gravitino-optimizer-*.jar",
-        "gravitino-updaters-*.jar",
-        "gravitino-client-java-*.jar",
-        "commons-cli-*.jar",
-        "qlexpress4-*.jar"
-      )
-    }
+    // Callable so root-lib jar names are resolved at execution time, not configuration time.
+    from({
+      val rootLibJarNames =
+        rootProject.subprojects
+          .filter { it.publishesRuntimeJarsToRootLibs() }
+          .flatMapTo(sortedSetOf()) { sp ->
+            val runtime =
+              sp.configurations.findByName("runtimeClasspath") ?: return@flatMapTo emptySet()
+            if (!runtime.isCanBeResolved) {
+              return@flatMapTo emptySet()
+            }
+            runtime.incoming.artifacts.artifacts.map { it.file.name }
+          }
+      fileTree(layout.buildDirectory.dir("libs")) {
+        include("*.jar")
+        exclude(
+          "*-tests.jar",
+          "*-sources.jar",
+          "*-javadoc.jar",
+          "*-jcstress.jar",
+          "*-jmh.jar",
+          "error_prone_annotations-*.jar"
+        )
+        // Always keep this module's jar; skip anything root libs already ships.
+        exclude { element ->
+          val name = element.file.name
+          !name.startsWith("gravitino-optimizer-") && rootLibJarNames.contains(name)
+        }
+      }
+    })
     into("$rootDir/distribution/package/optimizer/libs")
   }
 

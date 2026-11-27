@@ -76,50 +76,14 @@ if [[ "$JVM_VERSION" -eq 17 ]]; then
   JAVA_OPTS+=" --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED"
 fi
 
-# Shared runtime jars from root libs/ (version via -*). Module jars live in optimizer/libs.
-for jar in \
-  "${GRAVITINO_HOME}/libs"/commons-collections4-*.jar \
-  "${GRAVITINO_HOME}/libs"/commons-dbcp2-*.jar \
-  "${GRAVITINO_HOME}/libs"/commons-io-*.jar \
-  "${GRAVITINO_HOME}/libs"/commons-lang3-*.jar \
-  "${GRAVITINO_HOME}/libs"/commons-logging-*.jar \
-  "${GRAVITINO_HOME}/libs"/commons-pool2-*.jar \
-  "${GRAVITINO_HOME}/libs"/failureaccess-*.jar \
-  "${GRAVITINO_HOME}/libs"/gravitino-api-*.jar \
-  "${GRAVITINO_HOME}/libs"/gravitino-catalog-common-*.jar \
-  "${GRAVITINO_HOME}/libs"/gravitino-common-*.jar \
-  "${GRAVITINO_HOME}/libs"/gravitino-core-*.jar \
-  "${GRAVITINO_HOME}/libs"/guava-*.jar \
-  "${GRAVITINO_HOME}/libs"/h2-*.jar \
-  "${GRAVITINO_HOME}/libs"/httpclient5-*.jar \
-  "${GRAVITINO_HOME}/libs"/httpcore5-*.jar \
-  "${GRAVITINO_HOME}/libs"/j2objc-annotations-*.jar \
-  "${GRAVITINO_HOME}/libs"/jackson-annotations-*.jar \
-  "${GRAVITINO_HOME}/libs"/jackson-core-*.jar \
-  "${GRAVITINO_HOME}/libs"/jackson-databind-*.jar \
-  "${GRAVITINO_HOME}/libs"/jackson-datatype-jdk8-*.jar \
-  "${GRAVITINO_HOME}/libs"/jackson-datatype-jsr310-*.jar \
-  "${GRAVITINO_HOME}/libs"/jakarta.transaction-api-*.jar \
-  "${GRAVITINO_HOME}/libs"/jakarta.validation-api-*.jar \
-  "${GRAVITINO_HOME}/libs"/jspecify-*.jar \
-  "${GRAVITINO_HOME}/libs"/listenablefuture-*.jar \
-  "${GRAVITINO_HOME}/libs"/log4j-1.2-api-*.jar \
-  "${GRAVITINO_HOME}/libs"/log4j-api-*.jar \
-  "${GRAVITINO_HOME}/libs"/log4j-core-*.jar \
-  "${GRAVITINO_HOME}/libs"/log4j-layout-template-json-*.jar \
-  "${GRAVITINO_HOME}/libs"/log4j-slf4j2-impl-*.jar \
-  "${GRAVITINO_HOME}/libs"/slf4j-api-*.jar
-do
-  [[ -f "${jar}" ]] || continue
-  case "${jar}" in
-    *-tests.jar | *-sources.jar | *-javadoc.jar) continue ;;
-  esac
-  GRAVITINO_CLASSPATH="${jar}:${GRAVITINO_CLASSPATH}"
-done
-
+# Module-owned jars (Gradle copyLibs) first, then shared jars from root libs/.
+# Do not enumerate artifacts here: dependency changes are handled by Gradle packaging.
 if [ -d "${GRAVITINO_HOME}/optimizer/libs" ]; then
   addJarInDir "${GRAVITINO_HOME}/optimizer/libs"
   addDirToClasspath "${GRAVITINO_HOME}/optimizer/conf"
+fi
+if [ -d "${GRAVITINO_HOME}/libs" ]; then
+  addJarInDir "${GRAVITINO_HOME}/libs"
 fi
 
 ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_OPTIMIZER_NAME} "$@"
