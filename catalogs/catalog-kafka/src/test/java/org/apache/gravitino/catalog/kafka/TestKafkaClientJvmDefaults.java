@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.kafka;
 import static org.apache.gravitino.Catalog.Type.MESSAGING;
 import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
+import static org.apache.gravitino.catalog.kafka.KafkaCatalogOperations.OAUTHBEARER_ALLOWED_URLS_PROPERTY;
 import static org.apache.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
 
 import com.google.common.collect.ImmutableMap;
@@ -40,7 +41,6 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.kafka.common.config.AbstractConfig;
-import org.apache.kafka.common.config.internals.BrokerSecurityConfigs;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,8 +56,7 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestKafkaClientJvmDefaults {
 
   private static final String[] PROPERTIES = {
-    AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY,
-    BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG
+    AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY, OAUTHBEARER_ALLOWED_URLS_PROPERTY
   };
   private static final String PACKAGE = "org.apache.kafka.common.security.oauthbearer.";
   private static final String HANDLER = PACKAGE + "OAuthBearerLoginCallbackHandler";
@@ -94,24 +93,20 @@ public class TestKafkaClientJvmDefaults {
 
     Assertions.assertEquals(
         "none", System.getProperty(AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY));
-    Assertions.assertEquals(
-        "", System.getProperty(BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG));
+    Assertions.assertEquals("", System.getProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY));
   }
 
   @Test
   public void testConfiguredValuesAreKept() {
     System.setProperty(AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY, "file");
-    System.setProperty(
-        BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG,
-        "https://idp.example.com/token");
+    System.setProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY, "https://idp.example.com/token");
 
     KafkaCatalogOperations.applyClientJvmDefaults();
 
     Assertions.assertEquals(
         "file", System.getProperty(AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY));
     Assertions.assertEquals(
-        "https://idp.example.com/token",
-        System.getProperty(BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG));
+        "https://idp.example.com/token", System.getProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY));
   }
 
   @Test
@@ -123,8 +118,7 @@ public class TestKafkaClientJvmDefaults {
 
     Assertions.assertEquals(
         "", System.getProperty(AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY));
-    Assertions.assertEquals(
-        "", System.getProperty(BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG));
+    Assertions.assertEquals("", System.getProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY));
   }
 
   @Test
@@ -137,7 +131,7 @@ public class TestKafkaClientJvmDefaults {
               RuntimeException.class, () -> initialize(oauthBearerConfig(handler, tokenUrl)));
 
       Assertions.assertTrue(
-          messages(thrown).contains("is not allowed"),
+          messages(thrown).contains(OAUTHBEARER_ALLOWED_URLS_PROPERTY),
           handler + " must reject the token endpoint by default, got: " + messages(thrown));
     }
   }
@@ -154,7 +148,7 @@ public class TestKafkaClientJvmDefaults {
                 RuntimeException.class, () -> initialize(oauthBearerConfig(handler, tokenUrl)));
 
         Assertions.assertTrue(
-            messages(thrown).contains("is not allowed"),
+            messages(thrown).contains(OAUTHBEARER_ALLOWED_URLS_PROPERTY),
             handler + " must reject the token endpoint by default, got: " + messages(thrown));
       }
       Assertions.assertEquals(0, tokenRequests.get(), "No token request may reach the endpoint");
@@ -166,7 +160,7 @@ public class TestKafkaClientJvmDefaults {
     try (JwksMockServerHelper idp = JwksMockServerHelper.create("kafka-test-key")) {
       AtomicInteger tokenRequests = countTokenRequests(idp);
       String tokenUrl = idp.baseUri() + "/token";
-      System.setProperty(BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG, tokenUrl);
+      System.setProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY, tokenUrl);
 
       for (String handler : HANDLERS) {
         int before = tokenRequests.get();
@@ -182,6 +176,28 @@ public class TestKafkaClientJvmDefaults {
   }
 
   @Test
+  public void testInitializeRequiresExactTokenEndpointInAllowList() throws Exception {
+    try (JwksMockServerHelper idp = JwksMockServerHelper.create("kafka-test-key")) {
+      AtomicInteger tokenRequests = countTokenRequests(idp);
+      String tokenUrl = idp.baseUri() + "/token";
+      // Kafka compares the whole URL, so a prefix or a trailing slash does not match.
+      String[] nearMisses = {idp.baseUri(), idp.baseUri() + "/", tokenUrl + "/"};
+
+      for (String nearMiss : nearMisses) {
+        System.setProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY, nearMiss);
+        Throwable thrown =
+            Assertions.assertThrows(
+                RuntimeException.class, () -> initialize(oauthBearerConfig(HANDLER, tokenUrl)));
+
+        Assertions.assertTrue(
+            messages(thrown).contains(OAUTHBEARER_ALLOWED_URLS_PROPERTY),
+            nearMiss + " must not allow " + tokenUrl + ", got: " + messages(thrown));
+      }
+      Assertions.assertEquals(0, tokenRequests.get(), "No token request may reach the endpoint");
+    }
+  }
+
+  @Test
   public void testInitializeReadsTokenEndpointFromCommaSeparatedList() throws Exception {
     try (JwksMockServerHelper idp = JwksMockServerHelper.create("kafka-test-key")) {
       AtomicInteger tokenRequests = countTokenRequests(idp);
@@ -191,7 +207,7 @@ public class TestKafkaClientJvmDefaults {
       String[] allowLists = {tokenUrl + "," + otherUrl, otherUrl + "," + tokenUrl};
 
       for (String allowList : allowLists) {
-        System.setProperty(BrokerSecurityConfigs.ALLOWED_SASL_OAUTHBEARER_URLS_CONFIG, allowList);
+        System.setProperty(OAUTHBEARER_ALLOWED_URLS_PROPERTY, allowList);
         for (String handler : HANDLERS) {
           int before = tokenRequests.get();
           Assertions.assertDoesNotThrow(

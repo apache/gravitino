@@ -60,6 +60,15 @@ class needs its token endpoint URL in the list, for example
 `-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp.example.com/oauth2/token`. Login
 handlers that create the token themselves, such as the AWS MSK IAM handler, do not read the token
 endpoint and work with the empty list.
+Kafka compares each entry of the list, after trimming spaces, with the value of
+`sasl.oauthbearer.token.endpoint.url` as an exact string. It does not accept a prefix or a missing
+or extra trailing slash, so list the URL exactly as the catalog configures it.
+
+Both properties are JVM-wide. Every Kafka client in the server JVM reads them, including a server
+plugin that uses a config provider or OAUTHBEARER, whichever classloader it comes from. Gravitino
+sets them when the first Kafka catalog is loaded, not when the server starts, so a plugin that
+needs different values must set them itself with `-D` to get the same result in any load order.
+
 
 Set the allow list with `-D` in `JAVA_OPTS`, for example in `conf/gravitino-env.sh`:
 
