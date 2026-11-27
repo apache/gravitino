@@ -36,6 +36,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -49,6 +50,8 @@ import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
+import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -67,6 +70,11 @@ public class OwnerMetaService {
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "getOwner")
   public Optional<Entity> getOwner(NameIdentifier identifier, Entity.EntityType type) {
+    if (type == Entity.EntityType.KNOWLEDGE_BASE_ARTICLE) {
+      return SqlSessions.hasActiveSession()
+          ? getArticleOwner(identifier)
+          : SqlSessions.readSnapshot(() -> getArticleOwner(identifier));
+    }
 
     Long entityId = EntityIdService.getEntityId(identifier, type);
 
@@ -229,6 +237,38 @@ public class OwnerMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class, mapper -> mapper.batchInsertOwnerRels(ownerRelPOs)));
+  }
+
+  private Optional<Entity> getArticleOwner(NameIdentifier identifier) {
+    Entity.EntityType type = Entity.EntityType.KNOWLEDGE_BASE_ARTICLE;
+    long articleId = EntityIdService.getEntityId(identifier, type);
+    OwnerInfo assignment =
+        SessionUtils.getWithoutCommit(
+            OwnerMetaMapper.class,
+            mapper -> mapper.selectOwnerByMetadataObjectIdAndType(articleId, type.name()));
+    if (assignment == null) {
+      return Optional.empty();
+    }
+    String metalake = NameIdentifierUtil.getMetalake(identifier);
+    long ownerId = assignment.getOwnerId();
+    return switch (Owner.Type.valueOf(assignment.getOwnerType())) {
+      case USER -> Optional.ofNullable(
+              SessionUtils.getWithoutCommit(
+                  UserMetaMapper.class, m -> m.selectUserMetaById(ownerId)))
+          .map(
+              user ->
+                  POConverters.fromUserPO(
+                      user, Collections.emptyList(), AuthorizationUtils.ofUserNamespace(metalake)));
+      case GROUP -> Optional.ofNullable(
+              SessionUtils.getWithoutCommit(
+                  GroupMetaMapper.class, m -> m.selectGroupMetaById(ownerId)))
+          .map(
+              group ->
+                  POConverters.fromGroupPO(
+                      group,
+                      Collections.emptyList(),
+                      AuthorizationUtils.ofGroupNamespace(metalake)));
+    };
   }
 
   private void collectOwnersByObjectIds(

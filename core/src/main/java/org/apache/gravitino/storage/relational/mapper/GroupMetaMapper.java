@@ -57,6 +57,11 @@ public interface GroupMetaMapper {
   GroupPO selectGroupMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name);
 
+  /** Returns an active group by ID, or null if it does not exist. */
+  @Nullable
+  @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "selectGroupMetaById")
+  GroupPO selectGroupMetaById(@Param("groupId") Long groupId);
+
   /** Returns and locks an active group by ID for the current transaction. */
   @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "selectGroupMetaByIdForUpdate")
   GroupPO selectGroupMetaByIdForUpdate(@Param("groupId") Long groupId);
