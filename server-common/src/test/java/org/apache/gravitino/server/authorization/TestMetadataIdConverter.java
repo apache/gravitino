@@ -62,7 +62,6 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
-import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.rel.types.Types;
@@ -97,7 +96,6 @@ public class TestMetadataIdConverter {
   private FilesetEntity entity6;
   private TopicEntity entity7;
   private GroupEntity entity8;
-  private SemanticModelEntity entity9;
 
   @BeforeAll
   void initTest() throws IOException {
@@ -126,11 +124,8 @@ public class TestMetadataIdConverter {
         .when(catalogs)
         .doWithCatalog(any(), any());
     EntityStore store = mock(EntityStore.class);
-    SemanticModelEntity model = mock(SemanticModelEntity.class);
-    when(model.id()).thenReturn(91L);
     NameIdentifier normalized = NameIdentifier.of("metalake", "catalog", "schema", "SalesModel");
-    when(store.get(normalized, Entity.EntityType.SEMANTIC_MODEL, SemanticModelEntity.class))
-        .thenReturn(model);
+    when(store.getSemanticModelId(normalized)).thenReturn(91L);
     GravitinoEnv env = mock(GravitinoEnv.class);
     when(env.catalogManager()).thenReturn(catalogs);
     when(env.entityStore()).thenReturn(store);
@@ -548,8 +543,6 @@ public class TestMetadataIdConverter {
         getTestTopicEntity(
             7L, "topic", Namespace.of("metalake", "catalog", "schema"), "test_topic");
     entity8 = getTestGroupEntity(8L, "group", Namespace.of("metalake"));
-    entity9 = mock(SemanticModelEntity.class);
-    when(entity9.id()).thenReturn(9L);
   }
 
   private void initMockCache() throws IOException {
@@ -563,8 +556,7 @@ public class TestMetadataIdConverter {
     when(mockStore.get(ident6, Entity.EntityType.FILESET, FilesetEntity.class)).thenReturn(entity6);
     when(mockStore.get(ident7, Entity.EntityType.TOPIC, TopicEntity.class)).thenReturn(entity7);
     when(mockStore.get(ident8, Entity.EntityType.GROUP, GroupEntity.class)).thenReturn(entity8);
-    when(mockStore.get(ident9, Entity.EntityType.SEMANTIC_MODEL, SemanticModelEntity.class))
-        .thenReturn(entity9);
+    when(mockStore.getSemanticModelId(ident9)).thenReturn(9L);
   }
 
   private BaseMetalake getTestMetalake(long id, String name, String comment) {

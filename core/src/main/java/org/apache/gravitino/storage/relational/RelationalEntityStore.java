@@ -262,6 +262,13 @@ public class RelationalEntityStore
     return backend.listDescendantSchemas(identifier);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public long getSemanticModelId(NameIdentifier ident) throws IOException {
+    // Semantic Models are not in the entity cache allowlist, so the identity row is always read.
+    return backend.getSemanticModelId(ident);
+  }
+
   @Override
   public SemanticModelEntity loadSemanticModelRevision(
       NameIdentifier ident, SemanticModelRevisionSelector selector) throws IOException {
