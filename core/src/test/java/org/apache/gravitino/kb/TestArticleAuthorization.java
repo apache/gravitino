@@ -306,6 +306,88 @@ class TestArticleAuthorization extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void getAndTransferUseNewestLiveAssignment() throws Exception {
+    long groupId = ids.incrementAndGet();
+    backend.insert(
+        createGroupEntity(
+            groupId,
+            AuthorizationUtils.ofGroupNamespace(LAKE),
+            "authors",
+            AUDIT_INFO,
+            List.of(),
+            List.of()),
+        false);
+    long writer2 =
+        backend.get(NameIdentifierUtil.ofUser(LAKE, "writer2"), Entity.EntityType.USER).id();
+    for (Owner.Type ownerType : List.of(Owner.Type.USER, Owner.Type.GROUP)) {
+      String name = ownerType == Owner.Type.USER ? "two-users" : "user-and-group";
+      long id =
+          as("writer", () -> manager.createArticle(LAKE, article(name, ArticleStatus.PUBLISHED)))
+              .article()
+              .id();
+      MetadataObject object =
+          MetadataObjects.of(null, name, MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
+      // The two user assignments share a timestamp, so the later row ID decides the owner.
+      try (var session =
+              SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+          var insert =
+              session
+                  .getConnection()
+                  .prepareStatement(
+                      """
+              INSERT INTO owner_meta (metalake_id, metadata_object_id, metadata_object_type, owner_id,
+                  owner_type, audit_info, current_version, last_version, deleted_at, updated_at)
+              SELECT metalake_id, metadata_object_id, metadata_object_type, ?, ?, audit_info,
+                  current_version, last_version, deleted_at, updated_at + ?
+              FROM owner_meta WHERE metadata_object_id = ? AND metadata_object_type = 'KNOWLEDGE_BASE_ARTICLE'
+                  AND deleted_at = 0
+              """)) {
+        insert.setLong(1, ownerType == Owner.Type.USER ? writer2 : groupId);
+        insert.setString(2, ownerType.name());
+        insert.setLong(3, ownerType == Owner.Type.USER ? 0 : 1);
+        insert.setLong(4, id);
+        assertEquals(1, insert.executeUpdate());
+      }
+      as(
+          "lakeOwner",
+          () -> {
+            Owner current = owners.getOwner(LAKE, object).orElseThrow();
+            assertEquals(ownerType, current.type());
+            assertEquals(ownerType == Owner.Type.USER ? "writer2" : "authors", current.name());
+            try (var queries = ArticleQueries.record()) {
+              owners.setOwner(LAKE, object, "viewer", Owner.Type.USER);
+              assertEquals(1, queries.count("lockArticleId"));
+              assertEquals(0, queries.count("lock"));
+              assertEquals(0, queries.count("joined"));
+            }
+            assertEquals("viewer", owners.getOwner(LAKE, object).orElseThrow().name());
+            return null;
+          });
+    }
+  }
+
+  @TestTemplate
+  void preparesHtmlOnceAcrossAuthorizedNameRetries() throws Exception {
+    as("writer", () -> manager.createArticle(LAKE, article("guide", ArticleStatus.PUBLISHED)));
+    ArticleCreate request =
+        Mockito.spy(
+            ArticleCreate.builder()
+                .withTitle("Guide")
+                .withBody(
+                    ArticleBody.of(ArticleBody.Format.HTML, "<p onclick='ignored()'>hello</p>"))
+                .build());
+    assertThrows(
+        ForbiddenException.class, () -> as("viewer", () -> manager.createArticle(LAKE, request)));
+    Mockito.verify(request, Mockito.never()).body();
+    var result = as("writer", () -> manager.createArticle(LAKE, request));
+    assertEquals("guide-2", result.article().name());
+    Mockito.verify(request).body();
+    assertEquals(
+        "<p>hello</p>",
+        as("writer", () -> manager.getArticleContent(LAKE, "guide-2")).body().content());
+  }
+
+  @TestTemplate
   void ownerReadsCheckVisibilityWithoutMaterializingRelations() throws Exception {
     as("writer", () -> manager.createArticle(LAKE, article("published", ArticleStatus.PUBLISHED)));
     MetadataObject object =
@@ -377,6 +459,19 @@ class TestArticleAuthorization extends TestJDBCBackend {
               .thenReturn(true);
           assertEquals(draft, manager.loadArticle(LAKE, "draft"));
           assertEquals(List.of(draft.article(), published.article()), manager.listArticles(LAKE));
+          owners.setOwner(
+              LAKE,
+              MetadataObjects.of(null, "draft", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE),
+              "writer2",
+              Owner.Type.USER);
+          long writerId =
+              backend.get(NameIdentifierUtil.ofUser(LAKE, "writer"), Entity.EntityType.USER).id();
+          Mockito.verify(provider)
+              .handleMetadataOwnerChange(
+                  LAKE,
+                  writerId,
+                  draft.article().nameIdentifier(),
+                  Entity.EntityType.KNOWLEDGE_BASE_ARTICLE);
           return null;
         });
   }

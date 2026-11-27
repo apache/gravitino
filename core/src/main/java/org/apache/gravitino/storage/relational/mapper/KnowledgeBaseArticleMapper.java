@@ -48,6 +48,11 @@ public interface KnowledgeBaseArticleMapper {
   /** Predicate for live rows in the selected metalake. */
   String LIVE = " FROM kb_article_meta WHERE metalake_id=#{metalakeId} AND deleted_at=0";
 
+  /** Locks the live Article for an ownership transfer and returns its stable ID. */
+  @Select("SELECT article_id" + LIVE + " AND article_name=#{name} FOR UPDATE")
+  @Nullable
+  Long lockArticleId(@Param("metalakeId") long metalakeId, @Param("name") String name);
+
   /** Loads the live row under an exclusive lock. */
   @Select("SELECT " + COLUMNS + LIVE + " AND article_name=#{name} FOR UPDATE")
   @Nullable

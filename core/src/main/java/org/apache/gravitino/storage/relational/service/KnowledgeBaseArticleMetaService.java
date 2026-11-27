@@ -516,8 +516,16 @@ public final class KnowledgeBaseArticleMetaService {
 
   /** Runs an owner transfer under the parent fence and the current Article's row lock. */
   public <T> T withLockedArticleId(NameIdentifier ident, LongFunction<T> operation) {
-    return withLockedRow(
-        ident, missing -> missing, (mapper, row) -> operation.apply(row.getArticleId()));
+    String name = KnowledgeBaseArticle.normalizeName(ident.name());
+    return write(
+        mapper -> {
+          long lake = lockMetalake(ident.namespace());
+          Long id = mapper.lockArticleId(lake, name);
+          if (id == null) {
+            throw missing(ident);
+          }
+          return operation.apply(id);
+        });
   }
 
   /** Retires a live Article and its bindings atomically. */

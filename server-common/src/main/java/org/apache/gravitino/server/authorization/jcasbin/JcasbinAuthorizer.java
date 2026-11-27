@@ -984,6 +984,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public void handleMetadataOwnerChange(
+      String metalake,
+      Long oldOwnerId,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType type,
+      long metadataId) {
+    MetadataObject object = NameIdentifierUtil.toMetadataObjectForRead(nameIdentifier, type);
+    metadataIdCache.invalidate(JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, object));
+    ownerRelCache.invalidate(metadataId);
+  }
+
+  @Override
   public void handleEntityNameIdMappingChange(
       String metalake, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject =

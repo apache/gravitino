@@ -351,6 +351,19 @@ public interface GravitinoAuthorizer extends Closeable {
       Entity.EntityType type);
 
   /**
+   * Notifies an owner change with the stable object ID observed during the mutation. Providers that
+   * only implement the name-based hook receive the same notification as before.
+   */
+  default void handleMetadataOwnerChange(
+      String metalake,
+      @Nullable Long oldOwnerId,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType type,
+      long metadataId) {
+    handleMetadataOwnerChange(metalake, oldOwnerId, nameIdentifier, type);
+  }
+
+  /**
    * Called when an entity name-to-id mapping may have changed because of a rename or drop.
    * Implementations evict the cache key for the given entity and all of its descendants.
    *

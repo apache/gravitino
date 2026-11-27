@@ -20,6 +20,7 @@
 package org.apache.gravitino.kb;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
@@ -119,6 +120,7 @@ public final class ArticleManager {
     } else if (generated) {
       name = ArticleEdits.generatedName(request.title(), 0);
     }
+    Supplier<ArticleBody> body = Suppliers.memoize(() -> edits.storedBody(request.body()));
     for (int attempt = 0; ; attempt++) {
       NameIdentifier ident = ident(metalake, name);
       long articleId = ids.nextId();
@@ -130,7 +132,7 @@ public final class ArticleManager {
                   if (authorizationEnabled) {
                     ArticleAccess.forRequest(metalake).requireCreate();
                   }
-                  return edits.create(metalake, articleId, ident.name(), request);
+                  return edits.create(metalake, articleId, ident.name(), request, body);
                 },
                 expectedMetalakeId,
                 (before, created) -> {
