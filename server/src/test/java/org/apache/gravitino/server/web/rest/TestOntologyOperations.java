@@ -20,12 +20,14 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -40,6 +42,8 @@ import javax.ws.rs.client.Invocation;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.requests.OntologyCreateRequest;
 import org.apache.gravitino.dto.requests.OntologyUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -61,6 +65,8 @@ import org.apache.gravitino.ontology.OntologyDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
@@ -71,6 +77,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 
 /** Exercises the ontology REST resource with authorization disabled. */
 public class TestOntologyOperations extends BaseOperationsTest {
@@ -138,14 +145,43 @@ public class TestOntologyOperations extends BaseOperationsTest {
     }
   }
 
+  /** Checks the parent model privilege required to disclose a mapping conflict. */
+  @Test
+  public void testMappingConflictVisibilityRequiresModifyBeforeFirstPublication() {
+    NameIdentifier model = NameIdentifier.of(METALAKE, "catalog", "schema", "model");
+    NameIdentifier mapping = NameIdentifier.of(METALAKE, "catalog", "schema", "model", "mapping");
+    try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
+      auth.when(
+              () ->
+                  MetadataAuthzHelper.checkAccess(
+                      model,
+                      EntityType.SEMANTIC_MODEL,
+                      AuthorizationExpressionConstants
+                          .LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION))
+          .thenReturn(true);
+      assertFalse(OntologyRestSupport.canLoadMapping(mapping, false));
+      assertTrue(OntologyRestSupport.canLoadMapping(mapping, true));
+
+      auth.when(
+              () ->
+                  MetadataAuthzHelper.checkAccess(
+                      model,
+                      EntityType.SEMANTIC_MODEL,
+                      AuthorizationExpressionConstants
+                          .MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION))
+          .thenReturn(true);
+      assertTrue(OntologyRestSupport.canLoadMapping(mapping, false));
+    }
+  }
+
   @Test
   public void testCreateAlterAndDrop() {
     when(dispatcher.createOntology(
             eq(METALAKE), eq("Sales"), eq("orders"), any(OntologyDefinition.class), anyMap()))
         .thenReturn(ontology());
-    when(dispatcher.alterOntology(eq(METALAKE), eq("Sales"), any(OntologyChange[].class)))
+    when(dispatcher.alterOntology(eq(METALAKE), eq("Sales"), any(), any(OntologyChange[].class)))
         .thenReturn(ontology());
-    when(dispatcher.dropOntology(eq(METALAKE), eq("Sales"))).thenReturn(true);
+    when(dispatcher.dropOntology(eq(METALAKE), eq("Sales"), any())).thenReturn(true);
 
     OntologyCreateRequest create =
         new OntologyCreateRequest("Sales", "orders", DEFINITION, Map.of("k", "v"));
@@ -163,7 +199,7 @@ public class TestOntologyOperations extends BaseOperationsTest {
       assertEquals(200, response.getStatus());
     }
     ArgumentCaptor<OntologyChange[]> changes = ArgumentCaptor.forClass(OntologyChange[].class);
-    verify(dispatcher).alterOntology(eq(METALAKE), eq("Sales"), changes.capture());
+    verify(dispatcher).alterOntology(eq(METALAKE), eq("Sales"), any(), changes.capture());
     assertEquals(
         List.of(OntologyChange.updateComment("new"), OntologyChange.setProperty("k", "v2")),
         List.of(changes.getValue()));
@@ -221,7 +257,7 @@ public class TestOntologyOperations extends BaseOperationsTest {
         ErrorConstants.NOT_FOUND_CODE,
         NoSuchOntologyException.class);
 
-    when(dispatcher.dropOntology(eq(METALAKE), eq("Sales")))
+    when(dispatcher.dropOntology(eq(METALAKE), eq("Sales"), any()))
         .thenThrow(new OntologyInUseException("Ontology Sales is used by cat.sch.model.customers"));
     try (Response response = target(ITEM).request(GRAVITINO_JSON).delete()) {
       ErrorResponse error = response.readEntity(ErrorResponse.class);
@@ -260,7 +296,7 @@ public class TestOntologyOperations extends BaseOperationsTest {
 
   @Test
   public void testLockConflictsAreRetryable() {
-    when(dispatcher.alterOntology(eq(METALAKE), eq("Sales"), any(OntologyChange[].class)))
+    when(dispatcher.alterOntology(eq(METALAKE), eq("Sales"), any(), any(OntologyChange[].class)))
         .thenThrow(new OptimisticLockException("The ontology Sales could not be changed"));
     OntologyUpdatesRequest updates =
         OntologyUpdatesRequest.fromOntologyChanges(OntologyChange.updateComment("new"));
@@ -275,9 +311,9 @@ public class TestOntologyOperations extends BaseOperationsTest {
   @Test
   public void testOntologyNamedOssieIsRoutable() {
     when(dispatcher.loadOntology(METALAKE, "ossie")).thenReturn(ontology());
-    when(dispatcher.alterOntology(eq(METALAKE), eq("ossie"), any(OntologyChange[].class)))
+    when(dispatcher.alterOntology(eq(METALAKE), eq("ossie"), any(), any(OntologyChange[].class)))
         .thenReturn(ontology());
-    when(dispatcher.dropOntology(eq(METALAKE), eq("ossie"))).thenReturn(true);
+    when(dispatcher.dropOntology(eq(METALAKE), eq("ossie"), any())).thenReturn(true);
     OntologyUpdatesRequest updates =
         OntologyUpdatesRequest.fromOntologyChanges(OntologyChange.updateComment("new"));
     try (Response response = target(BASE + "/ossie").request(GRAVITINO_JSON).get()) {

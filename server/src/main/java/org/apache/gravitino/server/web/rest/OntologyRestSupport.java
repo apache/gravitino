@@ -25,6 +25,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.InUseException;
@@ -34,11 +36,13 @@ import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Shared handling for ontology requests. */
+/** Shared handling for ontology and mapping requests. */
 final class OntologyRestSupport {
   static final String YAML = "application/yaml";
   static final String VND_GRAVITINO_V1_JSON = "application/vnd.gravitino.v1+json";
@@ -96,5 +100,15 @@ final class OntologyRestSupport {
             document.content(),
             document.format() == OssieFormat.JSON ? MediaType.APPLICATION_JSON : YAML)
         .build();
+  }
+
+  static boolean canLoadMapping(NameIdentifier mapping, boolean modelHasPublishedRevision) {
+    NameIdentifier model = NameIdentifier.of(mapping.namespace().levels());
+    return MetadataAuthzHelper.checkAccess(
+        model,
+        Entity.EntityType.SEMANTIC_MODEL,
+        modelHasPublishedRevision
+            ? AuthorizationExpressionConstants.LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION
+            : AuthorizationExpressionConstants.MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION);
   }
 }

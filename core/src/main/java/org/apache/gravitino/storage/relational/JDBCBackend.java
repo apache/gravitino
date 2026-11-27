@@ -620,8 +620,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
             .deleteSemanticModelMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case ONTOLOGY:
+      case ONTOLOGY_MAPPING:
         return OntologyMetaService.getInstance()
-            .purge(legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            .purge(
+                entityType == Entity.EntityType.ONTOLOGY_MAPPING,
+                legacyTimeline,
+                GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case DOMAIN:
         return DomainMetaService.getInstance()
             .deleteDomainMetasByLegacyTimeline(
@@ -673,8 +677,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
                 versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
 
       case ONTOLOGY:
+      case ONTOLOGY_MAPPING:
         return OntologyMetaService.getInstance()
-            .retireVersions(versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            .retireVersions(
+                entityType == Entity.EntityType.ONTOLOGY_MAPPING,
+                versionRetentionCount,
+                GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
 
       case FILESET:
         return FilesetMetaService.getInstance()

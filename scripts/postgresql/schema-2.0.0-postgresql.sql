@@ -1524,3 +1524,78 @@ COMMENT ON COLUMN ontology_version_info.definition IS 'normalized OntologyDefini
 COMMENT ON COLUMN ontology_version_info.properties IS 'properties snapshot (JSON)';
 COMMENT ON COLUMN ontology_version_info.audit_info IS 'version audit info';
 COMMENT ON COLUMN ontology_version_info.deleted_at IS 'version deleted at';
+
+CREATE TABLE IF NOT EXISTS ontology_mapping_meta (
+    mapping_id BIGINT NOT NULL,
+    mapping_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    catalog_id BIGINT NOT NULL,
+    schema_id BIGINT NOT NULL,
+    semantic_model_id BIGINT NOT NULL,
+    ontology_id BIGINT NOT NULL,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (mapping_id),
+    CONSTRAINT uk_onmm_smid_name_del UNIQUE (semantic_model_id, mapping_name, deleted_at),
+    CONSTRAINT uk_onmm_smid_oid_del UNIQUE (semantic_model_id, ontology_id, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_onmm_oid ON ontology_mapping_meta (ontology_id) WHERE deleted_at = 0;
+
+CREATE INDEX IF NOT EXISTS idx_onmm_mid ON ontology_mapping_meta (metalake_id) WHERE deleted_at = 0;
+
+CREATE INDEX IF NOT EXISTS idx_onmm_cid ON ontology_mapping_meta (catalog_id) WHERE deleted_at = 0;
+
+CREATE INDEX IF NOT EXISTS idx_onmm_sid ON ontology_mapping_meta (schema_id) WHERE deleted_at = 0;
+
+CREATE INDEX IF NOT EXISTS idx_onmm_deleted ON ontology_mapping_meta (deleted_at);
+COMMENT ON TABLE ontology_mapping_meta IS 'ontology mapping identity';
+COMMENT ON COLUMN ontology_mapping_meta.mapping_id IS 'mapping id';
+COMMENT ON COLUMN ontology_mapping_meta.mapping_name IS 'mapping name';
+COMMENT ON COLUMN ontology_mapping_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN ontology_mapping_meta.catalog_id IS 'catalog id';
+COMMENT ON COLUMN ontology_mapping_meta.schema_id IS 'schema id';
+COMMENT ON COLUMN ontology_mapping_meta.semantic_model_id IS 'parent semantic model id';
+COMMENT ON COLUMN ontology_mapping_meta.ontology_id IS 'referenced ontology id, fixed for life';
+COMMENT ON COLUMN ontology_mapping_meta.audit_info IS 'mapping identity audit info';
+COMMENT ON COLUMN ontology_mapping_meta.current_version IS 'current version';
+COMMENT ON COLUMN ontology_mapping_meta.last_version IS 'last allocated version';
+COMMENT ON COLUMN ontology_mapping_meta.deleted_at IS 'mapping deleted at';
+
+CREATE TABLE IF NOT EXISTS ontology_mapping_version_info (
+    id BIGSERIAL,
+    metalake_id BIGINT NOT NULL,
+    catalog_id BIGINT NOT NULL,
+    schema_id BIGINT NOT NULL,
+    mapping_id BIGINT NOT NULL,
+    version INT NOT NULL,
+    mapping_comment TEXT DEFAULT NULL,
+    definition TEXT NOT NULL,
+    properties TEXT DEFAULT NULL,
+    audit_info TEXT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_onmvi_mpid_ver_del UNIQUE (mapping_id, version, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_onmvi_mid ON ontology_mapping_version_info (metalake_id) WHERE deleted_at = 0;
+
+CREATE INDEX IF NOT EXISTS idx_onmvi_cid ON ontology_mapping_version_info (catalog_id) WHERE deleted_at = 0;
+
+CREATE INDEX IF NOT EXISTS idx_onmvi_sid ON ontology_mapping_version_info (schema_id) WHERE deleted_at = 0;
+
+CREATE INDEX IF NOT EXISTS idx_onmvi_deleted ON ontology_mapping_version_info (deleted_at);
+COMMENT ON TABLE ontology_mapping_version_info IS 'ontology mapping versions';
+COMMENT ON COLUMN ontology_mapping_version_info.id IS 'auto increment id';
+COMMENT ON COLUMN ontology_mapping_version_info.metalake_id IS 'metalake id';
+COMMENT ON COLUMN ontology_mapping_version_info.catalog_id IS 'catalog id';
+COMMENT ON COLUMN ontology_mapping_version_info.schema_id IS 'schema id';
+COMMENT ON COLUMN ontology_mapping_version_info.mapping_id IS 'mapping id';
+COMMENT ON COLUMN ontology_mapping_version_info.version IS 'version';
+COMMENT ON COLUMN ontology_mapping_version_info.mapping_comment IS 'comment snapshot';
+COMMENT ON COLUMN ontology_mapping_version_info.definition IS 'normalized OntologyMappingDefinition (JSON)';
+COMMENT ON COLUMN ontology_mapping_version_info.properties IS 'properties snapshot (JSON)';
+COMMENT ON COLUMN ontology_mapping_version_info.audit_info IS 'version audit info';
+COMMENT ON COLUMN ontology_mapping_version_info.deleted_at IS 'version deleted at';

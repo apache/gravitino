@@ -883,3 +883,45 @@ CREATE TABLE IF NOT EXISTS `ontology_version_info` (
     KEY `idx_onvi_mid` (`metalake_id`, `deleted_at`),
     KEY `idx_onvi_deleted` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'ontology versions';
+
+CREATE TABLE IF NOT EXISTS `ontology_mapping_meta` (
+    `mapping_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'mapping id',
+    `mapping_name` VARCHAR(128) NOT NULL COMMENT 'mapping name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'parent semantic model id',
+    `ontology_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'referenced ontology id, fixed for life',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'mapping identity audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'last allocated version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'mapping deleted at',
+    PRIMARY KEY (`mapping_id`),
+    UNIQUE KEY `uk_onmm_smid_name_del` (`semantic_model_id`, `mapping_name`, `deleted_at`),
+    UNIQUE KEY `uk_onmm_smid_oid_del` (`semantic_model_id`, `ontology_id`, `deleted_at`),
+    KEY `idx_onmm_oid` (`ontology_id`, `deleted_at`),
+    KEY `idx_onmm_mid` (`metalake_id`, `deleted_at`),
+    KEY `idx_onmm_cid` (`catalog_id`, `deleted_at`),
+    KEY `idx_onmm_sid` (`schema_id`, `deleted_at`),
+    KEY `idx_onmm_deleted` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'ontology mapping identity';
+
+CREATE TABLE IF NOT EXISTS `ontology_mapping_version_info` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `mapping_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'mapping id',
+    `version` INT UNSIGNED NOT NULL COMMENT 'version',
+    `mapping_comment` TEXT DEFAULT NULL COMMENT 'comment snapshot',
+    `definition` MEDIUMTEXT NOT NULL COMMENT 'normalized OntologyMappingDefinition (JSON)',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'properties snapshot (JSON)',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'version audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_onmvi_mpid_ver_del` (`mapping_id`, `version`, `deleted_at`),
+    KEY `idx_onmvi_mid` (`metalake_id`, `deleted_at`),
+    KEY `idx_onmvi_cid` (`catalog_id`, `deleted_at`),
+    KEY `idx_onmvi_sid` (`schema_id`, `deleted_at`),
+    KEY `idx_onmvi_deleted` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'ontology mapping versions';

@@ -22,13 +22,22 @@ import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
 
-/** Joined identity and current snapshot of an ontology. */
+/** Joined identity and current snapshot of an ontology or a mapping. */
 @Getter
 @Setter
 public class OntologySnapshotPO {
   private long id;
   private String name;
   private long metalakeId;
+  private long catalogId;
+  private long schemaId;
+  private long semanticModelId;
+  private long ontologyId;
+  private String ontologyName;
+  private String catalogName;
+  private String schemaName;
+  private String semanticModelName;
+  private int semanticModelActiveVersion;
   private int currentVersion;
   private int lastVersion;
   @Nullable private String comment;
