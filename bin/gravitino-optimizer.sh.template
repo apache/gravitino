@@ -76,12 +76,29 @@ if [[ "$JVM_VERSION" -eq 17 ]]; then
   JAVA_OPTS+=" --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED"
 fi
 
-# Shared server jars first, then optimizer-specific jars (prepended last so they
-# win on the classpath). optimizer/libs only ships the CLI module jars plus
-# commons-cli; everything else comes from ${GRAVITINO_HOME}/libs.
-if [ -d "${GRAVITINO_HOME}/libs" ]; then
-  addJarInDir "${GRAVITINO_HOME}/libs"
+# Shared runtime jars used by the CLI are listed in optimizer/conf/shared-libs and
+# resolved from ${GRAVITINO_HOME}/libs (not the whole libs/ tree). optimizer/libs
+# only ships CLI-owned jars (optimizer / optimizer-api / updaters / commons-cli).
+SHARED_LIBS_LIST="${GRAVITINO_HOME}/optimizer/conf/shared-libs"
+if [[ ! -f "${SHARED_LIBS_LIST}" ]]; then
+  echo "ERROR: missing ${SHARED_LIBS_LIST}" >&2
+  exit 1
 fi
+if [[ ! -d "${GRAVITINO_HOME}/libs" ]]; then
+  echo "ERROR: missing ${GRAVITINO_HOME}/libs" >&2
+  exit 1
+fi
+while IFS= read -r jar_name || [[ -n "${jar_name}" ]]; do
+  [[ -z "${jar_name}" || "${jar_name}" =~ ^[[:space:]]*# ]] && continue
+  jar_path="${GRAVITINO_HOME}/libs/${jar_name}"
+  if [[ ! -f "${jar_path}" ]]; then
+    echo "ERROR: required shared jar not found: ${jar_path}" >&2
+    echo "       (listed in ${SHARED_LIBS_LIST})" >&2
+    exit 1
+  fi
+  GRAVITINO_CLASSPATH="${jar_path}:${GRAVITINO_CLASSPATH}"
+done < "${SHARED_LIBS_LIST}"
+
 if [ -d "${GRAVITINO_HOME}/optimizer/libs" ]; then
   addJarInDir "${GRAVITINO_HOME}/optimizer/libs"
   addDirToClasspath "${GRAVITINO_HOME}/optimizer/conf"
