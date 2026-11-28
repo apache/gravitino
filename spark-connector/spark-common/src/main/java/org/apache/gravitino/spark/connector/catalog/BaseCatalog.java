@@ -164,6 +164,20 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
    */
   protected abstract SparkTransformConverter getSparkTransformConverter();
 
+  /**
+   * Returns the transform converter for a table about to be created, given its Gravitino
+   * properties. Mixed-format catalogs override this to pick the converter per table (for example,
+   * bucket transforms are partitioning for Iceberg tables but only bucketing for Hive tables); the
+   * default ignores the properties.
+   *
+   * @param gravitinoTableProperties the Gravitino properties of the table being created
+   * @return the converter to translate this table's transforms
+   */
+  protected SparkTransformConverter getSparkTransformConverter(
+      Map<String, String> gravitinoTableProperties) {
+    return getSparkTransformConverter();
+  }
+
   protected SparkTypeConverter getSparkTypeConverter() {
     return new SparkTypeConverter();
   }
@@ -319,10 +333,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
             .map(structField -> createGravitinoColumn(structField, columnTypeConverter))
             .toArray(org.apache.gravitino.rel.Column[]::new);
 
+    SparkTransformConverter transformConverter = getSparkTransformConverter(gravitinoProperties);
     DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
-        sparkTransformConverter.toGravitinoDistributionAndSortOrders(transforms);
+        transformConverter.toGravitinoDistributionAndSortOrders(transforms);
     org.apache.gravitino.rel.expressions.transforms.Transform[] partitionings =
-        sparkTransformConverter.toGravitinoPartitionings(transforms);
+        transformConverter.toGravitinoPartitionings(transforms);
 
     return gravitinoCatalog()
         .asTableCatalog()

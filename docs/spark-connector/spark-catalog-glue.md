@@ -286,6 +286,10 @@ SELECT * FROM orders WHERE order_ts >= DATE '2024-01-01';
 Iceberg tables use the Iceberg type mapping, as with the Iceberg catalog: a Spark `TIMESTAMP` column is an Iceberg `timestamptz`, and a Spark `TIMESTAMP_NTZ` column an Iceberg `timestamp`. Hive-format tables store a Spark `TIMESTAMP` as a Hive `timestamp` and do not support `TIMESTAMP_NTZ`.
 :::
 
+:::note
+Bucketing depends on the table format too. On an Iceberg-format table, `bucket(N, col)` becomes an Iceberg bucket partition. Iceberg buckets take exactly one column and have no sorted bucket, so `CLUSTERED BY (a, b) INTO N BUCKETS` is rejected by the Gravitino server and `CLUSTERED BY (a) SORTED BY (ts) INTO N BUCKETS` is rejected by the connector when the table is created. On a Hive-format table a bucket stays Hive bucketing in both forms. A new table is in Iceberg format when it is created `USING iceberg` or sets `table-format` to `ICEBERG`, or when it sets no `table-format` and the catalog's `default-table-format` is `ICEBERG`.
+:::
+
 
 ## Catalog Properties
 
