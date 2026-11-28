@@ -345,6 +345,14 @@ Alternatively, use `spark.bypass.` prefix in catalog properties to pass S3 confi
 }
 ```
 
+For this catalog's Hive-format tables, where no S3 key is configured, credentials the Gravitino catalog stores itself (`aws-access-key-id` and `aws-secret-access-key`) are written to the Spark catalog as `fs.s3a.access.key` and `fs.s3a.secret.key`, unless the Gravitino catalog property `credential-providers` is set without `s3-secret-key` (for example to `aws-secret-key` alone).
+
+Which key counts as configured, when session settings are read, and which reads the keys reach (Parquet and ORC tables read with Spark's native readers do not get them) is the same as for the Hive catalog; see [Credentials stored on the Gravitino catalog](spark-catalog-hive.md#credentials-stored-on-the-gravitino-catalog).
+
+:::warning
+Where no key is set, the vended keys are used like a key pair of your own, and the credential provider chain of S3A decides which credentials it picks: in the default chain, on Hadoop 3.3 and 3.4 alike, a key pair comes before environment variables and the instance profile. A catalog that stores S3 keys therefore makes Spark use them even where the environment offers credentials of its own, such as an instance profile. To keep other credentials instead, set `fs.s3a.aws.credentials.provider` to the providers to use, for example `org.apache.hadoop.fs.s3a.auth.IAMInstanceCredentialsProvider`: S3A then consults only those.
+:::
+
 :::note
 Ensure you have the AWS Java SDK and Hadoop AWS JARs in your Spark classpath when using S3 storage.
 :::

@@ -23,6 +23,8 @@ import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.credential.AwsSecretKeyCredential;
 import org.apache.gravitino.credential.Credential;
@@ -36,6 +38,8 @@ import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
 import org.apache.gravitino.spark.connector.hive.SparkHiveTable;
 import org.apache.gravitino.spark.connector.hive.SparkHiveTypeConverter;
 import org.apache.gravitino.spark.connector.iceberg.SparkIcebergTable;
+import org.apache.gravitino.spark.connector.utils.VendedCredentialOptions;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTable;
@@ -123,7 +127,8 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     TableCatalog hiveCatalog = createHiveTableCatalog();
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
-    this.vendedAwsCredentials = applyS3Credential(gravitinoCatalog(), all);
+    this.vendedAwsCredentials =
+        applyS3Credential(gravitinoCatalog(), all, VendedCredentialOptions.sessionHadoopConf());
     hiveCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     return hiveCatalog;
   }
@@ -131,13 +136,19 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   /**
    * Obtains credentials via Gravitino credential vending. {@link AwsSecretKeyCredential} supplies
    * Glue API keys (returned for the Iceberg path). {@link S3SecretKeyCredential} supplies {@code
-   * hadoop.fs.s3a.*} for Hive-path S3 data access. When only {@link S3SecretKeyCredential} is
-   * present (legacy remap), it also fills Glue API keys for backward compatibility.
+   * fs.s3a.*} for Hive-path S3 data access. The {@code fs.s3a.*} pair is written only where neither
+   * key is configured; the Glue API keys are returned regardless. When only {@link
+   * S3SecretKeyCredential} is present (legacy remap), it also fills Glue API keys for backward
+   * compatibility.
    *
+   * @param catalog the Gravitino catalog that may vend credentials
+   * @param props the merged Spark catalog options
+   * @param sessionHadoopConf the session's Hadoop configuration, in which session-level keys are
+   *     configured; null when there is no live Spark session
    * @return map of vended AWS credentials (Gravitino key names), or empty map if none vended
    */
   static Map<String, String> applyS3Credential(
-      org.apache.gravitino.Catalog catalog, Map<String, String> props) {
+      Catalog catalog, Map<String, String> props, @Nullable Configuration sessionHadoopConf) {
     Map<String, String> vended = new HashMap<>();
     Credential[] credentials;
     try {
@@ -155,8 +166,13 @@ public class GravitinoGlueCatalog extends BaseCatalog {
         vended.put(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY, aws.secretAccessKey());
       } else if (credential instanceof S3SecretKeyCredential) {
         s3SecretKey = (S3SecretKeyCredential) credential;
-        props.put("hadoop.fs.s3a.access.key", s3SecretKey.accessKeyId());
-        props.put("hadoop.fs.s3a.secret.key", s3SecretKey.secretAccessKey());
+        VendedCredentialOptions.putPairUnlessConfigured(
+            props,
+            sessionHadoopConf,
+            "fs.s3a.access.key",
+            s3SecretKey.accessKeyId(),
+            "fs.s3a.secret.key",
+            s3SecretKey.secretAccessKey());
       } else {
         LOG.warn(
             "Received unrecognized credential type '{}' for Glue catalog, skipping",

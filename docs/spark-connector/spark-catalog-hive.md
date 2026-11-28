@@ -109,4 +109,31 @@ When using the `spark-sql` shell client, you must explicitly set the `spark.bypa
 
 ### S3
 
-Refer to [Hive catalog with s3](../hive-catalog-with-cloud-storage.md) to set up a Hive catalog with s3 storage. To query the data stored in s3, you need to add s3 secret to the Spark configuration using `spark.sql.catalog.${hive_catalog_name}.fs.s3a.access.key` and `spark.sql.catalog.${hive_catalog_name}.fs.s3a.secret.key`. Additionally, download [hadoop aws jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), the AWS SDK jar that matches the Hadoop version of Spark ([aws java sdk v1 jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) for Hadoop 3.3, [aws java sdk v2 jar](https://mvnrepository.com/artifact/software.amazon.awssdk/bundle) for Hadoop 3.4 and later) and place them in the classpath of Spark.
+Refer to [Hive catalog with s3](../hive-catalog-with-cloud-storage.md) to set up a Hive catalog with s3 storage. To query the data stored in S3, Spark needs S3 credentials: either add them to the Spark configuration using `spark.sql.catalog.${hive_catalog_name}.fs.s3a.access.key` and `spark.sql.catalog.${hive_catalog_name}.fs.s3a.secret.key`, or store them on the Gravitino catalog. For Parquet and ORC tables, see [Credentials stored on the Gravitino catalog](#credentials-stored-on-the-gravitino-catalog) for which reads get these keys. Additionally, download [hadoop aws jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), the AWS SDK jar that matches the Hadoop version of Spark ([aws java sdk v1 jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) for Hadoop 3.3, [aws java sdk v2 jar](https://mvnrepository.com/artifact/software.amazon.awssdk/bundle) for Hadoop 3.4 and later) and place them in the classpath of Spark.
+
+## Credentials stored on the Gravitino catalog
+
+The catalog can store object-store credentials itself. The connector passes the credentials the Gravitino catalog vends to the Spark catalog, under the keys the object stores read:
+
+- S3 credentials (`s3-access-key-id` and `s3-secret-access-key`) are written as `fs.s3a.access.key` and `fs.s3a.secret.key`.
+- The Azure account key is written as `fs.azure.account.key.<account name>.dfs.core.windows.net`, the key hadoop-azure reads for table locations on the public Azure Data Lake endpoint. For table locations elsewhere, such as `wasb://` blob locations or other Azure clouds, hadoop-azure looks the key up under another name and does not read the one written.
+- OSS credentials are written as `fs.oss.accessKeyId` with `fs.oss.accessKeySecret`. Catalog option keys are passed on in lower case, which these two names do not survive, so OSS credentials are written to the configuration of the Spark catalog itself rather than to its options.
+
+A vended key is written only where the key is not configured:
+
+- An S3 or OSS pair is taken as a unit: when either half is configured, neither vended half is written, since one vended half next to a configured one would not authenticate.
+- A blank value does not count as configured: for S3 and Azure its entry is removed, for OSS it is ignored.
+- For the Azure account key, a key set for all accounts (`fs.azure.account.key`) counts as configured as well.
+- For OSS, keys given as catalog options or `spark.bypass.*` properties are written as given, over keys set on the session, the way catalog options for S3 rank; the vended pair is written only where no OSS key is configured at all.
+
+The keys reach the Hadoop configuration the Spark catalog lists files and writes data with, and reads data with through the Hive SerDe reader. Parquet and ORC tables are read with Spark's native readers by default (see [Dynamic Partition Pruning](#dynamic-partition-pruning)), which take their Hadoop configuration from the session: the stored credentials do not reach them, and neither do keys given as `spark.sql.catalog.${hive_catalog_name}.fs.*` options or `spark.bypass.fs.*` properties. To read such a table with the stored credentials, set the `convertMetastore*` option of its format to `false`, which applies to the whole session. Otherwise set the keys session-wide, through `spark.hadoop.fs.*`.
+
+Hadoop caches one filesystem instance per scheme, bucket and user in each JVM, and the instance keeps the keys it was opened with. Within one Spark application, whatever opens a bucket first in a JVM (a catalog, a native reader, or Spark itself) decides which keys later accesses to that bucket use there. Catalogs that use different keys, stored on Gravitino or set as options, should therefore not share a bucket.
+
+A key you set yourself takes precedence over a vended one, in any of these places: through the `spark.sql.catalog.${hive_catalog_name}.fs.s3a.*` options above, through a `spark.bypass.fs.s3a.*` catalog property, session-wide through `spark.hadoop.fs.s3a.*`, or on the session with `spark.conf().set("fs.s3a.access.key", ...)`. Spark also copies the environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` of the driver into `fs.s3a.access.key` and `fs.s3a.secret.key`, so where both are set, the vended S3 pair is not written. The session settings are read when the catalog is initialized, the first time the session uses it: a key set on the session afterwards does not count, and the vended key takes precedence over it in this catalog. A key kept in a Hadoop credential provider is not recognized here, but the filesystem still asks the provider first. An Azure account that authenticates with SAS or OAuth does not use its account key, so the vended key has no effect there.
+
+:::warning
+OSS credentials given as catalog options or `spark.bypass.*` properties had no effect before, because their names did not survive the way to the catalog; they take effect now and outrank the vended pair and keys set on the session.
+
+Where no key is set, the vended keys are used like a key pair of your own, and the credential provider chain of S3A decides which credentials it picks: in the default chain, on Hadoop 3.3 and 3.4 alike, a key pair comes before environment variables and the instance profile. A catalog that stores S3 keys therefore makes Spark use them even where the environment offers credentials of its own, such as an instance profile. To keep other credentials instead, set `fs.s3a.aws.credentials.provider` to the providers to use, for example `org.apache.hadoop.fs.s3a.auth.IAMInstanceCredentialsProvider`: S3A then consults only those.
+:::
