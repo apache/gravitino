@@ -544,6 +544,7 @@ public class TestGravitinoGlueCatalog {
     CreatedTable created = createTableWithBucket(ImmutableMap.of(), null);
 
     assertHashBucketing(created, 16, "id");
+    Assertions.assertEquals(0, created.sortOrders.length, "a plain bucket carries no sort order");
   }
 
   @Test
@@ -580,6 +581,7 @@ public class TestGravitinoGlueCatalog {
     CreatedTable created = createTableWithBucket(tableWithFormat("hive"), "iceberg");
 
     assertHashBucketing(created, 16, "id");
+    Assertions.assertEquals(0, created.sortOrders.length, "a plain bucket carries no sort order");
   }
 
   @Test
@@ -613,9 +615,9 @@ public class TestGravitinoGlueCatalog {
   @Test
   void testMultiColumnBucketIsForwardedForAnIcebergFormatTable() throws Exception {
     // Iceberg buckets take exactly one column; the server's GlueIcebergTableHelper rejects more.
-    // The connector used to drop such a bucket silently along with every other bucket, creating
-    // an unpartitioned table; it now sends the partitioning as asked, for the server to accept
-    // or reject.
+    // The connector used to send such a bucket as a distribution, which the server drops for an
+    // Iceberg table, creating an unpartitioned table; it now sends it as partitioning, which the
+    // server rejects.
     CreatedTable created =
         createThroughCatalog(
             new Transform[] {Expressions.bucket(16, new String[] {"a", "b"})},
@@ -628,6 +630,7 @@ public class TestGravitinoGlueCatalog {
     Assertions.assertArrayEquals(new String[][] {{"a"}, {"b"}}, bucket.fieldNames());
     Assertions.assertEquals(16, bucket.numBuckets());
     Assertions.assertEquals(Strategy.NONE, created.distribution.strategy());
+    Assertions.assertEquals(0, created.sortOrders.length, "a plain bucket carries no sort order");
   }
 
   // -------------------------------------------------------------------------
@@ -829,6 +832,9 @@ public class TestGravitinoGlueCatalog {
     private TestableGlueCatalog(Catalog client) {
       this.client = client;
       this.propertiesConverter = GluePropertiesConverter.getInstance();
+      // initialize() stores this catalog-wide converter as well; without it, the create path of a
+      // catalog that does not pick a converter per table would fail here with an NPE.
+      this.sparkTransformConverter = getSparkTransformConverter();
     }
 
     @Override
