@@ -417,7 +417,18 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       this.fileSystemCache = cacheBuilder.build();
     }
 
-    this.catalogStorageLocations = getAndCheckCatalogStorageLocations(config);
+    try {
+      this.catalogStorageLocations = getAndCheckCatalogStorageLocations(config);
+    } catch (RuntimeException | Error e) {
+      // A catalog keeps no operations whose initialization failed, so nothing else closes the file
+      // systems created to check the locations.
+      try {
+        close();
+      } catch (Throwable closeFailure) {
+        e.addSuppressed(closeFailure);
+      }
+      throw e;
+    }
 
     // Metrics System could be null in UT.
     if (metricsSystem != null) {
@@ -1124,7 +1135,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               (k, v) -> {
                 try {
                   v.close();
-                } catch (IOException e) {
+                } catch (IOException | RuntimeException e) {
+                  // Goes on with the others, which would otherwise keep their logins open.
                   LOG.warn("Failed to close FileSystem instance in cache", e);
                 }
               });

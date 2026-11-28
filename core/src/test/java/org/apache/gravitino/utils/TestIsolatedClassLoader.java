@@ -175,6 +175,20 @@ public class TestIsolatedClassLoader {
     Assertions.assertFalse(isCatalogClass("org.slf4j.Logger"));
   }
 
+  /** Keytab file names are reused across catalog reloads only if all catalog loaders share them. */
+  @Test
+  public void testCatalogLoadersShareKeytabNames() throws Exception {
+    // Even a catalog loader whose own class path holds the class gets the server's copy.
+    URL common = KeytabNames.class.getProtectionDomain().getCodeSource().getLocation();
+    try (IsolatedClassLoader loader =
+        new IsolatedClassLoader(
+            Collections.singletonList(common), Collections.emptyList(), Collections.emptyList())) {
+      Assertions.assertSame(
+          KeytabNames.class,
+          loader.withClassLoader(cl -> cl.loadClass(KeytabNames.class.getName())));
+    }
+  }
+
   /** A nested loader must keep its cold dependencies loadable after the context owner closes. */
   @Test
   public void testNestedLoaderSurvivesContextLoaderClose() throws Exception {

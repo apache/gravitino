@@ -2722,6 +2722,165 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testFailedInitializeClosesTheFileSystemsItCreated(boolean locationIsAFile)
+      throws IOException {
+    Path checked = new Path("hdfs://cluster-a:8020/checked");
+    Path failing = new Path("hdfs://cluster-b:8020/failing");
+    FileSystem checkedFs = Mockito.mock(FileSystem.class);
+    FileSystem failingFs = Mockito.mock(FileSystem.class);
+    if (locationIsAFile) {
+      FileStatus file = Mockito.mock(FileStatus.class);
+      when(file.isFile()).thenReturn(true);
+      when(failingFs.exists(failing)).thenReturn(true);
+      when(failingFs.getFileStatus(failing)).thenReturn(file);
+    } else {
+      when(failingFs.exists(failing)).thenThrow(new IOException("Connection refused"));
+    }
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      doReturn(checkedFs)
+          .when(ops)
+          .createFileSystemIfLoginMatches(Mockito.eq(checked), any(), any(), any());
+      doReturn(failingFs)
+          .when(ops)
+          .createFileSystemIfLoginMatches(Mockito.eq(failing), any(), any(), any());
+      RuntimeException failure =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  ops.initialize(
+                      ImmutableMap.of(
+                          PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "checked",
+                          checked.toString(),
+                          PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "failing",
+                          failing.toString()),
+                      randomCatalogInfo("metalake", "catalog"),
+                      FILESET_PROPERTIES_METADATA));
+      Class<? extends RuntimeException> expected =
+          locationIsAFile ? IllegalArgumentException.class : ConnectionFailedException.class;
+      Assertions.assertInstanceOf(expected, failure);
+      // Checked before the try closes ops: no catalog keeps an ops whose initialization failed.
+      Mockito.verify(checkedFs, Mockito.atLeastOnce()).close();
+      Mockito.verify(failingFs, Mockito.atLeastOnce()).close();
+      Assertions.assertTrue(ops.fileSystemExecutor.isShutdown());
+      Assertions.assertTrue(ops.loginSettingsExecutor.isShutdown());
+    }
+  }
+
+  @Test
+  public void testFailedInitializeClosesTheFileSystemsItCreatedOnAnError() throws IOException {
+    Path checked = new Path("hdfs://cluster-a:8020/checked");
+    Path failing = new Path("hdfs://cluster-b:8020/failing");
+    FileSystem checkedFs = Mockito.mock(FileSystem.class);
+    FileSystem failingFs = Mockito.mock(FileSystem.class);
+    // For example a class of the file system client that can no longer be loaded.
+    NoClassDefFoundError error = new NoClassDefFoundError("org/example/Missing");
+    when(failingFs.exists(failing)).thenThrow(error);
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      doReturn(checkedFs)
+          .when(ops)
+          .createFileSystemIfLoginMatches(Mockito.eq(checked), any(), any(), any());
+      doReturn(failingFs)
+          .when(ops)
+          .createFileSystemIfLoginMatches(Mockito.eq(failing), any(), any(), any());
+      NoClassDefFoundError thrown =
+          Assertions.assertThrows(
+              NoClassDefFoundError.class,
+              () ->
+                  ops.initialize(
+                      ImmutableMap.of(
+                          PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "checked",
+                          checked.toString(),
+                          PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "failing",
+                          failing.toString()),
+                      randomCatalogInfo("metalake", "catalog"),
+                      FILESET_PROPERTIES_METADATA));
+      Assertions.assertSame(error, thrown);
+      Mockito.verify(checkedFs, Mockito.atLeastOnce()).close();
+      Mockito.verify(failingFs, Mockito.atLeastOnce()).close();
+      Assertions.assertTrue(ops.fileSystemExecutor.isShutdown());
+      Assertions.assertTrue(ops.loginSettingsExecutor.isShutdown());
+    }
+  }
+
+  @Test
+  public void testFailedInitializeClosesEveryFileSystemWhenClosingOneFails() throws IOException {
+    Path checked = new Path("hdfs://cluster-a:8020/checked");
+    Path failing = new Path("hdfs://cluster-b:8020/failing");
+    FileSystem checkedFs = Mockito.mock(FileSystem.class);
+    FileSystem failingFs = Mockito.mock(FileSystem.class);
+    when(failingFs.exists(failing)).thenThrow(new IOException("Connection refused"));
+    // Whichever is closed first fails, so a cleanup that stops there leaves the other one open.
+    // Only the close of the failed initialization fails, not the one of the try below.
+    for (FileSystem fs : new FileSystem[] {checkedFs, failingFs}) {
+      Mockito.doThrow(new IllegalStateException("close failed")).doNothing().when(fs).close();
+    }
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      doReturn(checkedFs)
+          .when(ops)
+          .createFileSystemIfLoginMatches(Mockito.eq(checked), any(), any(), any());
+      doReturn(failingFs)
+          .when(ops)
+          .createFileSystemIfLoginMatches(Mockito.eq(failing), any(), any(), any());
+      Assertions.assertThrows(
+          ConnectionFailedException.class,
+          () ->
+              ops.initialize(
+                  ImmutableMap.of(
+                      PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "checked",
+                      checked.toString(),
+                      PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "failing",
+                      failing.toString()),
+                  randomCatalogInfo("metalake", "catalog"),
+                  FILESET_PROPERTIES_METADATA));
+      Mockito.verify(checkedFs, Mockito.atLeastOnce()).close();
+      Mockito.verify(failingFs, Mockito.atLeastOnce()).close();
+    }
+  }
+
+  @Test
+  public void testFailedInitializeKeepsItsErrorWhenClosingThrowsAnError() throws IOException {
+    Path checked = new Path("hdfs://cluster-a:8020/checked");
+    Path failing = new Path("hdfs://cluster-b:8020/failing");
+    FileSystem checkedFs = Mockito.mock(FileSystem.class);
+    FileSystem failingFs = Mockito.mock(FileSystem.class);
+    when(failingFs.exists(failing)).thenThrow(new IOException("Connection refused"));
+    LinkageError closeError = new LinkageError("close failed");
+    // Only the close of the failed initialization fails, not the one of the try below.
+    Mockito.doThrow(closeError).doNothing().when(checkedFs).close();
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      doReturn(checkedFs)
+          .when(ops)
+          .createFileSystemIfLoginMatches(Mockito.eq(checked), any(), any(), any());
+      doReturn(failingFs)
+          .when(ops)
+          .createFileSystemIfLoginMatches(Mockito.eq(failing), any(), any(), any());
+      ConnectionFailedException failure =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () ->
+                  ops.initialize(
+                      ImmutableMap.of(
+                          PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "checked",
+                          checked.toString(),
+                          PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "failing",
+                          failing.toString()),
+                      randomCatalogInfo("metalake", "catalog"),
+                      FILESET_PROPERTIES_METADATA));
+      Assertions.assertEquals(1, failure.getSuppressed().length);
+      Assertions.assertSame(closeError, failure.getSuppressed()[0]);
+    }
+  }
+
   @Test
   public void testTestConnectionRejectsDefaultCatalogLocationThatIsAFile() throws IOException {
     File fileLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/default-file-location");
