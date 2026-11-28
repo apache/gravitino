@@ -832,8 +832,8 @@ public class TestGravitinoGlueCatalog {
     private TestableGlueCatalog(Catalog client) {
       this.client = client;
       this.propertiesConverter = GluePropertiesConverter.getInstance();
-      // initialize() stores this catalog-wide converter as well; without it, the create path of a
-      // catalog that does not pick a converter per table would fail here with an NPE.
+      // initialize() stores this catalog-wide converter as well; a create path that reads this
+      // field instead of the per-table hook would otherwise fail here with an NPE.
       this.sparkTransformConverter = getSparkTransformConverter();
     }
 
