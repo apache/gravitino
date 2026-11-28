@@ -24,6 +24,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -38,15 +43,22 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
+import org.apache.gravitino.cache.CachedEntityIdResolver;
+import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.EntityIdResolver;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -76,12 +88,25 @@ public class TestRelationalEntityStore {
     FieldUtils.writeField(store, "cache", Mockito.spy(new NoOpsCache(config)), true);
   }
 
+  @SuppressWarnings("unchecked")
+  private Map<String, AtomicInteger> cacheBlocks() throws IllegalAccessException {
+    return (Map<String, AtomicInteger>) FieldUtils.readField(store, "cacheBlocks", true);
+  }
+
+  private boolean writeBlocked(NameIdentifier ident, Entity.EntityType type)
+      throws IllegalAccessException {
+    AtomicInteger count = cacheBlocks().get("w\0" + type.name() + "\0" + ident);
+    return count != null && count.get() > 0;
+  }
+
   @Test
   void testUncachedInsertStillInvokesRelatedInvalidationAfterEpochChanges() throws Exception {
     BaseEntityCache cache = Mockito.mock(BaseEntityCache.class);
     FieldUtils.writeField(store, "cache", cache, true);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "model");
     ModelEntity entity = Mockito.mock(ModelEntity.class);
     Mockito.when(entity.type()).thenReturn(Entity.EntityType.MODEL);
+    Mockito.when(entity.nameIdentifier()).thenReturn(ident);
     Mockito.doAnswer(
             invocation -> {
               store.clearCache();
@@ -90,43 +115,424 @@ public class TestRelationalEntityStore {
         .when(backend)
         .insert(entity, false);
     store.put(entity, false);
-    Mockito.verify(cache).put(entity);
+    // Epoch advanced during insert, so publication is fenced; related invalidation still ran via
+    // beginPendingWrite / the final invalidateCache path.
+    Mockito.verify(cache, Mockito.atLeastOnce()).invalidate(ident, Entity.EntityType.MODEL);
   }
 
   @Test
-  void testUpdateInvalidatesCacheAfterBackendUpdate()
+  void testColdTableIdLookupDoesNotLoadOrCacheFullEntity() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    Mockito.when(backend.getTableId(ident)).thenReturn(42L);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    Assertions.assertEquals(42L, store.getTableId(ident));
+    Mockito.verify(backend).getTableId(ident);
+    Mockito.verifyNoMoreInteractions(backend);
+    Mockito.verify(cache, Mockito.never()).put(any());
+  }
+
+  @Test
+  void testWarmTableIdLookupUsesExistingEntityCache() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    TableEntity table = Mockito.mock(TableEntity.class);
+    Mockito.when(table.id()).thenReturn(42L);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    Mockito.doReturn(Optional.of(table)).when(cache).getIfPresent(ident, Entity.EntityType.TABLE);
+    Assertions.assertEquals(42L, store.getTableId(ident));
+    Mockito.verifyNoInteractions(backend);
+  }
+
+  @Test
+  void testTableIdLookupPropagatesMissingTableAndStorageFailure() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "missing");
+    Mockito.when(backend.getTableId(ident))
+        .thenThrow(new NoSuchEntityException("Missing table"))
+        .thenThrow(new IOException("Storage unavailable"));
+    Assertions.assertThrows(NoSuchEntityException.class, () -> store.getTableId(ident));
+    Assertions.assertThrows(IOException.class, () -> store.getTableId(ident));
+  }
+
+  @Test
+  void testOfflineTableIdLookupUsesInjectedBackendWithFullReadFallback() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    RelationalBackend injected = Mockito.mock(RelationalBackend.class);
+    TableEntity table = Mockito.mock(TableEntity.class);
+    Mockito.when(table.id()).thenReturn(42L);
+    Mockito.when(table.type()).thenReturn(Entity.EntityType.TABLE);
+    Mockito.when(table.nameIdentifier()).thenReturn(ident);
+    Mockito.when(injected.get(ident, Entity.EntityType.TABLE)).thenReturn(table);
+    Mockito.when(injected.getTableId(ident)).thenCallRealMethod();
+    RelationalEntityStore offline =
+        RelationalEntityStore.forOfflineMigration(injected, new Config(false) {});
+    Assertions.assertEquals(
+        offline.get(ident, Entity.EntityType.TABLE, TableEntity.class).id(),
+        offline.getTableId(ident));
+    Mockito.verify(injected, Mockito.times(2)).get(ident, Entity.EntityType.TABLE);
+    Mockito.verify(injected).getTableId(ident);
+    Mockito.verifyNoMoreInteractions(injected);
+  }
+
+  @Test
+  void testSemanticModelIdLookupUsesBackendIdentityLookup() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "model");
+    NameIdentifier missing = NameIdentifier.of("metalake", "catalog", "schema", "missing");
+    Mockito.when(backend.getSemanticModelId(ident)).thenReturn(7L);
+    Mockito.when(backend.getSemanticModelId(missing))
+        .thenThrow(new NoSuchEntityException("Missing Semantic Model"));
+
+    Assertions.assertEquals(7L, store.getSemanticModelId(ident));
+    Assertions.assertThrows(NoSuchEntityException.class, () -> store.getSemanticModelId(missing));
+    // A content read would miss a model with only drafts, so the lookup must not fall back to it.
+    Mockito.verify(backend).getSemanticModelId(ident);
+    Mockito.verify(backend).getSemanticModelId(missing);
+    Mockito.verifyNoMoreInteractions(backend);
+  }
+
+  @Test
+  void testTableIdLookupAfterInvalidationReadsReplacementId() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    TableEntity table = Mockito.mock(TableEntity.class);
+    Mockito.when(table.id()).thenReturn(42L);
+    Mockito.when(table.type()).thenReturn(Entity.EntityType.TABLE);
+    Mockito.when(table.nameIdentifier()).thenReturn(ident);
+    CaffeineEntityCache cache = new CaffeineEntityCache(new Config(false) {});
+    try {
+      FieldUtils.writeField(store, "cache", cache, true);
+      cache.put(table);
+      Mockito.when(backend.getTableId(ident)).thenReturn(43L);
+      Assertions.assertEquals(42L, store.getTableId(ident));
+      Mockito.verifyNoInteractions(backend);
+      store.clearCache();
+      Assertions.assertEquals(43L, store.getTableId(ident));
+      Mockito.verify(backend).getTableId(ident);
+    } finally {
+      cache.clear();
+    }
+  }
+
+  @Test
+  void testUpdateDropsCacheBeforeBackendUpdate()
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
           IllegalAccessException {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
+    AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
+
+    CatalogEntity updated = Mockito.mock(CatalogEntity.class);
+    Mockito.when(updated.nameIdentifier()).thenReturn(ident);
 
     Mockito.doAnswer(
             invocation -> {
-              Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.CATALOG);
-              return null;
+              Mockito.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+              invalidatedBeforeBackend.set(true);
+              pendingDuringBackend.set(writeBlocked(ident, Entity.EntityType.CATALOG));
+              @SuppressWarnings("unchecked")
+              Function<CatalogEntity, CatalogEntity> updater = invocation.getArgument(2);
+              return updater.apply(updated);
             })
         .when(backend)
         .update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
 
     store.update(ident, null, Entity.EntityType.CATALOG, entity -> entity);
 
-    InOrder inOrder = Mockito.inOrder(backend, cache);
-    inOrder.verify(backend).update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
-    inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+    Assertions.assertTrue(invalidatedBeforeBackend.get());
+    Assertions.assertTrue(pendingDuringBackend.get());
+    Assertions.assertFalse(writeBlocked(ident, Entity.EntityType.CATALOG));
   }
 
   @Test
-  void testOverwriteInvalidatesCacheAfterBackendInsert()
+  void testRenamePendingBlocksNewIdentBeforeCommit()
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
+          IllegalAccessException {
+    NameIdentifier oldIdent = NameIdentifier.of("metalake", "catalog", "schema", "old");
+    NameIdentifier newIdent = NameIdentifier.of("metalake", "catalog", "schema", "new");
+    TopicEntity renamed = Mockito.mock(TopicEntity.class);
+    Mockito.when(renamed.nameIdentifier()).thenReturn(newIdent);
+    Mockito.when(renamed.type()).thenReturn(Entity.EntityType.TOPIC);
+
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    AtomicBoolean newPendingBeforeReturn = new AtomicBoolean(false);
+    AtomicBoolean newInvalidatedBeforeReturn = new AtomicBoolean(false);
+
+    Mockito.doAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TopicEntity, TopicEntity> updater = invocation.getArgument(2);
+              TopicEntity result = updater.apply(renamed);
+              newPendingBeforeReturn.set(writeBlocked(newIdent, Entity.EntityType.TOPIC));
+              Mockito.verify(cache).invalidate(newIdent, Entity.EntityType.TOPIC);
+              newInvalidatedBeforeReturn.set(true);
+              return result;
+            })
+        .when(backend)
+        .update(eq(oldIdent), eq(Entity.EntityType.TOPIC), any(Function.class));
+
+    Assertions.assertSame(
+        renamed, store.update(oldIdent, null, Entity.EntityType.TOPIC, entity -> renamed));
+
+    Assertions.assertTrue(newPendingBeforeReturn.get());
+    Assertions.assertTrue(newInvalidatedBeforeReturn.get());
+    Assertions.assertFalse(writeBlocked(newIdent, Entity.EntityType.TOPIC));
+    Assertions.assertFalse(writeBlocked(oldIdent, Entity.EntityType.TOPIC));
+  }
+
+  @Test
+  void testRenameBeginPendingRollsBackWhenInvalidateFails()
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
+          IllegalAccessException {
+    NameIdentifier oldIdent = NameIdentifier.of("metalake", "catalog", "schema", "old");
+    NameIdentifier newIdent = NameIdentifier.of("metalake", "catalog", "schema", "new");
+    TopicEntity renamed = Mockito.mock(TopicEntity.class);
+    Mockito.when(renamed.nameIdentifier()).thenReturn(newIdent);
+
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+
+    Mockito.doReturn(true).when(cache).invalidate(eq(oldIdent), eq(Entity.EntityType.TOPIC));
+    Mockito.doThrow(new RuntimeException("invalidate failed"))
+        .when(cache)
+        .invalidate(eq(newIdent), eq(Entity.EntityType.TOPIC));
+
+    Mockito.doAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TopicEntity, TopicEntity> updater = invocation.getArgument(2);
+              return updater.apply(renamed);
+            })
+        .when(backend)
+        .update(eq(oldIdent), eq(Entity.EntityType.TOPIC), any(Function.class));
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> store.update(oldIdent, null, Entity.EntityType.TOPIC, entity -> renamed));
+
+    Assertions.assertFalse(writeBlocked(newIdent, Entity.EntityType.TOPIC));
+    Assertions.assertFalse(writeBlocked(oldIdent, Entity.EntityType.TOPIC));
+    Assertions.assertTrue(cacheBlocks().isEmpty());
+  }
+
+  @Test
+  void testClearCacheKeepsPendingRegistrations() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "retainPendingWrite", ident, Entity.EntityType.CATALOG);
+
+    store.clearCache();
+
+    Assertions.assertTrue(writeBlocked(ident, Entity.EntityType.CATALOG));
+    Assertions.assertFalse(cacheBlocks().isEmpty());
+  }
+
+  @Test
+  void testExistsAndBatchGetSkipCacheWhilePublishing() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    TopicEntity cached = Mockito.mock(TopicEntity.class);
+    Mockito.when(cached.nameIdentifier()).thenReturn(ident);
+    Mockito.when(cached.type()).thenReturn(Entity.EntityType.TOPIC);
+
+    EntityCache cache = Mockito.mock(EntityCache.class);
+    FieldUtils.writeField(store, "cache", cache, true);
+    Mockito.when(cache.contains(ident, Entity.EntityType.TOPIC)).thenReturn(true);
+    Mockito.when(cache.getIfPresent(ident, Entity.EntityType.TOPIC))
+        .thenReturn(Optional.of(cached));
+    Mockito.when(
+            cache.withCacheLock(any(EntityCacheKey.class), any(EntityCache.ThrowingSupplier.class)))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              EntityCache.ThrowingSupplier<?, Exception> action = invocation.getArgument(1);
+              return action.get();
+            });
+    Mockito.when(backend.exists(ident, Entity.EntityType.TOPIC)).thenReturn(false);
+    Mockito.when(backend.batchGet(List.of(ident), Entity.EntityType.TOPIC)).thenReturn(List.of());
+
+    cacheBlocks().put("p\0" + Entity.EntityType.TOPIC.name() + "\0" + ident, new AtomicInteger(1));
+
+    Assertions.assertFalse(store.exists(ident, Entity.EntityType.TOPIC));
+    Assertions.assertTrue(
+        store.batchGet(List.of(ident), Entity.EntityType.TOPIC, TopicEntity.class).isEmpty());
+    Mockito.verify(backend).exists(ident, Entity.EntityType.TOPIC);
+    Mockito.verify(backend).batchGet(List.of(ident), Entity.EntityType.TOPIC);
+  }
+
+  @Test
+  void testCachedEntityIdResolverSkipsCacheWhenGateDisallows() {
+    // Root entity: no parent chain, so the gate alone decides cache vs underlying.
+    NameIdentifier ident = NameIdentifier.of("metalake");
+    TopicEntity cachedEntity = Mockito.mock(TopicEntity.class);
+    Mockito.when(cachedEntity.id()).thenReturn(1L);
+    EntityCache cache = Mockito.mock(EntityCache.class);
+    Mockito.when(
+            cache.withCacheLock(any(EntityCacheKey.class), any(EntityCache.ThrowingSupplier.class)))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              EntityCache.ThrowingSupplier<?, Exception> action = invocation.getArgument(1);
+              return action.get();
+            });
+    Mockito.when(cache.getIfPresent(ident, Entity.EntityType.METALAKE))
+        .thenReturn(Optional.of(cachedEntity));
+    EntityIdResolver underlying = Mockito.mock(EntityIdResolver.class);
+    Mockito.when(underlying.getEntityId(ident, Entity.EntityType.METALAKE)).thenReturn(99L);
+
+    AtomicBoolean allowCache = new AtomicBoolean(false);
+    EntityIdResolver resolver =
+        new CachedEntityIdResolver(cache, underlying, (id, type) -> allowCache.get());
+
+    Assertions.assertEquals(99L, resolver.getEntityId(ident, Entity.EntityType.METALAKE));
+    Mockito.verify(underlying).getEntityId(ident, Entity.EntityType.METALAKE);
+    Mockito.verify(cache, Mockito.never()).getIfPresent(ident, Entity.EntityType.METALAKE);
+
+    allowCache.set(true);
+    Assertions.assertEquals(1L, resolver.getEntityId(ident, Entity.EntityType.METALAKE));
+    Mockito.verify(cache).getIfPresent(ident, Entity.EntityType.METALAKE);
+  }
+
+  @Test
+  void testCachedEntityIdResolverFallsBackWhenParentChainMisses() {
+    NameIdentifier topic = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
+    TopicEntity cachedTopic = Mockito.mock(TopicEntity.class);
+    Mockito.when(cachedTopic.id()).thenReturn(1L);
+    EntityCache cache = Mockito.mock(EntityCache.class);
+    Mockito.when(
+            cache.withCacheLock(any(EntityCacheKey.class), any(EntityCache.ThrowingSupplier.class)))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              EntityCache.ThrowingSupplier<?, Exception> action = invocation.getArgument(1);
+              return action.get();
+            });
+    Mockito.when(cache.getIfPresent(topic, Entity.EntityType.TOPIC))
+        .thenReturn(Optional.of(cachedTopic));
+    Mockito.when(cache.getIfPresent(schema, Entity.EntityType.SCHEMA)).thenReturn(Optional.empty());
+    EntityIdResolver underlying = Mockito.mock(EntityIdResolver.class);
+    NamespacedEntityId fromDb = new NamespacedEntityId(99L, 10L, 20L, 30L);
+    Mockito.when(underlying.getEntityIds(topic, Entity.EntityType.TOPIC)).thenReturn(fromDb);
+    Mockito.when(underlying.getEntityId(topic, Entity.EntityType.TOPIC)).thenReturn(99L);
+
+    EntityIdResolver resolver = new CachedEntityIdResolver(cache, underlying);
+
+    Assertions.assertSame(fromDb, resolver.getEntityIds(topic, Entity.EntityType.TOPIC));
+    Mockito.verify(underlying).getEntityIds(topic, Entity.EntityType.TOPIC);
+    Assertions.assertEquals(99L, resolver.getEntityId(topic, Entity.EntityType.TOPIC));
+    Mockito.verify(underlying).getEntityId(topic, Entity.EntityType.TOPIC);
+  }
+
+  @Test
+  void testEndPendingWriteInvalidatesBeforeReleasingPrefixes() throws Exception {
+    NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    AtomicLong epoch = (AtomicLong) FieldUtils.readField(store, "cacheInvalidationEpoch", true);
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "retainPendingWrite", schema, Entity.EntityType.SCHEMA);
+    long epochBefore = epoch.get();
+    Assertions.assertTrue(
+        (boolean)
+            org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                store, true, "isPendingWrite", table, Entity.EntityType.TABLE));
+
+    AtomicBoolean pendingDuringInvalidate = new AtomicBoolean(false);
+    Mockito.doAnswer(
+            invocation -> {
+              pendingDuringInvalidate.set(
+                  (boolean)
+                      org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                          store, true, "isPendingWrite", table, Entity.EntityType.TABLE));
+              return false;
+            })
+        .when(cache)
+        .invalidate(schema, Entity.EntityType.SCHEMA);
+
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "endPendingWrite", schema, Entity.EntityType.SCHEMA);
+
+    Assertions.assertTrue(pendingDuringInvalidate.get());
+    Assertions.assertTrue(epoch.get() > epochBefore);
+    Assertions.assertTrue(cacheBlocks().isEmpty());
+    Assertions.assertFalse(
+        (boolean)
+            org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                store, true, "isPendingWrite", table, Entity.EntityType.TABLE));
+  }
+
+  @Test
+  void testEndPendingWriteClearsCacheWhenInvalidateFails() throws Exception {
+    NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "retainPendingWrite", schema, Entity.EntityType.SCHEMA);
+    Mockito.doThrow(new IllegalStateException("interrupted invalidate"))
+        .when(cache)
+        .invalidate(schema, Entity.EntityType.SCHEMA);
+
+    Exception thrown =
+        Assertions.assertThrows(
+            Exception.class,
+            () ->
+                org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                    store, true, "endPendingWrite", schema, Entity.EntityType.SCHEMA));
+    Assertions.assertInstanceOf(IllegalStateException.class, thrown.getCause());
+
+    Mockito.verify(cache).clear();
+    Assertions.assertTrue(cacheBlocks().isEmpty());
+    Assertions.assertFalse(
+        (boolean)
+            org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                store, true, "isCacheObservationBlocked", table, Entity.EntityType.TABLE));
+  }
+
+  @Test
+  void testGetDoesNotPublishWhileWritePending() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    TopicEntity entity = Mockito.mock(TopicEntity.class);
+    Mockito.when(entity.nameIdentifier()).thenReturn(ident);
+    Mockito.when(entity.type()).thenReturn(Entity.EntityType.TOPIC);
+    Mockito.when(backend.get(ident, Entity.EntityType.TOPIC)).thenReturn(entity);
+
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "retainPendingWrite", ident, Entity.EntityType.TOPIC);
+
+    Assertions.assertSame(entity, store.get(ident, Entity.EntityType.TOPIC, TopicEntity.class));
+    Mockito.verify(cache, Mockito.never()).put(entity);
+  }
+
+  @Test
+  void testGetDoesNotPublishWhileAncestorWritePending() throws Exception {
+    NameIdentifier catalog = NameIdentifier.of("metalake", "catalog");
+    NameIdentifier topic = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    TopicEntity entity = Mockito.mock(TopicEntity.class);
+    Mockito.when(entity.nameIdentifier()).thenReturn(topic);
+    Mockito.when(entity.type()).thenReturn(Entity.EntityType.TOPIC);
+    Mockito.when(backend.get(topic, Entity.EntityType.TOPIC)).thenReturn(entity);
+
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "retainPendingWrite", catalog, Entity.EntityType.CATALOG);
+
+    Assertions.assertSame(entity, store.get(topic, Entity.EntityType.TOPIC, TopicEntity.class));
+    Mockito.verify(cache, Mockito.never()).put(entity);
+  }
+
+  @Test
+  void testOverwriteDropsCacheBeforeBackendInsert()
       throws IOException, EntityAlreadyExistsException, IllegalAccessException {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
     TopicEntity topic = Mockito.mock(TopicEntity.class);
     Mockito.when(topic.nameIdentifier()).thenReturn(ident);
     Mockito.when(topic.type()).thenReturn(Entity.EntityType.TOPIC);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
+    AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
 
     Mockito.doAnswer(
             invocation -> {
-              Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.TOPIC);
+              Mockito.verify(cache).invalidate(ident, Entity.EntityType.TOPIC);
+              invalidatedBeforeBackend.set(true);
+              pendingDuringBackend.set(writeBlocked(ident, Entity.EntityType.TOPIC));
               return null;
             })
         .when(backend)
@@ -134,21 +540,72 @@ public class TestRelationalEntityStore {
 
     store.put(topic, true);
 
-    InOrder inOrder = Mockito.inOrder(backend, cache);
-    inOrder.verify(backend).insert(topic, true);
-    inOrder.verify(cache).invalidate(ident, Entity.EntityType.TOPIC);
+    Assertions.assertTrue(invalidatedBeforeBackend.get());
+    Assertions.assertTrue(pendingDuringBackend.get());
+    Assertions.assertFalse(writeBlocked(ident, Entity.EntityType.TOPIC));
     Mockito.verify(cache, Mockito.never()).put(topic);
   }
 
   @Test
-  void testDeleteInvalidatesCacheAfterBackendDelete()
-      throws IOException, NoSuchEntityException, IllegalAccessException {
-    NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
+  void testNonOverwritePutDropsStaleCacheBeforeInsertAndPublishesAfter()
+      throws IOException, EntityAlreadyExistsException, IllegalAccessException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    TopicEntity created = Mockito.mock(TopicEntity.class);
+    Mockito.when(created.nameIdentifier()).thenReturn(ident);
+    Mockito.when(created.type()).thenReturn(Entity.EntityType.TOPIC);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
+    AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
 
     Mockito.doAnswer(
             invocation -> {
-              Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.CATALOG);
+              Mockito.verify(cache).invalidate(ident, Entity.EntityType.TOPIC);
+              invalidatedBeforeBackend.set(true);
+              pendingDuringBackend.set(writeBlocked(ident, Entity.EntityType.TOPIC));
+              return null;
+            })
+        .when(backend)
+        .insert(created, false);
+
+    store.put(created, false);
+
+    Assertions.assertTrue(invalidatedBeforeBackend.get());
+    Assertions.assertTrue(pendingDuringBackend.get());
+    Assertions.assertFalse(writeBlocked(ident, Entity.EntityType.TOPIC));
+    Mockito.verify(cache).put(created);
+  }
+
+  @Test
+  void testIsPendingWriteLooksUpAncestorPrefixes() throws Exception {
+    NameIdentifier catalog = NameIdentifier.of("metalake", "catalog");
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NameIdentifier other = NameIdentifier.of("metalake", "other", "schema", "table");
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "retainPendingWrite", catalog, Entity.EntityType.CATALOG);
+
+    Assertions.assertTrue(
+        (boolean)
+            org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                store, true, "isPendingWrite", table, Entity.EntityType.TABLE));
+    Assertions.assertFalse(
+        (boolean)
+            org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                store, true, "isPendingWrite", other, Entity.EntityType.TABLE));
+  }
+
+  @Test
+  void testDeleteDropsCacheBeforeBackendDelete()
+      throws IOException, NoSuchEntityException, IllegalAccessException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
+    AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
+
+    Mockito.doAnswer(
+            invocation -> {
+              Mockito.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+              invalidatedBeforeBackend.set(true);
+              pendingDuringBackend.set(writeBlocked(ident, Entity.EntityType.CATALOG));
               return true;
             })
         .when(backend)
@@ -156,9 +613,9 @@ public class TestRelationalEntityStore {
 
     Assertions.assertTrue(store.delete(ident, Entity.EntityType.CATALOG, true));
 
-    InOrder inOrder = Mockito.inOrder(backend, cache);
-    inOrder.verify(backend).delete(ident, Entity.EntityType.CATALOG, true);
-    inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+    Assertions.assertTrue(invalidatedBeforeBackend.get());
+    Assertions.assertTrue(pendingDuringBackend.get());
+    Assertions.assertFalse(writeBlocked(ident, Entity.EntityType.CATALOG));
   }
 
   @Test

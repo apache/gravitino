@@ -62,9 +62,15 @@ export const updateTagApi = ({ metalake, tag, data }) => {
   })
 }
 
-export const associateTagApi = ({ metalake, metadataObjectType, metadataObjectFullName, data }) => {
+export const associateTagApi = ({ metalake, metadataObjectType, metadataObjectFullName, data, apiVersion = 2 }) => {
+  const mediaType = apiVersion === 1 ? 'application/vnd.gravitino.v1+json' : 'application/vnd.gravitino.v2+json'
+
   return defHttp.post({
     url: Apis.ASSOCIATE({ metalake, metadataObjectType, metadataObjectFullName }),
+    headers: {
+      'Content-Type': apiVersion === 1 ? 'application/json' : mediaType,
+      Accept: mediaType
+    },
     data
   })
 }

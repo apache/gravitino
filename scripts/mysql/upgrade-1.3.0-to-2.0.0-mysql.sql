@@ -571,6 +571,18 @@ CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy tag relation';
 
+CREATE TABLE IF NOT EXISTS `policy_role_relation_meta` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
+    `role_name` VARCHAR(128) NOT NULL COMMENT 'role name referenced by the policy content',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy role relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy role relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy role relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `policy_role_relation_meta_uk_pid_rn_del` (`policy_id`, `role_name`, `deleted_at`),
+    KEY `policy_role_relation_meta_idx_role_name` (`role_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy role relation';
+
 SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
     WHERE table_schema = DATABASE() AND table_name = 'job_run_meta' AND column_name = 'runtime_job_template'),
     'SELECT 1',
@@ -587,6 +599,7 @@ CREATE TABLE IF NOT EXISTS `semantic_model_meta` (
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'semantic model identity audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'current version',
+    `active_version` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'published revision, 0 if none',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'last allocated version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'semantic model deleted at',
     PRIMARY KEY (`semantic_model_id`),
@@ -602,7 +615,9 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'semantic model id',
     `version` INT UNSIGNED NOT NULL COMMENT 'semantic model version',
-    `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name snapshot',
+    `publication_status` VARCHAR(32) NOT NULL DEFAULT 'DRAFT' COMMENT 'publication status of the revision',
+    `published_by` VARCHAR(128) NOT NULL DEFAULT '' COMMENT 'publishing principal, empty for a draft',
+    `published_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'publication time in epoch millis, 0 for a draft',
     `semantic_model_comment` TEXT DEFAULT NULL COMMENT 'semantic model comment snapshot',
     `datasets` MEDIUMTEXT NOT NULL COMMENT 'dataset definitions snapshot (JSON)',
     `relationships` MEDIUMTEXT DEFAULT NULL COMMENT 'relationship definitions snapshot (JSON)',
@@ -765,16 +780,18 @@ CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing metalake id',
     `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing semantic model id',
-    `dataset_name` MEDIUMTEXT NOT NULL COMMENT 'exact dataset name in the current definition',
+    `dataset_name` MEDIUMTEXT NOT NULL COMMENT 'exact dataset name in the associated revisions',
     `source_type` VARCHAR(64) NOT NULL COMMENT 'TABLE or VIEW',
     `source_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'resolved source object id',
+    `from_version` INT UNSIGNED NOT NULL COMMENT 'first revision containing this association',
+    `to_version` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'first revision without it, 0 if open',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'association retired at',
     PRIMARY KEY (`id`),
     KEY `idx_smsr_model` (`semantic_model_id`, `deleted_at`),
     KEY `idx_smsr_source` (`metalake_id`, `source_type`, `source_id`, `deleted_at`),
     KEY `idx_smsr_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
-  COMMENT 'current semantic model dataset source associations';
+  COMMENT 'versioned semantic model dataset source associations';
 
 -- Clear governance attached to retired external registrations before their IDs can be reused.
 -- A retry must preserve relationships attached to a new active registration of the same ID.
@@ -923,3 +940,110 @@ CREATE TABLE IF NOT EXISTS `domain_rel` (
     KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
     KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'domain parent relation';
+
+CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
+  `idempotency_key`  VARCHAR(36)         NOT NULL     COMMENT 'client-provided UUIDv7 idempotency key',
+  `http_method`      VARCHAR(16)         NOT NULL     COMMENT 'HTTP method of the request',
+  `request_uri`      MEDIUMTEXT          NOT NULL     COMMENT 'encoded request path and sorted query string',
+  `http_status`      INT(10) UNSIGNED    DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
+  `response_summary` MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
+  `audit_info`       MEDIUMTEXT          NOT NULL     COMMENT 'idempotency record audit info',
+  `created_at`       BIGINT(20) UNSIGNED NOT NULL     COMMENT 'record created at (unix epoch millis)',
+  `expires_at`       BIGINT(20) UNSIGNED NOT NULL     COMMENT 'record expires at (unix epoch millis)',
+  PRIMARY KEY (`idempotency_key`),
+  KEY `idx_iim_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency records';
+
+-- Index live metadata lists and relationship cleanup by their lookup keys and deletion status.
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'tag_meta' AND index_name = 'idx_tag_meta_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_tag_meta_live` ON `tag_meta` (`metalake_id`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'policy_meta' AND index_name = 'idx_policy_meta_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_policy_meta_live` ON `policy_meta` (`metalake_id`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'role_meta' AND index_name = 'idx_role_meta_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_role_meta_live` ON `role_meta` (`metalake_id`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'user_meta' AND index_name = 'idx_user_meta_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_user_meta_live` ON `user_meta` (`metalake_id`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'tag_relation_meta' AND index_name = 'idx_tag_relation_meta_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_tag_relation_meta_live` ON `tag_relation_meta` (`metadata_object_id`, `metadata_object_type`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'role_meta_securable_object' AND index_name = 'idx_role_meta_securable_object_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_role_meta_securable_object_live` ON `role_meta_securable_object` (`metadata_object_id`, `type`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'user_role_rel' AND index_name = 'idx_user_role_rel_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_user_role_rel_live` ON `user_role_rel` (`role_id`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'policy_tag_relation_meta' AND index_name = 'idx_policy_tag_relation_meta_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_policy_tag_relation_meta_live` ON `policy_tag_relation_meta` (`tag_id`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+CREATE TABLE IF NOT EXISTS `ontology_meta` (
+    `ontology_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'ontology id',
+    `ontology_name` VARCHAR(128) NOT NULL COMMENT 'ontology name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'ontology identity audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'last allocated version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ontology deleted at',
+    PRIMARY KEY (`ontology_id`),
+    UNIQUE KEY `uk_onm_mid_name_del` (`metalake_id`, `ontology_name`, `deleted_at`),
+    KEY `idx_onm_deleted` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'ontology identity';
+
+CREATE TABLE IF NOT EXISTS `ontology_version_info` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `ontology_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'ontology id',
+    `version` INT UNSIGNED NOT NULL COMMENT 'version',
+    `ontology_comment` TEXT DEFAULT NULL COMMENT 'comment snapshot',
+    `definition` MEDIUMTEXT NOT NULL COMMENT 'normalized OntologyDefinition (JSON)',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'properties snapshot (JSON)',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'version audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_onvi_oid_ver_del` (`ontology_id`, `version`, `deleted_at`),
+    KEY `idx_onvi_mid` (`metalake_id`, `deleted_at`),
+    KEY `idx_onvi_deleted` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'ontology versions';

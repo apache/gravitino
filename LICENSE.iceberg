@@ -288,6 +288,7 @@
    Apache Java Data Objects (JDO)
    JetS3t
    JJWT
+   JSpecify
    Joda Time
    Apache Kerby
    Apache Thrift
@@ -309,6 +310,13 @@
    Apache XML Commons XML APIs
    XNIO API
    Apache Zookeeper
+   Google AutoValue Annotations
+   Failsafe
+   npgall concurrent-trees
+   Objenesis
+   OpenCensus
+   Snappy Java
+   WildFly
    
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
@@ -319,6 +327,7 @@
    BSD license
 
    ANTLR4
+   ANTLR 3 Runtime
    Apache Avro
    Apache Yetus - Audience Annotations
    ASM
@@ -333,6 +342,7 @@
    Protobuf
    Stax2 API
    XMLenc
+   Snappy native library (bundled in Snappy Java, see licenses/snappy.txt)
 
    This product bundles various third-party components also under the
    MIT license
@@ -343,6 +353,7 @@
    Reactive Streams
    Schubfach
    SLF4J
+   Bitshuffle (bundled in Snappy Java, see licenses/bitshuffle.txt)
 
    This product bundles various third-party components also under the
    Boost Software License 1.0
@@ -374,6 +385,7 @@
    Eclipse Public License 2.0
 
    Eclipse GlassFish
+   HK2 API Module
    HK2 Service Locator
    HK2 Utils
    Jakarta Annotations API
@@ -413,3 +425,8 @@
    For the Schubfach license text, see licenses/Schubfach.txt.
 
 For the BSD license of OGNL shaded in MyBatis, see licenses/mybatis-ognl.txt.
+
+For the BSD license of the ANTLR 3 runtime, see licenses/antlr3.txt.
+
+For the BSD license of the native Snappy code and the MIT license of the Bitshuffle code bundled
+   in Snappy Java, see licenses/snappy.txt and licenses/bitshuffle.txt.

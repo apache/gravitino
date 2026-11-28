@@ -53,7 +53,6 @@ import {
   ColumnSpesicalType,
   ColumnType,
   ColumnTypeForUnsigned,
-  ColumnTypeSupportAutoIncrement,
   ColumnWithParamType,
   UnsupportColumnType,
   autoIncrementInfoMap,
@@ -68,7 +67,13 @@ import {
 } from '@/config'
 import { tableDefaultProps } from '@/config/catalog'
 import { nameRegex } from '@/lib/utils/regex'
-import { capitalizeFirstLetter, genUpdates } from '@/lib/utils'
+import {
+  capitalizeFirstLetter,
+  genUpdates,
+  normalizeColumnDefaultValue,
+  isAutoIncrementColumnTypeSupported,
+  hasAutoIncrementEditConflict
+} from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
 import { createTable, updateTable, getTableDetails } from '@/lib/store/metalakes'
 import { useAppDispatch } from '@/lib/hooks/useStore'
@@ -420,8 +425,15 @@ export default function CreateTableDialog({ ...props }) {
                     )
                 }
               }
-              if (table.columns[key].defaultValue) {
-                form.setFieldValue(['columns', key, 'defaultValue'], table.columns[key].defaultValue)
+              const defaultValue = table.columns[key].defaultValue
+
+              if (defaultValue) {
+                form.setFieldValue(
+                  ['columns', key, 'defaultValue'],
+                  defaultValue.type === 'unparsed'
+                    ? { ...defaultValue, value: defaultValue.unparsedExpression }
+                    : defaultValue
+                )
               }
             }
             if (table.distribution) {
@@ -597,6 +609,16 @@ export default function CreateTableDialog({ ...props }) {
     form
       .validateFields()
       .then(async () => {
+        if (editTable && hasAutoIncrementEditConflict(provider, cacheData?.columns, values?.columns)) {
+          Modal.warning({
+            title: 'Save these changes separately',
+            content:
+              'When turning AutoIncrement off, save it first. When turning it on, save it last. Reopen the table and apply one change per save.'
+          })
+
+          return
+        }
+
         setConfirmLoading(true)
 
         let submitted = false
@@ -620,39 +642,7 @@ export default function CreateTableDialog({ ...props }) {
                   column['autoIncrement'] = col.autoIncrement
                 }
                 if (col.defaultValue) {
-                  switch (col.defaultValue.type) {
-                    case 'field':
-                      column['defaultValue'] = {
-                        type: 'field',
-                        fieldName: [col.defaultValue?.fieldName]
-                      }
-                      break
-                    case 'function':
-                      column['defaultValue'] = {
-                        type: 'function',
-                        funcName: col.defaultValue?.funcName,
-                        funcArgs: col.defaultValue?.funcArgs.map(f => {
-                          const func = {}
-                          if (f.type === 'literal') {
-                            func['type'] = 'literal'
-                            func['dataType'] = 'string'
-                            func['value'] = f.value
-                          } else {
-                            func['type'] = 'field'
-                            func['fieldName'] = [f.fieldName]
-                          }
-
-                          return func
-                        })
-                      }
-                      break
-                    default:
-                      column['defaultValue'] = {
-                        type: 'literal',
-                        dataType: col.defaultValue?.dataType || 'string',
-                        value: col.defaultValue?.value
-                      }
-                  }
+                  column['defaultValue'] = normalizeColumnDefaultValue(col.defaultValue)
                 }
 
                 return column
@@ -962,10 +952,7 @@ export default function CreateTableDialog({ ...props }) {
                     >
                       <Switch
                         size='small'
-                        disabled={
-                          !!editTable ||
-                          !ColumnTypeSupportAutoIncrement.includes(values?.columns[subField.name]?.typeObj?.type)
-                        }
+                        disabled={!isAutoIncrementColumnTypeSupported(values?.columns?.[subField.name]?.typeObj?.type)}
                       />
                     </Form.Item>
                     <Form.Item

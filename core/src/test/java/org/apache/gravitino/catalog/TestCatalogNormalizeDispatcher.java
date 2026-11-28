@@ -105,7 +105,7 @@ public class TestCatalogNormalizeDispatcher {
   @Test
   public void testNameSpec() {
     // Test for valid names
-    String[] legalNames = {"catalog", "_catalog", "1_catalog", "_", "1"};
+    String[] legalNames = {"catalog", "_catalog", "1_catalog", "_", "1", "a".repeat(64)};
     for (String legalName : legalNames) {
       NameIdentifier catalogIdent = NameIdentifier.of(metalake, legalName);
       Map<String, String> props =
@@ -162,7 +162,8 @@ public class TestCatalogNormalizeDispatcher {
       "catalog[xxx",
       "catalog]xxx",
       "catalog{xxx",
-      "catalog}xxx"
+      "catalog}xxx",
+      "a".repeat(64) + "?"
     };
     for (String illegalName : illegalNames) {
       NameIdentifier catalogIdent2 = NameIdentifier.of(metalake, illegalName);
@@ -175,6 +176,27 @@ public class TestCatalogNormalizeDispatcher {
       Assertions.assertEquals(
           "The catalog name '" + illegalName + "' is illegal.", exception.getMessage());
     }
+  }
+
+  @Test
+  void testCreateAndRenameReportNameLengthLimit() {
+    String longName = "a".repeat(65);
+    IllegalArgumentException createError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogNormalizeDispatcher.createCatalog(
+                    NameIdentifier.of(metalake, longName), RELATIONAL, "test", null, null));
+    Assertions.assertEquals(
+        "The catalog name must not exceed 64 characters.", createError.getMessage());
+
+    IllegalArgumentException renameError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogNormalizeDispatcher.alterCatalog(
+                    NameIdentifier.of(metalake, "catalog"), CatalogChange.rename(longName)));
+    Assertions.assertEquals(createError.getMessage(), renameError.getMessage());
   }
 
   @Test

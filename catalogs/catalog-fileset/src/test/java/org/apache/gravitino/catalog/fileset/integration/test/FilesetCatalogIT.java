@@ -592,7 +592,8 @@ public class FilesetCatalogIT extends BaseIT {
         exception.getMessage().contains("does not support '/' in the name for SCHEMA"));
 
     // test illegal fileset name
-    NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, illegalName);
+    String overlongNameWithSlash = "a/" + "b".repeat(63);
+    NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, overlongNameWithSlash);
     exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -604,15 +605,18 @@ public class FilesetCatalogIT extends BaseIT {
         exception.getMessage().contains("does not support '/' in the name for FILESET"));
 
     // test rename fileset to illegal name
+    NameIdentifier source = NameIdentifier.of(schemaName, "rename_source");
+    catalog.asFilesetCatalog().createFileset(source, null, MANAGED, null, null);
     exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
                 catalog
                     .asFilesetCatalog()
-                    .alterFileset(nameIdentifier, FilesetChange.rename(illegalName)));
+                    .alterFileset(source, FilesetChange.rename(overlongNameWithSlash)));
     Assertions.assertTrue(
         exception.getMessage().contains("does not support '/' in the name for FILESET"));
+    Assertions.assertTrue(catalog.asFilesetCatalog().filesetExists(source));
   }
 
   @Test

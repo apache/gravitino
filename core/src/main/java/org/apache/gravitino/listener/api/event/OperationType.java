@@ -259,6 +259,8 @@ public enum OperationType {
   IMPORT_SEMANTIC_MODEL,
   /** Export a Semantic Model as an Ossie document. */
   EXPORT_SEMANTIC_MODEL,
+  /** Publish a saved Semantic Model revision. */
+  PUBLISH_SEMANTIC_MODEL_REVISION,
 
   // Function operations
   REGISTER_FUNCTION,

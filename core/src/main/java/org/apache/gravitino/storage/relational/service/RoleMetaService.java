@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -44,6 +45,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.exceptions.IllegalRoleException;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -54,6 +57,7 @@ import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
@@ -359,6 +363,64 @@ public class RoleMetaService {
     }
   }
 
+  /**
+   * Requires every role an access control policy names to exist, and holds those roles until the
+   * surrounding policy write commits.
+   *
+   * <p>A role cannot be deleted while a policy names it, so a policy cannot name a missing role
+   * either. Each name is resolved to its live role, whose row is then locked in share mode and read
+   * again. Role deletion locks the same row exclusively before it looks for references, so the two
+   * serialize. If the policy write locks first, the deletion waits and then sees the committed
+   * reference. If the deletion locks first, the row is gone once it commits and the policy write
+   * fails. Shared locks let policies naming the same role be written at the same time; H2 uses
+   * exclusive locks instead.
+   *
+   * <p>Call after locking the metalake and before writing the policy row. Policy writes, role
+   * deletion and metalake deletion then all lock in the order metalake, role, policy. Roles are
+   * locked in ascending ID order.
+   *
+   * @param metalakeId the ID of the policy's metalake
+   * @param policy the policy being written, used only in the error
+   * @param roleNames the role names the policy content names
+   * @throws IllegalRoleException if a named role does not exist in the metalake
+   * @throws IllegalStateException if called outside a transaction
+   */
+  void lockRolesNamedByPolicy(
+      Long metalakeId, NameIdentifier policy, Collection<String> roleNames) {
+    Preconditions.checkState(
+        SessionUtils.isInTransaction(), "Policy role locks require an active transaction");
+    // A name lookup earlier in the caller's transaction may still be in MyBatis's session cache.
+    SessionUtils.clearSessionCache();
+    Map<Long, RolePO> resolved = new TreeMap<>();
+    for (String roleName : roleNames) {
+      RolePO role =
+          SessionUtils.getWithoutCommit(
+              RoleMetaMapper.class,
+              mapper -> mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
+      // MySQL's collation ignores trailing spaces, so "analyst " finds the role "analyst". The
+      // policy keeps the name as written and matches roles by exact name, so require an exact one.
+      if (role == null || !roleName.equals(role.getRoleName())) {
+        throw missingPolicyRole(policy, roleName);
+      }
+      resolved.putIfAbsent(role.getRoleId(), role);
+    }
+
+    for (RolePO role : resolved.values()) {
+      RolePO locked =
+          SessionUtils.getWithoutCommit(
+              RoleMetaMapper.class, mapper -> mapper.selectRoleMetaByIdForShare(role.getRoleId()));
+      if (locked == null || !isSameRole(locked, role)) {
+        throw missingPolicyRole(policy, role.getRoleName());
+      }
+    }
+  }
+
+  private static IllegalRoleException missingPolicyRole(NameIdentifier policy, String roleName) {
+    return new IllegalRoleException(
+        "Policy %s names role %s, which does not exist in metalake %s",
+        policy.name(), roleName, policy.namespace().level(0));
+  }
+
   private List<SecurableObjectPO> toSecurableObjectPOs(
       Set<SecurableObject> deleteObjects, RoleEntity oldRoleEntity, String metalake) {
     List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
@@ -408,16 +470,43 @@ public class RoleMetaService {
   }
 
   /**
+   * Deletes a role and returns it, securable objects included, as it was before the deletion. Run
+   * inside a caller's transaction, the role stays locked until that transaction ends, so the caller
+   * can act on the deleted role before committing.
+   *
+   * @param identifier the role identifier
+   * @return the deleted role
+   * @throws InUseException if an access control policy names the role
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteRoleAndGet")
+  public RoleEntity deleteRoleAndGet(NameIdentifier identifier) {
+    AuthorizationUtils.checkRole(identifier);
+
+    Long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name(), true);
+    RoleEntity role =
+        POConverters.fromRolePO(rolePO, listSecurableObjects(rolePO), identifier.namespace());
+
+    deleteRoleWithVersion(identifier, rolePO);
+    return role;
+  }
+
+  /**
    * Deletes the role whose version matches {@code observedRolePO}, together with its role and owner
    * relations. Package-private so tests can hand in a deliberately stale PO; callers outside this
    * class go through {@link #deleteRole(NameIdentifier)}, which reads the row first.
    *
    * @param identifier the role being deleted, used only to build the error
    * @param observedRolePO the role row the caller observed, carrying the version to match
+   * @throws InUseException if an access control policy names the role
    */
   void deleteRoleWithVersion(NameIdentifier identifier, RolePO observedRolePO) {
     Long roleId = observedRolePO.getRoleId();
     SessionUtils.doMultipleWithCommit(
+        () -> lockUnreferencedRole(identifier, observedRolePO),
         () ->
             OccWriteSupport.deleteWithVersion(
                 () ->
@@ -613,9 +702,48 @@ public class RoleMetaService {
                 RoleMetaMapper.class,
                 mapper -> mapper.selectRoleMetaByIdForUpdate(observedRolePO.getRoleId())),
         null,
-        current ->
-            Objects.equals(current.getRoleName(), observedRolePO.getRoleName())
-                && Objects.equals(current.getMetalakeId(), observedRolePO.getMetalakeId()));
+        current -> isSameRole(current, observedRolePO));
+  }
+
+  /**
+   * Locks the role for deletion and refuses the deletion while an access control policy names it.
+   *
+   * <p>The metalake row is locked in share mode first. That keeps the metalake name the reference
+   * lookup uses from changing until commit, and keeps the metalake, role, policy lock order. The
+   * role row is then locked exclusively, which waits for any policy write holding it (see {@link
+   * #lockRolesNamedByPolicy}), so the references read afterwards include what that write committed.
+   * The policies are not named in the error, since the caller may not be allowed to see them.
+   */
+  private void lockUnreferencedRole(NameIdentifier identifier, RolePO observedRolePO) {
+    String metalake = identifier.namespace().level(0);
+    LiveEndpointService.lockLiveEndpoint(
+        NameIdentifier.of(metalake),
+        Entity.EntityType.METALAKE,
+        new NamespacedEntityId(observedRolePO.getMetalakeId()));
+
+    RolePO locked =
+        SessionUtils.getWithoutCommit(
+            RoleMetaMapper.class,
+            mapper -> mapper.selectRoleMetaByIdForUpdate(observedRolePO.getRoleId()));
+    if (locked == null || !isSameRole(locked, observedRolePO)) {
+      throw roleWriteFailure(identifier, observedRolePO);
+    }
+
+    // Read the references only now, past the lock, and from the database rather than the cache.
+    SessionUtils.clearSessionCache();
+    boolean referenced =
+        !SessionUtils.getWithoutCommit(
+                PolicyRoleRelMapper.class,
+                mapper -> mapper.listByRoleName(metalake, locked.getRoleName()))
+            .isEmpty();
+    if (referenced) {
+      throw new InUseException(AuthorizationUtils.ROLE_IN_USE_MSG, identifier.name(), metalake);
+    }
+  }
+
+  private static boolean isSameRole(RolePO current, RolePO observed) {
+    return Objects.equals(current.getRoleName(), observed.getRoleName())
+        && Objects.equals(current.getMetalakeId(), observed.getMetalakeId());
   }
 
   private static MetadataObject.Type getType(String type) {

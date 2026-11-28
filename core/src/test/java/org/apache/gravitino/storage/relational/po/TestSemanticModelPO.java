@@ -177,7 +177,7 @@ class TestSemanticModelPO {
   private static SemanticModelPO identity(SemanticModelVersionInfoPO snapshot) {
     return SemanticModelPO.builder()
         .withSemanticModelId(snapshot.semanticModelId())
-        .withSemanticModelName(snapshot.semanticModelName())
+        .withSemanticModelName("sales_model")
         .withMetalakeId(snapshot.metalakeId())
         .withCatalogId(snapshot.catalogId())
         .withSchemaId(snapshot.schemaId())

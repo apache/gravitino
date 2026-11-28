@@ -32,6 +32,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SupportsTableIdLookup;
 import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;
@@ -162,6 +163,12 @@ public class MetadataIdConverter {
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject.type());
     Entity entity;
     try {
+      if (entityType == Entity.EntityType.TABLE && entityStore instanceof SupportsTableIdLookup) {
+        return Optional.of(((SupportsTableIdLookup) entityStore).getTableId(ident));
+      }
+      if (entityType == Entity.EntityType.SEMANTIC_MODEL) {
+        return Optional.of(entityStore.getSemanticModelId(ident));
+      }
       entity = entityStore.get(ident, entityType, EntityClassMapper.getEntityClass(entityType));
     } catch (NoSuchEntityException e) {
       return Optional.empty();

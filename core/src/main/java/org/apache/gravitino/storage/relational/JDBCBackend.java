@@ -77,6 +77,8 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
@@ -140,6 +142,40 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   @Override
   public List<SchemaEntity> listDescendantSchemas(NameIdentifier identifier) throws IOException {
     return SchemaMetaService.getInstance().listDescendantSchemas(identifier);
+  }
+
+  @Override
+  public SemanticModelEntity loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector) throws IOException {
+    return SemanticModelMetaService.getInstance().getSemanticModelByIdentifier(ident, selector);
+  }
+
+  @Override
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident)
+      throws IOException {
+    return SemanticModelMetaService.getInstance().listSemanticModelRevisions(ident);
+  }
+
+  @Override
+  public SemanticModelEntity publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) throws IOException {
+    return SemanticModelMetaService.getInstance().publishRevision(ident, revision, principal);
+  }
+
+  @Override
+  public List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace) throws IOException {
+    return SemanticModelMetaService.getInstance().listSemanticModelIdentifiers(namespace);
+  }
+
+  @Override
+  public SemanticModelEntity updateSemanticModel(
+      NameIdentifier ident,
+      @Nullable Integer expectedRevision,
+      boolean rename,
+      Function<SemanticModelEntity, SemanticModelEntity> updater)
+      throws IOException {
+    return SemanticModelMetaService.getInstance()
+        .updateSemanticModel(ident, expectedRevision, rename, updater);
   }
 
   @Override
@@ -211,6 +247,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
+    if (entityType == Entity.EntityType.SEMANTIC_MODEL) {
+      return SemanticModelMetaService.getInstance().semanticModelExists(ident);
+    }
     try {
       Entity entity = get(ident, entityType);
       return entity != null;
@@ -272,6 +311,16 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         SessionUtils.rollbackTransaction();
       }
     }
+  }
+
+  @Override
+  public long getTableId(NameIdentifier identifier) {
+    return TableMetaService.getInstance().getTableIdByIdentifier(identifier);
+  }
+
+  @Override
+  public long getSemanticModelId(NameIdentifier identifier) {
+    return SemanticModelMetaService.getInstance().getSemanticModelIdByIdentifier(identifier);
   }
 
   @Override
@@ -451,14 +500,22 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       Class<E> clazz,
       Consumer<E> postDeleteAction)
       throws IOException {
-    if (entityType != Entity.EntityType.FILESET) {
-      return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
+    switch (entityType) {
+      case FILESET:
+        return deleteWithCallback(
+            ident,
+            entityType,
+            () -> clazz.cast(FilesetMetaService.getInstance().deleteFilesetAndGet(ident)),
+            postDeleteAction);
+      case ROLE:
+        return deleteWithCallback(
+            ident,
+            entityType,
+            () -> clazz.cast(RoleMetaService.getInstance().deleteRoleAndGet(ident)),
+            postDeleteAction);
+      default:
+        return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     }
-    return deleteWithCallback(
-        ident,
-        entityType,
-        () -> clazz.cast(FilesetMetaService.getInstance().deleteFilesetAndGet(ident)),
-        postDeleteAction);
   }
 
   @Override

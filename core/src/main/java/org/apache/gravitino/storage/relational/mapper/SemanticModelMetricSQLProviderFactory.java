@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.SemanticModelMetricBaseSQLProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.SemanticModelMetricPostgreSQLProvider;
@@ -46,20 +47,13 @@ public class SemanticModelMetricSQLProviderFactory {
     return PROVIDERS.get(JDBCBackendType.fromString(databaseId));
   }
 
-  /** Lists live metric and model names in one statement without reading snapshots. */
-  public static String listMetricNames(
-      @Param("metalakeName") String metalakeName,
-      @Param("catalogName") String catalogName,
-      @Param("schemaName") String schemaName) {
-    return getProvider().listMetricNames(metalakeName, catalogName, schemaName);
-  }
-
   /** Lists model names and current metric arrays in one statement without reading identities. */
   public static String listMetricSnapshots(
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
-      @Param("schemaName") String schemaName) {
-    return getProvider().listMetricSnapshots(metalakeName, catalogName, schemaName);
+      @Param("schemaName") String schemaName,
+      @Param("selector") SemanticModelRevisionSelector selector) {
+    return getProvider().listMetricSnapshots(metalakeName, catalogName, schemaName, selector);
   }
 
   /** Returns SQL for inserting new metric identities in one statement. */

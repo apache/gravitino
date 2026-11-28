@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,7 +55,6 @@ import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
-import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.TableChange;
@@ -196,14 +196,10 @@ public class TestGravitinoGlueCatalog {
           {
             sparkCatalog = mockCatalog;
           }
-
-          @Override
-          protected Table loadGravitinoTable(Identifier ident) throws NoSuchTableException {
-            return mockGravitinoTable;
-          }
         };
 
-    org.apache.spark.sql.connector.catalog.Table result = catalog.loadSparkTable(ident);
+    org.apache.spark.sql.connector.catalog.Table result =
+        catalog.loadSparkTable(ident, mockGravitinoTable);
     Assertions.assertSame(mockSparkTable, result);
   }
 
@@ -355,7 +351,8 @@ public class TestGravitinoGlueCatalog {
           }
 
           @Override
-          protected org.apache.spark.sql.connector.catalog.Table loadSparkTable(Identifier ident) {
+          protected org.apache.spark.sql.connector.catalog.Table loadSparkTable(
+              Identifier ident, Table gravitinoTable) {
             return null;
           }
 
@@ -631,6 +628,52 @@ public class TestGravitinoGlueCatalog {
     Assertions.assertArrayEquals(new String[][] {{"a"}, {"b"}}, bucket.fieldNames());
     Assertions.assertEquals(16, bucket.numBuckets());
     Assertions.assertEquals(Strategy.NONE, created.distribution.strategy());
+  }
+
+  // -------------------------------------------------------------------------
+  // One loadTable must cost one Gravitino round trip: the loadSparkTable hook receives
+  // the already-fetched table instead of re-fetching it for Iceberg/Hive routing.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testLoadTableFetchesGravitinoTableOnce() throws Exception {
+    Catalog client = mock(Catalog.class);
+    org.apache.gravitino.rel.TableCatalog gravitinoTableCatalog =
+        mock(org.apache.gravitino.rel.TableCatalog.class);
+    when(client.asTableCatalog()).thenReturn(gravitinoTableCatalog);
+    Table gravitinoTable = createMockGravitinoTable(ImmutableMap.of());
+    when(gravitinoTableCatalog.loadTable(any(), any())).thenReturn(gravitinoTable);
+    TableCatalog mockSparkCatalog = mock(TableCatalog.class);
+    when(mockSparkCatalog.loadTable(any()))
+        .thenReturn(mock(org.apache.spark.sql.connector.catalog.Table.class));
+
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          {
+            sparkCatalog = mockSparkCatalog;
+          }
+
+          @Override
+          protected Catalog gravitinoCatalog() {
+            return client;
+          }
+
+          @Override
+          protected org.apache.spark.sql.connector.catalog.Table createSparkTable(
+              Identifier identifier,
+              Table gravitinoTable,
+              org.apache.spark.sql.connector.catalog.Table sparkTable,
+              TableCatalog sparkHiveCatalog,
+              PropertiesConverter propertiesConverter,
+              SparkTransformConverter sparkTransformConverter,
+              SparkTypeConverter sparkTypeConverter) {
+            return sparkTable;
+          }
+        };
+
+    catalog.loadTable(Identifier.of(new String[] {"db"}, "tbl"));
+
+    verify(gravitinoTableCatalog, times(1)).loadTable(any(), any());
   }
 
   // -------------------------------------------------------------------------

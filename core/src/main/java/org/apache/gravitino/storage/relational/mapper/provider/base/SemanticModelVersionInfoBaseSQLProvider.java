@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.SemanticModelVersionInfoPO;
 import org.apache.ibatis.annotations.Param;
@@ -32,13 +33,14 @@ public class SemanticModelVersionInfoBaseSQLProvider {
     return "INSERT INTO "
         + SemanticModelVersionInfoMapper.TABLE_NAME
         + " (metalake_id, catalog_id, schema_id, semantic_model_id, version,"
-        + " semantic_model_name, semantic_model_comment, datasets, relationships, metrics,"
+        + " publication_status, published_by, published_at, semantic_model_comment, datasets, relationships, metrics,"
         + " ai_context, custom_extensions,"
         + " properties, audit_info, deleted_at)"
         + " VALUES (#{semanticModelVersionInfo.metalakeId},"
         + " #{semanticModelVersionInfo.catalogId}, #{semanticModelVersionInfo.schemaId},"
         + " #{semanticModelVersionInfo.semanticModelId}, #{semanticModelVersionInfo.version},"
-        + " #{semanticModelVersionInfo.semanticModelName},"
+        + " #{semanticModelVersionInfo.publicationStatus},"
+        + " #{semanticModelVersionInfo.publishedBy}, #{semanticModelVersionInfo.publishedAt},"
         + " #{semanticModelVersionInfo.semanticModelComment},"
         + " #{semanticModelVersionInfo.datasets}, #{semanticModelVersionInfo.relationships},"
         + " #{semanticModelVersionInfo.metrics}, #{semanticModelVersionInfo.aiContext},"
@@ -52,7 +54,8 @@ public class SemanticModelVersionInfoBaseSQLProvider {
       @Param("semanticModelId") Long semanticModelId, @Param("version") Integer version) {
     return "SELECT id as id, metalake_id as metalakeId, catalog_id as catalogId,"
         + " schema_id as schemaId, semantic_model_id as semanticModelId, version as version,"
-        + " semantic_model_name as semanticModelName,"
+        + " publication_status AS publicationStatus, published_by AS publishedBy,"
+        + " published_at AS publishedAt,"
         + " semantic_model_comment as semanticModelComment,"
         + " datasets as datasets, relationships as relationships, metrics as metrics,"
         + " ai_context as aiContext, custom_extensions as customExtensions, properties as properties,"
@@ -98,26 +101,35 @@ public class SemanticModelVersionInfoBaseSQLProvider {
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 
-  /** Returns SQL for finding Semantic Models that exceed a version retention count. */
+  /** Returns SQL for finding Semantic Models with snapshots eligible for retention cleanup. */
   public String selectSemanticModelVersionsByRetentionCount(
       @Param("versionRetentionCount") Long versionRetentionCount) {
-    return "SELECT semantic_model_id as semanticModelId, MAX(version) as version FROM "
+    // Keep the cutoff nonnegative for unsigned version columns.
+    return "SELECT smm.semantic_model_id AS semanticModelId, smm.current_version AS version FROM "
+        + SemanticModelMetaMapper.TABLE_NAME
+        + " smm WHERE smm.current_version > #{versionRetentionCount} AND smm.deleted_at = 0"
+        + " AND EXISTS (SELECT 1 FROM "
         + SemanticModelVersionInfoMapper.TABLE_NAME
-        + " WHERE version > #{versionRetentionCount} AND deleted_at = 0"
-        + " GROUP BY semantic_model_id";
+        + " smvi WHERE smvi.semantic_model_id = smm.semantic_model_id"
+        + " AND smvi.version <= smm.current_version"
+        + " - LEAST(smm.current_version, #{versionRetentionCount})"
+        + " AND smvi.version <> smm.active_version"
+        + " AND smvi.publication_status <> 'PUBLISHED_EXPLICITLY' AND smvi.deleted_at = 0)";
   }
 
   /** Returns SQL for soft-deleting snapshots through a per-model retention line. */
   public String softDeleteSemanticModelVersionsByRetentionLine(
       @Param("semanticModelId") Long semanticModelId,
       @Param("versionRetentionLine") long versionRetentionLine,
+      @Param("activeVersion") int activeVersion,
       @Param("limit") int limit) {
     return "UPDATE "
         + SemanticModelVersionInfoMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE semantic_model_id = #{semanticModelId}"
-        + " AND version <= #{versionRetentionLine} AND deleted_at = 0 LIMIT #{limit}";
+        + " AND version <= #{versionRetentionLine} AND version <> #{activeVersion}"
+        + " AND publication_status <> 'PUBLISHED_EXPLICITLY' AND deleted_at = 0 LIMIT #{limit}";
   }
 
   private String softDeleteBy(String condition) {

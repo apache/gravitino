@@ -121,7 +121,8 @@ public class TestBuiltinIcebergUpdateStatsJob {
   private static Map<String, String> buildUpdateStatsJobConfig(String tableName) {
     Map<String, String> jobConf = new HashMap<>();
     jobConf.put("table_identifier", "db." + tableName);
-    jobConf.put("update_mode", "all");
+    // stats-only: this IT asserts Gravitino table statistics, not JDBC metrics storage.
+    jobConf.put("update_mode", "stats");
     jobConf.put(
         "updater_options",
         "{\"gravitino_uri\":\""

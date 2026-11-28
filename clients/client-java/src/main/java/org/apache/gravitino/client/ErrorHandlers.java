@@ -68,6 +68,7 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelRevisionException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
@@ -983,6 +984,9 @@ public class ErrorHandlers {
         case ErrorConstants.NOT_IN_USE_CODE:
           throw new MetalakeNotInUseException(errorMessage);
 
+        case ErrorConstants.IN_USE_CODE:
+          throw new InUseException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -1205,6 +1209,10 @@ public class ErrorHandlers {
 
       switch (errorResponse.getCode()) {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          // An access control policy naming a role that does not exist.
+          if (errorResponse.getType().equals(IllegalRoleException.class.getSimpleName())) {
+            throw new IllegalRoleException(errorMessage);
+          }
           throw new IllegalArgumentException(errorMessage);
 
         case ErrorConstants.NOT_FOUND_CODE:
@@ -1593,6 +1601,11 @@ public class ErrorHandlers {
               .getSimpleName()
               .equals(errorResponse.getType())) {
             throw new NoSuchSemanticModelException(errorMessage);
+          }
+          if (NoSuchSemanticModelRevisionException.class
+              .getSimpleName()
+              .equals(errorResponse.getType())) {
+            throw new NoSuchSemanticModelRevisionException(errorMessage);
           }
           throw new NotFoundException(errorMessage);
 

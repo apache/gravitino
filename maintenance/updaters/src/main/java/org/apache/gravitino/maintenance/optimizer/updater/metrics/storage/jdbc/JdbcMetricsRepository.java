@@ -77,7 +77,7 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
   private static final Set<String> REQUIRED_JOB_METRICS_COLUMNS =
       buildRequiredColumnsSet("job_identifier", "metric_name", "metric_ts", "metric_value");
 
-  protected static final String DEFAULT_USER = "sa";
+  /** Empty password is allowed; username and URL must be set explicitly. */
   protected static final String DEFAULT_PASSWORD = "";
 
   private DataSourceJdbcConnectionProvider connectionProvider;

@@ -68,6 +68,17 @@ public class CatalogCredentialManager implements Closeable {
   }
 
   /**
+   * Returns whether every configured provider explicitly supports dynamic credentials.
+   *
+   * @return true if all configured providers support dynamic credentials, or no provider is
+   *     configured
+   */
+  public boolean hasOnlyDynamicCredentialProviders() {
+    return credentialProviders.values().stream()
+        .allMatch(SupportsDynamicCredential.class::isInstance);
+  }
+
+  /**
    * Returns whether a credential provider of this catalog supports the scheme of the path.
    *
    * @param path a storage location

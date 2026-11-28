@@ -521,9 +521,18 @@ class MockSemanticModelOperation(SemanticModelOperation):
         return "[]"
 
     async def load_semantic_model(
-        self, catalog_name: str, schema_name: str, semantic_model_name: str
+        self,
+        catalog_name: str,
+        schema_name: str,
+        semantic_model_name: str,
+        revision=None,
     ) -> str:
         return '{"name": "mock_semantic_model"}'
+
+    async def list_semantic_model_revisions(
+        self, catalog_name: str, schema_name: str, semantic_model_name: str
+    ) -> str:
+        return "[]"
 
     # pylint: disable=too-many-positional-arguments
     async def create_semantic_model(
@@ -543,6 +552,8 @@ class MockSemanticModelOperation(SemanticModelOperation):
         schema_name: str,
         semantic_model_name: str,
         updates: list[dict],
+        *,
+        expected_revision: Optional[int] = None,
     ) -> str:
         return '{"name": "mock_semantic_model"}'
 

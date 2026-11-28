@@ -42,7 +42,7 @@ directory. Use `--conf-path` only when you need a custom config file.
 | `--range-seconds`      | Time window (seconds) for monitor evaluation. Default is `86400` (24h).                              | `monitor-metrics`                                 |
 | `--partition-path`     | Partition path JSON array, for example `'[{"dt":"2026-01-01"}]'`. Requires exactly one identifier.   | `monitor-metrics`, `list-table-metrics`           |
 | `--update-mode`        | Controls what built-in update job updates: `stats`, `metrics`, or `all` (default).                   | `submit-update-stats-job`                         |
-| `--updater-options`    | Flat JSON map passed to updater logic. Always include `gravitino_uri` (loads `gravitino.schema.separator` from `GET /configs`). For `stats`/`all`, also include `metalake`. | `submit-update-stats-job`                         |
+| `--updater-options`    | Flat JSON for updater logic; see [submit-update-stats-job](#submit-built-in-update-stats-jobs).      | `submit-update-stats-job`                         |
 | `--spark-conf`         | Flat JSON map of Spark and Iceberg catalog configs used by the job.                                  | `submit-update-stats-job`                         |
 
 Global option:
@@ -177,7 +177,7 @@ Submit built-in Iceberg update stats/metrics Spark jobs directly.
   --type submit-update-stats-job \
   --identifiers rest_catalog.db.t1 \
   --update-mode all \
-  --updater-options '{"gravitino_uri":"http://localhost:8090","metalake":"test"}' \
+  --updater-options '{"gravitino_uri":"http://localhost:8090","metalake":"test","gravitino.optimizer.jdbcMetrics.jdbcUrl":"jdbc:postgresql://localhost:5432/optimizer","gravitino.optimizer.jdbcMetrics.jdbcUser":"postgres","gravitino.optimizer.jdbcMetrics.jdbcPassword":"postgres","gravitino.optimizer.jdbcMetrics.jdbcDriver":"org.postgresql.Driver"}' \
   --spark-conf '{"spark.sql.catalog.rest_catalog.type":"rest","spark.sql.catalog.rest_catalog.uri":"http://localhost:9001/iceberg","spark.hadoop.fs.defaultFS":"file:///"}'
 ```
 
@@ -190,9 +190,11 @@ Notes:
 - `--updater-options` must always include `gravitino_uri`. The CLI and the Spark job both load
   `gravitino.schema.separator` from that server's unauthenticated `GET /configs` endpoint (including
   `--dry-run`, which does not submit a job but still needs a reachable URI). For `stats` or `all`,
-  also include `metalake`.
-- If `--updater-options` includes external JDBC metrics settings
-  (`gravitino.optimizer.jdbcMetrics.*`), ensure the JDBC driver JAR is available to Spark
+  also include `metalake`. For `metrics` or `all`, also include non-blank
+  `gravitino.optimizer.jdbcMetrics.jdbcUrl`, `gravitino.optimizer.jdbcMetrics.jdbcUser`, and
+  `gravitino.optimizer.jdbcMetrics.jdbcDriver` (`jdbcPassword` may be empty). There is no embedded
+  H2 fallback on that path.
+- When JDBC metrics settings are present, ensure the JDBC driver JAR is available to the Spark
   runtime classpath of the driver: with the k8s job executor, for example via `spark.jars` in
   `--spark-conf`, which replaces a `spark.jars` default of the k8s job executor, so list the
   Iceberg runtime there too if that default provides it; with the local job executor, by installing
@@ -243,7 +245,7 @@ Examples:
 SUMMARY: statistics totalRecords=3 tableRecords=2 partitionRecords=1 jobRecords=0
 DRY-RUN: strategy=iceberg-data-compaction identifier=rest_catalog.db.t1 score=95 jobTemplate=builtin-iceberg-rewrite-data-files jobOptions={catalog_name=rest_catalog, table_identifier=db.t1}
 SUBMIT: strategy=iceberg-data-compaction identifier=rest_catalog.db.t1 score=95 jobTemplate=builtin-iceberg-rewrite-data-files jobOptions={catalog_name=rest_catalog, table_identifier=db.t1} jobId=1f54c6d3-4e27-4cc8-bdfa-b05ecf59a4c2
-DRY-RUN: identifier=rest_catalog.db.t1 jobTemplate=builtin-iceberg-update-stats jobConfig={catalog_name=rest_catalog, table_identifier=db.t1, update_mode=all, updater_options={"gravitino_uri":"http://localhost:8090","metalake":"test"}, spark_conf={"spark.hadoop.fs.defaultFS":"file:///"}}
+DRY-RUN: identifier=rest_catalog.db.t1 jobTemplate=builtin-iceberg-update-stats jobConfig={catalog_name=rest_catalog, table_identifier=db.t1, update_mode=all, updater_options={"gravitino_uri":"http://localhost:8090","metalake":"test","gravitino.optimizer.jdbcMetrics.jdbcUrl":"jdbc:postgresql://localhost:5432/optimizer","gravitino.optimizer.jdbcMetrics.jdbcUser":"postgres","gravitino.optimizer.jdbcMetrics.jdbcPassword":"******","gravitino.optimizer.jdbcMetrics.jdbcDriver":"org.postgresql.Driver"}, spark_conf={"spark.hadoop.fs.defaultFS":"file:///"}}
 SUMMARY: submit-update-stats-job total=1 submitted=1 dryRun=false
 MetricsResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<table-or-job-scope>, metrics={row_count=[{timestamp=1735689600, value=100}]}}
 EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<table-or-job-scope>, evaluation=true, evaluatorName=gravitino-metrics-evaluator, actionTimeSeconds=1735689600, rangeSeconds=86400, beforeMetrics={row_count=[MetricSample{timestampSeconds=1735686000, value=120}]}, afterMetrics={row_count=[MetricSample{timestampSeconds=1735689600, value=100}]}}
@@ -289,7 +291,7 @@ missing keys. An empty string is a value, not an omission: it overrides the defa
 | Job template                          | Required keys                                                                           | Optional keys and defaults                                                                                                                                                 |
 | ------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Every Iceberg job                     | `catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location` | `spark_master` (empty), `spark_executor_instances` (`1`), `spark_executor_cores` (`1`), `spark_executor_memory` (`1g`), `spark_driver_memory` (`1g`), `spark_conf` (empty) |
-| `builtin-iceberg-update-stats`        | —                                                                                       | `update_mode` (`all`), `updater_options` (empty)                                                                                                                           |
+| `builtin-iceberg-update-stats`        | —                                                                                       | `update_mode` (`all`), `updater_options` (empty). `metrics`/`all` JDBC: [Update Statistics](#update-statistics).                                                           |
 | `builtin-iceberg-rewrite-data-files`  | `where_clause` (pass `""` to rewrite the whole table)                                   | `strategy` (`binpack`), `sort_order` (empty), `options` (empty)                                                                                                            |
 | `builtin-iceberg-expire-snapshots`    | —                                                                                       | `older_than` (empty), `retain_last` (empty), `stream_results` (`false`)                                                                                                    |
 | `builtin-iceberg-remove-orphan-files` | —                                                                                       | `older_than` (empty), `location` (empty), `dry_run` (`false`)                                                                                                              |
@@ -312,7 +314,9 @@ such as the namespace, the image, the service account, Secrets, and volumes: who
 `updater_options` must include `gravitino_uri` for every `update_mode` (including `metrics`): the job
 loads `gravitino.schema.separator` from that server's `GET /configs` and maps Spark
 `table_identifier` values (such as `a.b.events`) back to Gravitino hierarchical names (such as
-`a|b.events`).
+`a|b.events`). For `stats` or `all`, also include `metalake`. For `metrics` or `all`, also include
+non-blank `gravitino.optimizer.jdbcMetrics.jdbcUrl`, `jdbcUser`, and `jdbcDriver` (`jdbcPassword`
+may be empty). Metrics are written over JDBC to that repository; there is no embedded H2 fallback.
 
 Its `jobConf` is documented in [Configuration](./optimizer-configuration.md#job-submission-configuration).
 

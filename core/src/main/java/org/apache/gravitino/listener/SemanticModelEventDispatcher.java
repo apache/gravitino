@@ -20,7 +20,9 @@
 package org.apache.gravitino.listener;
 
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
@@ -62,6 +64,9 @@ import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelPreEven
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelPreEvent;
+import org.apache.gravitino.listener.api.event.semantic.PublishSemanticModelRevisionEvent;
+import org.apache.gravitino.listener.api.event.semantic.PublishSemanticModelRevisionFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.PublishSemanticModelRevisionPreEvent;
 import org.apache.gravitino.listener.api.info.SemanticModelInfo;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
@@ -69,6 +74,8 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -160,22 +167,41 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
 
   @Override
   public SemanticModel loadSemanticModel(NameIdentifier ident) throws NoSuchSemanticModelException {
-    String user = PrincipalUtils.getCurrentUserName();
-    eventBus.dispatchEvent(new LoadSemanticModelPreEvent(user, ident));
-    try {
-      SemanticModel semanticModel = dispatcher.loadSemanticModel(ident);
-      eventBus.dispatchEvent(
-          new LoadSemanticModelEvent(user, ident, new SemanticModelInfo(semanticModel)));
-      return semanticModel;
-    } catch (Exception e) {
-      eventBus.dispatchEvent(new LoadSemanticModelFailureEvent(user, ident, e));
-      throw e;
-    }
+    return loadWithEvents(ident, () -> dispatcher.loadSemanticModel(ident));
   }
 
   @Override
   public boolean semanticModelExists(NameIdentifier ident) {
     return dispatcher.semanticModelExists(ident);
+  }
+
+  @Override
+  public SemanticModel loadSemanticModelRevision(
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      Consumer<SemanticModelRevision> checkVisibility) {
+    return loadWithEvents(
+        ident, () -> dispatcher.loadSemanticModelRevision(ident, selector, checkVisibility));
+  }
+
+  @Override
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
+    return dispatcher.listSemanticModelRevisions(ident);
+  }
+
+  @Override
+  public SemanticModel publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) {
+    eventBus.dispatchEvent(new PublishSemanticModelRevisionPreEvent(principal, ident, revision));
+    try {
+      SemanticModel model = dispatcher.publishSemanticModelRevision(ident, revision, principal);
+      eventBus.dispatchEvent(new PublishSemanticModelRevisionEvent(principal, ident, revision));
+      return model;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new PublishSemanticModelRevisionFailureEvent(principal, ident, revision, e));
+      throw e;
+    }
   }
 
   @Override
@@ -239,13 +265,18 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
   }
 
   @Override
-  public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
+  public SemanticModelExport exportSemanticModel(
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      OssieFormat format,
+      Consumer<SemanticModelRevision> checkVisibility) {
     String user = PrincipalUtils.getCurrentUserName();
     try {
       eventBus.dispatchEvent(new ExportSemanticModelPreEvent(user, ident, format));
-      OssieDocument document = dispatcher.exportOssieDocument(ident, format);
-      eventBus.dispatchEvent(new ExportSemanticModelEvent(user, ident, format));
-      return document;
+      SemanticModelExport export =
+          dispatcher.exportSemanticModel(ident, selector, format, checkVisibility);
+      eventBus.dispatchEvent(new ExportSemanticModelEvent(user, ident, format, export.revision()));
+      return export;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ExportSemanticModelFailureEvent(user, ident, format, e));
       throw e;
@@ -254,13 +285,17 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
 
   @Override
   public SemanticModel alterSemanticModel(
-      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
+      NameIdentifier ident,
+      @Nullable Integer expectedRevision,
+      SemanticModelSourceUpdate sourceUpdate,
+      SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     String user = PrincipalUtils.getCurrentUserName();
     eventBus.dispatchEvent(new AlterSemanticModelPreEvent(user, ident, changes));
     try {
-      SemanticModel semanticModel = dispatcher.alterSemanticModel(ident, sourceUpdate, changes);
+      SemanticModel semanticModel =
+          dispatcher.alterSemanticModel(ident, expectedRevision, sourceUpdate, changes);
       eventBus.dispatchEvent(
           new AlterSemanticModelEvent(user, ident, changes, new SemanticModelInfo(semanticModel)));
       return semanticModel;
@@ -280,6 +315,20 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
       return existed;
     } catch (Exception e) {
       eventBus.dispatchEvent(new DropSemanticModelFailureEvent(user, ident, e));
+      throw e;
+    }
+  }
+
+  private SemanticModel loadWithEvents(NameIdentifier ident, Supplier<SemanticModel> load) {
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new LoadSemanticModelPreEvent(user, ident));
+    try {
+      SemanticModel semanticModel = load.get();
+      eventBus.dispatchEvent(
+          new LoadSemanticModelEvent(user, ident, new SemanticModelInfo(semanticModel)));
+      return semanticModel;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new LoadSemanticModelFailureEvent(user, ident, e));
       throw e;
     }
   }

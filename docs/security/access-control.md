@@ -140,6 +140,11 @@ A role holds objects, and for each one a list of privileges, each carrying an `A
 condition. A privilege binds only to object types it supports, so `CREATE_TABLE` binds to a metalake,
 catalog, or schema, never to a table. Whoever creates a role owns it, and can alter or delete it.
 
+A role cannot be deleted while an access control policy names it in its applicable roles. Remove
+the role from those policies, or delete them, first. The deletion fails with `InUseException`
+(HTTP 409); in a bulk delete, only that role's item fails. Deleting the metalake removes its roles
+and policies together and is not blocked.
+
 #### Ownership
 
 Ownership can be held by a group as well as a user, in which case every member of that group holds
@@ -205,8 +210,8 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `REGISTER_MODEL`     | Metalake, Catalog, Schema                                                   | Register models in any schema in scope                               |
 | `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model                                            | Link versions to any model in scope                                  |
 | `USE_MODEL`          | Metalake, Catalog, Schema, Model                                            | Read the metadata of, and download versions of, any model in scope   |
-| `USE_SECRETS`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`); required with `INCLUDE_CREDENTIAL_SECRETS` for catalog `getCredentials` |
-| `INCLUDE_CREDENTIAL_SECRETS`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | With `USE_SECRETS`, include cloud access-key pairs in `getSecrets` and authorize catalog `getCredentials` |
+| `USE_SECRETS`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Soft-unlock `getSecrets` (empty map without it, not 403); static credential keys still omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`; with `INCLUDE_CREDENTIAL_SECRETS`, include static providers on catalog/fileset `getCredentials` |
+| `INCLUDE_CREDENTIAL_SECRETS`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | With `USE_SECRETS`, include static credential properties in `getSecrets` and static providers on catalog/fileset `getCredentials` (token providers need only metadata access; missing privileges soft-filter, not 403) |
 | `REGISTER_FUNCTION`  | Metalake, Catalog, Schema                                                   | Register functions in any schema in scope                            |
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function                                         | Read the metadata of, and execute, any function in scope             |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function                                         | Alter or drop any function in scope                                  |
@@ -252,8 +257,13 @@ policy with tags, provided they also have `APPLY_TAG` on each tag. Granting it o
 covers any policy in that metalake.
 
 Assigning a tag to a metadata object requires `APPLY_TAG` on the tag and access to the object.
+For a tag bound to an access-control policy, adding or removing the tag instead requires an explicit
+`APPLY_TAG` grant on that tag and ownership or `MANAGE_GRANTS` on the object or an ancestor.
+Tag ownership or a metalake-level `APPLY_TAG` grant alone is not sufficient. The metalake owner
+can still assign or remove the tag.
 Associating a policy with a tag requires access to both: `APPLY_POLICY` on the policy and
-`APPLY_TAG` on the tag. Ownership can satisfy either check.
+`APPLY_TAG` on the tag. For descriptive tags and policy association, ownership can satisfy the
+corresponding check.
 
 Reading a tag requires `VIEW_TAG` or `APPLY_TAG`; reading a policy requires `VIEW_POLICY` or
 `APPLY_POLICY`. The view privileges do not allow tag assignment or policy-to-tag association.
@@ -293,11 +303,15 @@ ownership, the same as altering it, because the caller chooses what the server c
 Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `MODIFY_TABLE`,
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
 alter or delete. Fetching plaintext secrets (`getSecrets`) requires owning the metalake or holding
-`USE_SECRETS`. Cloud access-key pairs are included only when the caller is the metalake owner or also
-holds `INCLUDE_CREDENTIAL_SECRETS`. Catalog credential vending (`getCredentials`) requires metadata access plus both
-`USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership. Missing either privilege
-returns a forbidden error. Fileset credential vending retains its path-based authorization. Callers who can load the object but lack
-`USE_SECRETS` receive an empty `getSecrets` result rather than a forbidden error.
+`USE_SECRETS`. Canonical static credential keys on that object (and catalog keys implied by
+its effective providers) are included only when the caller is the metalake owner or also holds
+`INCLUDE_CREDENTIAL_SECRETS`. Typos and non-canonical aliases are not treated as static
+credential keys for this filter. Catalog and fileset credential vending (`getCredentials`)
+always require metadata access (filesets keep path-based read/write checks). Static providers
+also need both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership; token
+providers do not. Without those privileges, the response includes only token credentials
+(static ones are omitted). Callers who can load the object but lack `USE_SECRETS` receive an
+empty `getSecrets` result rather than a forbidden error.
 
 The View row applies to metadata operations through both the native Gravitino REST API and the
 Iceberg REST Catalog when authorization is enabled. Listing first requires access to the schema and

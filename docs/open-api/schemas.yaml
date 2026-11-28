@@ -36,6 +36,22 @@ paths:
           $ref: "./openapi.yaml#/components/responses/EntityListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "409":
+          description: Conflict - The catalog is disabled (CatalogNotInUseException).
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                CatalogNotInUseException:
+                  value:
+                    code: 1009
+                    type: CatalogNotInUseException
+                    message: >-
+                      Failed to operate schema(s) operation [LIST] under catalog [my_catalog],
+                      reason [The catalog my_catalog is not in use]
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -56,10 +72,14 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/SchemaResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "409":
-          description: Conflict - The target schema already exists
+          description: >-
+            Conflict - The target schema already exists, or the catalog is disabled
+            (CatalogNotInUseException).
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -83,10 +103,14 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/SchemaResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The target schema does not exist
+          description: >-
+            Not Found - The schema or one of its parent resources does not exist. When
+            authorization is enabled, a missing metalake returns 403.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -99,9 +123,10 @@ paths:
         "409":
           description: >
             Conflict - An external schema carries an identifier owned by another existing schema.
-            Remove the copied source marker before importing an independent copy.
+            Remove the copied source marker before importing an independent copy. A disabled catalog
+            also returns 409 (CatalogNotInUseException).
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
@@ -121,10 +146,14 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/SchemaResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The target schema does not exist
+          description: >-
+            Not Found - The schema or one of its parent resources does not exist. When
+            authorization is enabled, a missing metalake returns 403.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -135,9 +164,11 @@ paths:
                 NoSuchSchemaException:
                   $ref: "#/components/examples/NoSuchSchemaException"
         "409":
-          description: Conflict - The target schema already exists
+          description: >-
+            Conflict - The target schema already exists, or the catalog is disabled
+            (CatalogNotInUseException).
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -156,12 +187,15 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "409":
           description: >
             Conflict - The schema is not empty, or the catalog cannot safely support the requested
             cascading deletion. PostgreSQL rejects non-empty schema deletion even with cascade.
+            A disabled catalog also returns 409 (CatalogNotInUseException).
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":

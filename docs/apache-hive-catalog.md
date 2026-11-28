@@ -153,8 +153,11 @@ The `fieldName` specified in the `distribution` and `sortOrders` attribute must 
 
 ### Table Column Types
 
-The Hive catalog supports all data types defined in the [Hive Language Manual](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Types).
-The following table lists the data types mapped from the Hive catalog to Gravitino.
+When creating a table, use the Gravitino types in the right column in REST requests and the
+corresponding `Types` in the Java API. The left column shows the
+[Hive types](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Types) stored in the metastore.
+For example, `"type": "long"` creates a Hive `bigint` column, and
+`"type": {"type": "list", "elementType": "string"}` creates a Hive `array<string>` column.
 
 | Hive Data Type              | Gravitino Data Type |
 |-----------------------------|---------------------|
@@ -165,10 +168,10 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 | `bigint`                    | `long`              |
 | `float`                     | `float`             |
 | `double`/`double precision` | `double`            |
-| `decimal`                   | `decimal`           |
+| `decimal(p,s)`              | `decimal(p,s)`      |
 | `string`                    | `string`            |
-| `char`                      | `char`              |
-| `varchar`                   | `varchar`           |
+| `char(n)`                   | `char(n)`           |
+| `varchar(n)`                | `varchar(n)`        |
 | `timestamp`                 | `timestamp`         |
 | `date`                      | `date`              |
 | `interval_year_month`       | `interval_year`     |
@@ -179,14 +182,20 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 | `struct`                    | `struct`            |
 | `uniontype`                 | `union`             |
 
-:::info
-1. The data types other than listed above are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** that represents an unresolvable data type from the Hive catalog.
-2. Using the `struct` data type with field comments will throw an error, as it does not work for Hive tables (see [HIVE-26593](https://issues.apache.org/jira/browse/HIVE-26593)).
-:::
+Specify both precision (1–38) and scale (0 through precision) for `decimal(p,s)`, for example
+`decimal(10,2)`. The length of `char(n)` ranges from 1 to 255 and the length of `varchar(n)` from
+1 to 65535. Hive accepts `timestamp` without a time zone and rejects `timestamp_tz` on create.
+
+When loading a table, Gravitino represents unmapped Hive types as an
+[external type](./tables-and-views.md#external-type). Table creation requires a mapped Gravitino type.
+Hive also rejects comments on nested struct fields ([HIVE-26593](https://issues.apache.org/jira/browse/HIVE-26593)).
 
 ### Table Properties
 
-Table properties supply or set metadata for the underlying Hive tables.
+On create, `format` selects defaults for `input-format`, `output-format`, and `serde-lib`.
+When loading the table, read those properties for the effective storage classes. HMS stores them in
+the storage descriptor and Gravitino does not reconstruct the `format` shorthand.
+
 The following table lists predefined table properties for a Hive table. Additionally, you can define your own key-value pair properties and transmit them to the underlying Hive database.
 
 :::note

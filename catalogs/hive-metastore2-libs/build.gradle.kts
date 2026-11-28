@@ -60,6 +60,10 @@ dependencies {
     exclude(group = "net.java.dev.jets3t")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")
+    // hadoop-common 3.4 declares these, Hadoop 3.3 did not bring them. No Hadoop class on the
+    // metastore client path uses them.
+    exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
+    exclude(group = "org.codehaus.jettison", module = "jettison")
     exclude(group = "org.eclipse.jetty")
     exclude(group = "org.eclipse.jetty.aggregate", module = "jetty-all")
     exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
@@ -73,7 +77,8 @@ dependencies {
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")
     exclude(group = "com.sun.jersey")
-    exclude(group = "io.netty", module = "netty")
+    // hadoop-mapreduce-client-core 3.4 brings netty-all and the netty modules, which are not needed.
+    exclude(group = "io.netty")
     exclude(group = "log4j")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")

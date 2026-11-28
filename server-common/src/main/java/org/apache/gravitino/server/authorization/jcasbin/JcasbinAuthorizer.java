@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
@@ -62,13 +63,19 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.TagPolicyMatcher;
 import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.policy.AccessControlContent;
+import org.apache.gravitino.policy.ObjectPolicyResolver;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.server.authorization.DomainAuthzHelper;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
@@ -85,6 +92,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.casbin.jcasbin.main.Enforcer;
 import org.casbin.jcasbin.main.SyncedEnforcer;
@@ -309,6 +317,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   /** Background HA invalidator for {@link #metadataIdCache} and {@link #ownerRelCache}. */
   private JcasbinChangeListener changePoller;
 
+  /** Tag-policy resolver initialized at startup; null when tag authorization is disabled. */
+  @Nullable private ObjectPolicyResolver objectPolicyResolver;
+
   @Override
   public void initialize() {
     long cacheExpirationSecs =
@@ -354,6 +365,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     lookups = new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
     changePoller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, pollIntervalSecs);
     EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    objectPolicyResolver =
+        Boolean.TRUE.equals(
+                GravitinoEnv.getInstance().config().get(Configs.ENABLE_TAG_BASED_AUTHORIZATION))
+            ? new ObjectPolicyResolver(entityStore)
+            : null;
     if (entityStore instanceof SupportsEntityChangeLog) {
       ((SupportsEntityChangeLog) entityStore).registerEntityChangeLogListener(changePoller);
     }
@@ -465,6 +481,59 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         metalake,
         metadataObject);
     return result;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean isTagAuthorizationEnabled() {
+    return objectPolicyResolver != null;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Optional<PolicyEntity> matchTagPolicy(
+      Principal principal,
+      String metalake,
+      MetadataObject target,
+      Privilege.Name privilege,
+      AuthorizationRequestContext requestContext) {
+    if (objectPolicyResolver == null
+        || !AccessControlContent.PERMITTED_PRIVILEGES.contains(privilege)
+        || requestContext.getActiveRoles().isNone()) {
+      return Optional.empty();
+    }
+    if (prefetchUserAndGroupInfo(
+            metalake, principal.getName(), principalGroupNames(principal), requestContext)
+        .isEmpty()) {
+      return Optional.empty();
+    }
+    ActiveRoles activeRoles = requestContext.getActiveRoles();
+    Set<String> roleNames =
+        requestContext.getPrefetchedRoleVersions().values().stream()
+            .map(RoleUpdatedAt::getRoleName)
+            .filter(name -> activeRoles.isAll() || activeRoles.roleNames().contains(name))
+            .collect(Collectors.toSet());
+    if (roleNames.isEmpty()
+        || !requestContext.hasEnabledAccessPolicies(
+            metalake, () -> hasEnabledAccessPolicies(metalake))) {
+      return Optional.empty();
+    }
+    String rawKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, target);
+    MetadataObject canonicalTarget;
+    try {
+      canonicalTarget =
+          requestContext.computeNormalizedMetadataObjectIfAbsent(
+              rawKey,
+              NameIdentifierUtil.getCatalogIdentifier(
+                  MetadataObjectUtil.toEntityIdent(metalake, target)),
+              ignored -> MetadataIdConverter.normalizeMetadataObject(target, metalake));
+    } catch (NotFoundException e) {
+      return Optional.empty();
+    }
+    return TagPolicyMatcher.match(
+        privilege,
+        roleNames,
+        objectPolicyResolver.resolve(metalake, canonicalTarget, requestContext));
   }
 
   @Override
@@ -2358,6 +2427,30 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     } catch (Exception e) {
       // A diagnostic must never change the outcome of an authorization check.
       LOG.debug("Failed to diagnose denial for user {}", userId, e);
+    }
+  }
+
+  /**
+   * Checks current policy contents without the entity cache so new requests see policy changes.
+   *
+   * <p>The caller caches the result or failure only within its authorization request context.
+   *
+   * @param metalake the metalake to inspect
+   * @return whether an enabled access-control policy exists
+   * @throws UncheckedIOException if policies cannot be read
+   */
+  private boolean hasEnabledAccessPolicies(String metalake) {
+    try {
+      return GravitinoEnv.getInstance()
+          .entityStore()
+          .list(
+              NamespaceUtil.ofPolicy(metalake), PolicyEntity.class, Entity.EntityType.POLICY, true)
+          .stream()
+          .anyMatch(
+              policy ->
+                  policy.enabled() && policy.policyType() == Policy.BuiltInType.ACCESS_CONTROL);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to check access policies in " + metalake, e);
     }
   }
 }

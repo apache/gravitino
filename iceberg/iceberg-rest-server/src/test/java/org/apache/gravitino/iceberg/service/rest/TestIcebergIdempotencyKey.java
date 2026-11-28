@@ -204,11 +204,22 @@ public class TestIcebergIdempotencyKey extends IcebergNamespaceTestBase {
   void testLongQueryBindingsDoNotAlias() {
     Assertions.assertEquals(200, doCreateNamespace(NAMESPACE).getStatus());
     String prefix = "x".repeat(600);
-    try (Response first = createTableWithQuery("long_query", ImmutableMap.of("tag", prefix + "a"));
+    try (Response first =
+            createTableWithQuery(
+                "long_query", ImmutableMap.of("tag", prefix + "a", "mode", "sync"));
+        Response reordered =
+            createTableWithQuery(
+                "long_query", ImmutableMap.of("mode", "sync", "tag", prefix + "a"));
         Response different =
-            createTableWithQuery("long_query", ImmutableMap.of("tag", prefix + "b"))) {
+            createTableWithQuery(
+                "long_query", ImmutableMap.of("tag", prefix + "b", "mode", "sync"))) {
       Assertions.assertEquals(200, first.getStatus());
+      Assertions.assertEquals(200, reordered.getStatus());
+      Assertions.assertEquals(first.readEntity(String.class), reordered.readEntity(String.class));
       Assertions.assertEquals(409, different.getStatus());
+      Assertions.assertEquals(
+          "IdempotencyConflictException",
+          different.readEntity(JsonNode.class).get("error").get("type").asText());
     }
   }
 
@@ -234,6 +245,25 @@ public class TestIcebergIdempotencyKey extends IcebergNamespaceTestBase {
     }
     try (Response missing = getTableClientBuilder(NAMESPACE, Optional.of("changed_body")).get()) {
       Assertions.assertEquals(404, missing.getStatus());
+    }
+  }
+
+  @Test
+  void testInvalidBodyOnRetryStillReplays() {
+    Assertions.assertEquals(200, doCreateNamespace(NAMESPACE).getStatus());
+    try (Response first = createTable("valid_then_invalid", KEY);
+        Response invalidRetry =
+            getTableClientBuilder(NAMESPACE, Optional.empty())
+                .header(IcebergIdempotencyManager.IDEMPOTENCY_KEY, KEY)
+                .post(Entity.json("{}"))) {
+      Assertions.assertEquals(200, first.getStatus());
+      String firstBody = first.readEntity(String.class);
+      Assertions.assertEquals(200, invalidRetry.getStatus());
+      Assertions.assertEquals(firstBody, invalidRetry.readEntity(String.class));
+    }
+    try (Response missing =
+        getTableClientBuilder(NAMESPACE, Optional.of("valid_then_invalid")).get()) {
+      Assertions.assertEquals(200, missing.getStatus());
     }
   }
 

@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
@@ -34,13 +35,82 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.SupportsTableIdLookup;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 
 /** Interface defining the operations for a Relation Backend. */
 public interface RelationalBackend
-    extends Closeable, SupportsRelationOperations, SupportsDomainOperations {
+    extends Closeable, SupportsRelationOperations, SupportsDomainOperations, SupportsTableIdLookup {
+
+  /**
+   * Resolves a table ID, retaining full reads for backends without a lightweight implementation.
+   *
+   * @param identifier the full table identifier
+   * @return the active table ID
+   * @throws NoSuchEntityException if the table does not exist
+   * @throws IOException if the lookup fails
+   */
+  @Override
+  default long getTableId(NameIdentifier identifier) throws IOException {
+    return get(identifier, Entity.EntityType.TABLE).id();
+  }
+
+  /**
+   * Resolves a Semantic Model ID from its identity, whether or not it has an active revision.
+   *
+   * <p>The default reads the active revision. A backend that supports deferred publication must
+   * override it so that a model with only drafts still resolves.
+   *
+   * @param identifier the full Semantic Model identifier
+   * @return the stable Semantic Model ID
+   * @throws NoSuchEntityException if the Semantic Model or its namespace does not exist
+   * @throws IOException if the lookup fails
+   */
+  default long getSemanticModelId(NameIdentifier identifier) throws IOException {
+    return this.<SemanticModelEntity>get(identifier, Entity.EntityType.SEMANTIC_MODEL).id();
+  }
+
+  /** Loads a retained Semantic Model snapshot or the latest saved revision. */
+  default SemanticModelEntity loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector) throws IOException {
+    throw new UnsupportedOperationException("Loading Semantic Model revisions is not supported");
+  }
+
+  /** Lists retained Semantic Model revision metadata newest first. */
+  default SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident)
+      throws IOException {
+    throw new UnsupportedOperationException("Listing Semantic Model revisions is not supported");
+  }
+
+  /** Publishes the latest Semantic Model revision. */
+  default SemanticModelEntity publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) throws IOException {
+    throw new UnsupportedOperationException("Publishing Semantic Model revisions is not supported");
+  }
+
+  /** Lists model identities for governance, irrespective of publication state. */
+  default List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace)
+      throws IOException {
+    return this.<SemanticModelEntity>list(namespace, Entity.EntityType.SEMANTIC_MODEL, false)
+        .stream()
+        .map(SemanticModelEntity::nameIdentifier)
+        .toList();
+  }
+
+  /** Applies a Semantic Model update with an optional revision precondition. */
+  default SemanticModelEntity updateSemanticModel(
+      NameIdentifier ident,
+      @Nullable Integer expectedRevision,
+      boolean rename,
+      Function<SemanticModelEntity, SemanticModelEntity> updater)
+      throws IOException {
+    return update(ident, Entity.EntityType.SEMANTIC_MODEL, updater);
+  }
 
   /**
    * Reads metric identifiers in a schema without loading complete Semantic Models.
