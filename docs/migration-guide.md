@@ -133,6 +133,28 @@ and shutdown steps in [Upgrade Gravitino](./how-to-upgrade.md) before applying t
     `CatalogChange.setSecretReference` (REST update type `setSecretReference`) with an external
     secret that holds the whole property value. Use the locator recorded during the inventory.
     Neither `setSecretBinding` nor `setSecretReference` is available in the 1.3 client or REST API.
+- The Kafka catalog sets two defaults in the server JVM, unless the properties are already set with
+  `-D`: `org.apache.kafka.automatic.config.providers=none`, which loads no config provider without
+  explicit configuration, and an empty `org.apache.kafka.sasl.oauthbearer.allowed.urls`. Both are
+  JVM-wide, so every Kafka client in the server JVM reads them, including a server plugin that uses
+  a config provider or OAUTHBEARER. They are set when the first Kafka catalog is loaded, not when
+  the server starts, so such a plugin must set the properties itself with `-D`. The empty allow list
+  affects only Kafka catalogs whose `sasl.login.callback.handler.class` is Kafka's
+  `org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler` or its legacy
+  subclass `org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerLoginCallbackHandler`.
+  Both fetch a token from `sasl.oauthbearer.token.endpoint.url`. These catalogs fail to connect
+  after the upgrade until the token endpoint URL is added to the list. Each entry must equal
+  `sasl.oauthbearer.token.endpoint.url` exactly, with no prefix or trailing-slash tolerance. Set it
+  in `JAVA_OPTS`, for example in `conf/gravitino-env.sh`:
+  `JAVA_OPTS+=" -Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp.example.com/oauth2/token"`.
+  All Kafka catalogs share this one property, so when several catalogs use different token
+  endpoints, list them together in one comma-separated value, for example
+  `-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp-a.example.com/oauth2/token,https://idp-b.example.com/oauth2/token`.
+  A repeated `-D` for the same property keeps only the last one. Other Java processes that receive
+  the option also get the allow list: `gravitino-optimizer.sh` passes `JAVA_OPTS` to its JVM, and
+  local jobs inherit `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS` and an exported `JAVA_OPTS`, which the
+  Docker image entrypoint sets. Catalogs whose login handler creates the token itself, such as the
+  AWS MSK IAM handler, need no change.
 - The Kafka 3.9 client rejects `com.sun.security.auth.module.LdapLoginModule` in JAAS
   configurations by default. `JndiLoginModule` was already rejected by the 3.4 client. Check both
   the `sasl.jaas.config` of each Kafka catalog and the `KafkaClient` entry in the file named by the

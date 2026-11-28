@@ -83,6 +83,7 @@ import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
@@ -104,6 +105,12 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   // named by "config.providers". Those providers read the Gravitino server's own environment
   // variables and files, so they must not be selectable through catalog properties.
   @VisibleForTesting static final String CONFIG_PROVIDERS_KEY = "config.providers";
+
+  // JVM system property that lists the token endpoints Kafka's OAUTHBEARER login callback handler
+  // may fetch from. The name is a literal because Kafka declares it only in an internal class.
+  @VisibleForTesting
+  static final String OAUTHBEARER_ALLOWED_URLS_PROPERTY =
+      "org.apache.kafka.sasl.oauthbearer.allowed.urls";
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
@@ -127,6 +134,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
+    applyClientJvmDefaults();
     this.propertiesMetadata = propertiesMetadata;
     Preconditions.checkArgument(
         config.containsKey(KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS),
@@ -464,6 +472,32 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       adminClient.close();
       adminClient = null;
     }
+  }
+
+  /**
+   * Sets secure defaults for the Kafka client JVM properties that the operator has not set.
+   *
+   * <p>The Kafka client reads these JVM system properties each time it is created, and a catalog
+   * property cannot change them. An operator sets them with {@code -D} in {@code JAVA_OPTS}, {@code
+   * JAVA_TOOL_OPTIONS} or {@code JDK_JAVA_OPTIONS}, and the JVM has merged them into system
+   * properties before this method runs, so it only fills in the ones that are absent.
+   *
+   * <p>An empty {@code org.apache.kafka.sasl.oauthbearer.allowed.urls} stops Kafka's OAUTHBEARER
+   * login callback handler from fetching a token from any {@code
+   * sasl.oauthbearer.token.endpoint.url}, such as a {@code file://} URL. A catalog that uses the
+   * handler needs the operator to list its token endpoint. {@code
+   * org.apache.kafka.automatic.config.providers=none} loads no config provider without explicit
+   * configuration. The defaults live in the server JVM only, so processes that the server starts do
+   * not inherit them.
+   *
+   * <p>System properties are JVM-wide, so every Kafka client in the server JVM reads these
+   * defaults, whichever classloader it comes from. They are set when the first Kafka catalog is
+   * initialized, not when the server starts.
+   */
+  @VisibleForTesting
+  static void applyClientJvmDefaults() {
+    System.getProperties().putIfAbsent(AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY, "none");
+    System.getProperties().putIfAbsent(OAUTHBEARER_ALLOWED_URLS_PROPERTY, "");
   }
 
   /**

@@ -47,6 +47,51 @@ supports versioned writes, or `CatalogChange.setSecretReference` (REST update ty
 `setSecretReference`) with an external secret that holds the whole property value.
 :::
 
+When the server loads a Kafka catalog, it also sets the Kafka client JVM properties
+`org.apache.kafka.automatic.config.providers=none` and an empty
+`org.apache.kafka.sasl.oauthbearer.allowed.urls`, unless they are already set. Kafka's OAUTHBEARER
+login callback handler,
+`org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler`, fetches a token from
+`sasl.oauthbearer.token.endpoint.url` and refuses any URL that is not in the allow list. The legacy
+class name `org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerLoginCallbackHandler`
+is a subclass and behaves the same. With the empty list, a Kafka catalog cannot make the server read
+a `file://` URL or call an internal HTTP endpoint through that property. A catalog that uses either
+class needs its token endpoint URL in the list, for example
+`-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp.example.com/oauth2/token`. Login
+handlers that create the token themselves, such as the AWS MSK IAM handler, do not read the token
+endpoint and work with the empty list.
+Kafka compares each entry of the list, after trimming spaces, with the value of
+`sasl.oauthbearer.token.endpoint.url` as an exact string. It does not accept a prefix or a missing
+or extra trailing slash, so list the URL exactly as the catalog configures it.
+
+Both properties are JVM-wide. Every Kafka client in the server JVM reads them, including a server
+plugin that uses a config provider or OAUTHBEARER, whichever classloader it comes from. Gravitino
+sets them when the first Kafka catalog is loaded, not when the server starts, so a plugin that
+needs different values must set them itself with `-D` to get the same result in any load order.
+
+
+Set the allow list with `-D` in `JAVA_OPTS`, for example in `conf/gravitino-env.sh`:
+
+```shell
+JAVA_OPTS+=" -Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp.example.com/oauth2/token"
+```
+
+Any other Java process that receives the same option also gets the allow list. This includes Java
+jobs that the server starts, such as local Shell and Spark jobs, when the option reaches them
+through an environment variable that they inherit. `JAVA_TOOL_OPTIONS` and `JDK_JAVA_OPTIONS` are
+inherited this way. `JAVA_OPTS` is inherited only when it is exported, as the Docker image
+entrypoint does before it starts the server. Launchers that source the same `gravitino-env.sh`, such
+as `gravitino-optimizer.sh`, pass `JAVA_OPTS` to their own JVM. This matters when a job and a
+catalog use different token endpoints. The defaults that the server sets exist only in the server
+JVM, so those processes do not inherit them.
+
+All Kafka catalogs in the server share this one property. List every token endpoint in a single
+comma-separated value, because a repeated `-D` for the same property keeps only the last one:
+
+```shell
+JAVA_OPTS+=" -Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=https://idp-a.example.com/oauth2/token,https://idp-b.example.com/oauth2/token"
+```
+
 See [Kafka catalog client upgrade](./migration-guide.md#kafka-catalog-client-upgrade) for how to
 migrate catalogs that used config providers or `LdapLoginModule`.
 

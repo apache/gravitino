@@ -59,6 +59,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.servlet.http.HttpServletRequest;
@@ -101,6 +102,7 @@ import org.apache.gravitino.utils.ThrowableFunction;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.common.KafkaFuture;
+import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.junit.jupiter.api.AfterAll;
@@ -161,8 +163,21 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   private static CatalogEntity kafkaCatalogEntity;
   private static KafkaCatalogOperations kafkaCatalogOperations;
 
+  // initialize() sets Kafka client JVM defaults, so restore them for the other tests in this JVM.
+  private static final String[] KAFKA_JVM_PROPERTIES = {
+    AbstractConfig.AUTOMATIC_CONFIG_PROVIDERS_PROPERTY,
+    KafkaCatalogOperations.OAUTHBEARER_ALLOWED_URLS_PROPERTY
+  };
+  private static final Map<String, String> savedKafkaJvmProperties = new HashMap<>();
+
   @BeforeAll
   public static void setUp() throws IOException, IllegalAccessException {
+    for (String property : KAFKA_JVM_PROPERTIES) {
+      String value = System.getProperty(property);
+      if (value != null) {
+        savedKafkaJvmProperties.put(property, value);
+      }
+    }
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
@@ -247,6 +262,14 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
 
   @AfterAll
   public static void tearDown() throws IOException {
+    for (String property : KAFKA_JVM_PROPERTIES) {
+      String value = savedKafkaJvmProperties.get(property);
+      if (value == null) {
+        System.clearProperty(property);
+      } else {
+        System.setProperty(property, value);
+      }
+    }
     if (store != null) {
       store.close();
       FileUtils.deleteQuietly(FileUtils.getFile(H2_FILE));
