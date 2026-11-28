@@ -153,9 +153,7 @@ public class TestGravitinoHiveCatalogCredentials {
     // fs.s3a.access.key all the same. The vended pair is not written beside it.
     assertEquals(
         ImmutableMap.of(
-            "FS.S3A.ACCESS.KEY", "user-ak",
-            "FS.S3A.SECRET.KEY", "user-sk",
-            AZURE_KEY, "azure-key"),
+            "FS.S3A.ACCESS.KEY", "user-ak", "FS.S3A.SECRET.KEY", "user-sk", AZURE_KEY, "azure-key"),
         props,
         "the user's entries stay as they are and no vended S3 key is added beside them");
   }

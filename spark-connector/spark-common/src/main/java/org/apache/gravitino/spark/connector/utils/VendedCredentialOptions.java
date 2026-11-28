@@ -64,9 +64,9 @@ public final class VendedCredentialOptions {
    * catalog's data access looks for it.
    *
    * <p>The session is the one {@code SparkSession.active()} resolves: the thread's active session,
-   * or else the default session. A stopped session is not used: on Spark 3.5 it can stay
-   * registered as the thread's active session, and reading the configuration of one whose session
-   * state was never built fails.
+   * or else the default session. A stopped session is not used: on Spark 3.5 it can stay registered
+   * as the thread's active session, and reading the configuration of one whose session state was
+   * never built fails.
    *
    * @return a copy of the session's Hadoop configuration, or null when there is no live Spark
    *     session
