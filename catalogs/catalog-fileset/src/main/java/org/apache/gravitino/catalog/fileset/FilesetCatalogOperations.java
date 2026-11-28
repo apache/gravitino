@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.CONFIG_RESOURCES;
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.SCHEME_HDFS;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
@@ -57,6 +58,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -86,8 +88,11 @@ import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
+import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProxy;
 import org.apache.gravitino.catalog.hadoop.fs.InMemoryFileSystemCredentialsProvider;
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -180,6 +185,20 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   // BaseGVFSOperations
   @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
 
+  // Resolving the HDFS login settings parses XML, so the settings are cached by the whole
+  // configuration. Like the file systems, they expire an hour after their last use, so a lookup
+  // whose file system is cached does not read the config.resources files again, up to 1000
+  // configurations. A file system created under cached settings reads them to check those settings
+  // before it logs in. The keys may hold resolved secrets, so expired ones are removed on a
+  // schedule rather than at the next lookup.
+  @VisibleForTesting
+  final Cache<Map<String, String>, Map<String, String>> hdfsLoginSettingsCache =
+      Caffeine.newBuilder()
+          .maximumSize(1000)
+          .expireAfterAccess(1, TimeUnit.HOURS)
+          .scheduler(Scheduler.systemScheduler())
+          .build();
+
   @VisibleForTesting
   final ThreadPoolExecutor fileSystemExecutor =
       new ThreadPoolExecutor(
@@ -191,6 +210,26 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           new ThreadFactoryBuilder()
               .setDaemon(true)
               .setNameFormat("fileset-filesystem-getter-pool-%d")
+              .build(),
+          new ThreadPoolExecutor.AbortPolicy()) {
+        {
+          allowCoreThreadTimeOut(true);
+        }
+      };
+
+  // A pool of its own, so that resolving login settings, which only reads files, does not wait
+  // behind file system creations and logins that may hang.
+  @VisibleForTesting
+  final ThreadPoolExecutor loginSettingsExecutor =
+      new ThreadPoolExecutor(
+          Math.max(2, Math.min(Runtime.getRuntime().availableProcessors(), 4)),
+          Math.max(2, Math.min(Runtime.getRuntime().availableProcessors(), 4)),
+          5L,
+          TimeUnit.SECONDS,
+          new ArrayBlockingQueue<>(1000),
+          new ThreadFactoryBuilder()
+              .setDaemon(true)
+              .setNameFormat("fileset-login-settings-pool-%d")
               .build(),
           new ThreadPoolExecutor.AbortPolicy()) {
         {
@@ -223,18 +262,21 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
      * When the path is a path without scheme such as 'file','hdfs', etc., then the scheme and
      * authority are both null
      *
-     * <p>NOTE: The filesystem cache key includes the schema, authority, and current user. Changes
-     * to the configuration of the fileset will not affect the cached filesystem.
+     * <p>NOTE: The filesystem cache key includes the scheme, authority, current user and, for HDFS,
+     * the login settings and {@code config.resources} paths of the configuration. Changes to other
+     * configuration of the fileset will not affect the cached filesystem.
      */
     @Nullable private final String scheme;
 
     @Nullable private final String authority;
     private final String currentUser;
+    private final Map<String, String> loginSettings;
 
-    FileSystemCacheKey(String scheme, String authority) {
+    FileSystemCacheKey(String scheme, String authority, Map<String, String> loginSettings) {
       this.scheme = scheme;
       this.authority = authority;
       this.currentUser = PrincipalUtils.getCurrentUserName();
+      this.loginSettings = loginSettings;
     }
 
     @Override
@@ -248,7 +290,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       FileSystemCacheKey that = (FileSystemCacheKey) o;
       return Objects.equals(scheme, that.scheme)
           && Objects.equals(authority, that.authority)
-          && Objects.equals(currentUser, that.currentUser);
+          && Objects.equals(currentUser, that.currentUser)
+          && loginSettings.equals(that.loginSettings);
     }
 
     @Override
@@ -256,7 +299,22 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       int result = 31 * (scheme == null ? 0 : scheme.hashCode());
       result = 31 * result + (authority == null ? 0 : authority.hashCode());
       result = 31 * result + currentUser.hashCode();
+      result = 31 * result + loginSettings.hashCode();
       return result;
+    }
+  }
+
+  /**
+   * The login settings of a configuration, and the Hadoop configuration they were resolved from,
+   * which a file system logs in with; null for settings found in the cache.
+   */
+  static class HdfsLogin {
+    @Nullable final Configuration configuration;
+    final Map<String, String> settings;
+
+    HdfsLogin(@Nullable Configuration configuration, Map<String, String> settings) {
+      this.configuration = configuration;
+      this.settings = settings;
     }
   }
 
@@ -329,10 +387,17 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                   (key, value, cause) -> {
                     FileSystemCacheKey cacheKey = (FileSystemCacheKey) key;
                     LOG.debug(
-                        "Removing FileSystem from cache: scheme={}, authority={}, user={}, cause={}",
+                        "Removing FileSystem from cache: scheme={}, authority={}, user={}, "
+                            + "authentication={}, principal={}, cause={}",
                         cacheKey == null ? null : cacheKey.scheme,
                         cacheKey == null ? null : cacheKey.authority,
                         cacheKey == null ? null : cacheKey.currentUser,
+                        cacheKey == null
+                            ? null
+                            : cacheKey.loginSettings.get(AuthenticationConfig.AUTH_TYPE_KEY),
+                        cacheKey == null
+                            ? null
+                            : cacheKey.loginSettings.get(KerberosConfig.PRINCIPAL_KEY),
                         cause);
                     try {
                       ((FileSystem) value).close();
@@ -352,7 +417,18 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       this.fileSystemCache = cacheBuilder.build();
     }
 
-    this.catalogStorageLocations = getAndCheckCatalogStorageLocations(config);
+    try {
+      this.catalogStorageLocations = getAndCheckCatalogStorageLocations(config);
+    } catch (RuntimeException | Error e) {
+      // A catalog keeps no operations whose initialization failed, so nothing else closes the file
+      // systems created to check the locations.
+      try {
+        close();
+      } catch (Throwable closeFailure) {
+        e.addSuppressed(closeFailure);
+      }
+      throw e;
+    }
 
     // Metrics System could be null in UT.
     if (metricsSystem != null) {
@@ -1045,6 +1121,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     if (!fileSystemExecutor.isShutdown()) {
       fileSystemExecutor.shutdownNow();
     }
+    if (!loginSettingsExecutor.isShutdown()) {
+      loginSettingsExecutor.shutdownNow();
+    }
+    // The keys hold merged configurations, which may carry resolved secrets. Cleared after the pool
+    // is shut down: hdfsLoginSettings removes what it puts once it sees the pool shut down.
+    hdfsLoginSettingsCache.invalidateAll();
 
     if (fileSystemCache != null) {
       fileSystemCache
@@ -1053,7 +1135,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               (k, v) -> {
                 try {
                   v.close();
-                } catch (IOException e) {
+                } catch (IOException | RuntimeException e) {
+                  // Goes on with the others, which would otherwise keep their logins open.
                   LOG.warn("Failed to close FileSystem instance in cache", e);
                 }
               });
@@ -1481,17 +1564,130 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
     String authority =
         provider != null ? provider.getFullAuthority(path, conf) : path.toUri().getAuthority();
+    // Only an HDFS file system logs in with the settings of the configuration, see
+    // createFileSystem.
+    String fsScheme = scheme != null ? scheme : defaultFileSystemProvider.scheme();
+    if (!SCHEME_HDFS.equals(fsScheme)) {
+      return cachedFileSystem(
+          path, conf, new FileSystemCacheKey(scheme, authority, Collections.emptyMap()), null);
+    }
+
+    // A file system is cached only under the settings of the configuration it is created with.
+    HdfsLogin login = hdfsLoginSettings(path, conf);
+    FileSystem fs =
+        cachedFileSystem(
+            path, conf, new FileSystemCacheKey(scheme, authority, login.settings), login);
+    if (fs == null) {
+      // The config.resources files no longer resolve to these settings. Newer settings that
+      // another lookup cached meanwhile are kept.
+      hdfsLoginSettingsCache.asMap().remove(conf, login.settings);
+      login = hdfsLoginSettings(path, conf);
+      fs =
+          cachedFileSystem(
+              path, conf, new FileSystemCacheKey(scheme, authority, login.settings), login);
+    }
+    if (fs == null) {
+      throw new GravitinoRuntimeException(
+          "The login settings in config.resources changed while getting FileSystem for fileset:"
+              + " path: %s",
+          path);
+    }
+    return fs;
+  }
+
+  // Returns null if the configuration no longer resolves to the cached login settings of the
+  // login. A null result caches nothing; the cache statistics count it as a failed load.
+  @Nullable
+  private FileSystem cachedFileSystem(
+      Path path, Map<String, String> conf, FileSystemCacheKey key, @Nullable HdfsLogin login) {
     return fileSystemCache.get(
-        new FileSystemCacheKey(scheme, authority),
+        key,
         cacheKey -> {
+          fileSystemProvider(path);
           try {
-            // Create the file system for the user it is cached under.
-            return getFileSystem(path, conf, cacheKey.currentUser);
-          } catch (IOException e) {
+            // Create the file system for the user it is cached under, within the connection
+            // timeout as before.
+            return executeFileSystemTask(
+                fileSystemExecutor,
+                () -> createFileSystemIfLoginMatches(path, conf, cacheKey.currentUser, login),
+                connectionTimeoutSeconds(conf));
+          } catch (TimeoutException
+              | InterruptedException
+              | RejectedExecutionException
+              | ExecutionException e) {
             throw new GravitinoRuntimeException(
-                e, "Failed to get FileSystem for fileset: path: %s", path);
+                fileSystemFailure(path, conf, e),
+                "Failed to get FileSystem for fileset: path: %s",
+                path);
           }
         });
+  }
+
+  // Reading the config.resources files may hang, so on a miss the settings are resolved on a pool
+  // within the connection timeout, outside the cache, whose loads hold a lock that lookups of other
+  // configurations may wait on.
+  private HdfsLogin hdfsLoginSettings(Path path, Map<String, String> conf) {
+    // A hit uses the caller's map as it is. A miss resolves a copy, which it keeps as the cache
+    // key.
+    Map<String, String> cached = hdfsLoginSettingsCache.getIfPresent(conf);
+    if (cached != null) {
+      return new HdfsLogin(null, cached);
+    }
+    Map<String, String> keptConf = Collections.unmodifiableMap(new HashMap<>(conf));
+    int timeoutSeconds = connectionTimeoutSeconds(conf);
+    HdfsLogin login;
+    try {
+      login =
+          executeFileSystemTask(
+              loginSettingsExecutor, () -> resolveHdfsLogin(keptConf), timeoutSeconds);
+    } catch (RejectedExecutionException e) {
+      // The pool is full, or the catalog is closed.
+      throw new GravitinoRuntimeException(
+          e, "Failed to start resolving the login settings for path: %s", path);
+    } catch (TimeoutException e) {
+      LOG.warn(
+          "Timeout when resolving the login settings for path: {} within {} seconds",
+          path,
+          timeoutSeconds,
+          e);
+      throw new GravitinoRuntimeException(
+          e,
+          "Failed to resolve the login settings for path: %s within %s seconds, please check the "
+              + "config.resources files or increase the file system connection timeout time by "
+              + "setting catalog property: %s",
+          path,
+          timeoutSeconds,
+          FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
+    } catch (InterruptedException e) {
+      throw ExceptionMessages.wrap(
+          "Interrupted when resolving the login settings for path: " + path, e);
+    } catch (ExecutionException e) {
+      throw new GravitinoRuntimeException(
+          e.getCause(), "Failed to resolve the login settings for path: %s", path);
+    }
+    // May replace newer settings that another lookup put. A later lookup that takes these from the
+    // cache and creates a file system fails the check and resolves again. One whose file system is
+    // cached keeps using it.
+    hdfsLoginSettingsCache.put(keptConf, login.settings);
+    if (loginSettingsExecutor.isShutdown()) {
+      // close() may have cleared the cache before the put.
+      hdfsLoginSettingsCache.invalidate(keptConf);
+    }
+    return login;
+  }
+
+  // Builds the Hadoop configuration from the config.resources files, and resolves its login
+  // settings. Reading the files and expanding Hadoop variables can fail; the callers report the
+  // path.
+  @VisibleForTesting
+  HdfsLogin resolveHdfsLogin(Map<String, String> conf) {
+    Configuration hadoopConf = HDFSFileSystemProxy.hadoopConfiguration(conf);
+    Map<String, String> settings =
+        new HashMap<>(HDFSFileSystemProxy.loginSettings(conf, hadoopConf));
+    // Other settings in these files, such as HA name services, may decide which cluster is reached.
+    // The same settings given as properties are not in the key, as before.
+    settings.put(CONFIG_RESOURCES, conf.getOrDefault(CONFIG_RESOURCES, ""));
+    return new HdfsLogin(hadoopConf, Collections.unmodifiableMap(settings));
   }
 
   private String buildGVFSFilePath(
@@ -1504,10 +1700,48 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     // Read the user here: a pool thread keeps the Subject of the request that started it.
-    return getFileSystem(path, config, PrincipalUtils.getCurrentUserName());
+    String user = PrincipalUtils.getCurrentUserName();
+    fileSystemProvider(path);
+    try {
+      return executeFileSystemTask(
+          fileSystemExecutor,
+          () -> createFileSystemIfLoginMatches(path, config, user, null),
+          connectionTimeoutSeconds(config));
+    } catch (TimeoutException
+        | InterruptedException
+        | RejectedExecutionException
+        | ExecutionException e) {
+      throw fileSystemFailure(path, config, e);
+    }
   }
 
-  FileSystem getFileSystem(Path path, Map<String, String> config, String user) throws IOException {
+  // Creates the file system on this thread. With no login, it always creates one. An HDFS one logs
+  // in with the configuration of the login; for settings found in the cache, the configuration is
+  // resolved again, and null is returned if it no longer has those settings.
+  @VisibleForTesting
+  @Nullable
+  FileSystem createFileSystemIfLoginMatches(
+      Path path, Map<String, String> config, String user, @Nullable HdfsLogin login)
+      throws IOException {
+    FileSystemProvider provider = fileSystemProvider(path);
+    String scheme =
+        path.toUri().getScheme() != null
+            ? path.toUri().getScheme()
+            : defaultFileSystemProvider.scheme();
+    Configuration loginConf = login != null ? login.configuration : null;
+    if (login != null && loginConf == null) {
+      // Resolved here, so that reading the config.resources files is under the timeout too. The
+      // file system logs in with the configuration that was checked.
+      HdfsLogin current = resolveHdfsLogin(config);
+      if (!current.settings.equals(login.settings)) {
+        return null;
+      }
+      loginConf = current.configuration;
+    }
+    return createFileSystem(path, config, scheme, provider, user, loginConf);
+  }
+
+  private FileSystemProvider fileSystemProvider(Path path) {
     if (path == null) {
       throw new IllegalArgumentException("Path should not be null");
     }
@@ -1524,18 +1758,18 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               "Unsupported scheme: %s, path: %s, all supported schemes: %s and providers: %s",
               scheme, path, fileSystemProvidersMap.keySet(), fileSystemProvidersMap.values()));
     }
+    return provider;
+  }
 
-    int timeoutSeconds =
-        (int)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(
-                    config, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
-
-    try {
-      return executeFileSystemTask(
-          () -> createFileSystem(path, config, scheme, provider, user), timeoutSeconds);
-    } catch (TimeoutException e) {
+  // Returns the failure to report for a file system that was not created, or throws it.
+  private IOException fileSystemFailure(Path path, Map<String, String> config, Exception e) {
+    String scheme =
+        path.toUri().getScheme() != null
+            ? path.toUri().getScheme()
+            : defaultFileSystemProvider.scheme();
+    FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
+    int timeoutSeconds = connectionTimeoutSeconds(config);
+    if (e instanceof TimeoutException) {
       LOG.warn(
           "Timeout when getting FileSystem for path: {}, scheme: {}, provider: {} within {} seconds",
           path,
@@ -1544,7 +1778,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           timeoutSeconds,
           e);
 
-      throw new IOException(
+      return new IOException(
           String.format(
               "Failed to get FileSystem for path: %s, scheme: %s, provider: %s within %s "
                   + "seconds, please check the configuration or increase the "
@@ -1555,28 +1789,48 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               timeoutSeconds,
               FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS),
           e);
-    } catch (InterruptedException e) {
+    }
+    if (e instanceof InterruptedException) {
       LOG.warn(
           "Interrupted when getting FileSystem for path: {}, possibly the server is"
               + " shutting down or catalog is been dropped",
           path);
       throw ExceptionMessages.wrap("Interrupted when getting FileSystem for path: " + path, e);
-    } catch (ExecutionException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof IOException) {
-        throw (IOException) cause;
-      }
-      throw new IOException("Failed to create FileSystem", cause);
     }
+    if (e instanceof RejectedExecutionException) {
+      // The pool is full, or the catalog is closed.
+      return new IOException("Failed to start creating FileSystem for path: " + path, e);
+    }
+    Throwable cause = e.getCause();
+    if (cause instanceof IOException) {
+      return (IOException) cause;
+    }
+    return new IOException("Failed to create FileSystem", cause);
   }
 
-  private <T> T executeFileSystemTask(Callable<T> task, int timeoutSeconds)
+  private int connectionTimeoutSeconds(Map<String, String> conf) {
+    return (int)
+        propertiesMetadata
+            .catalogPropertiesMetadata()
+            .getOrDefault(
+                conf, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
+  }
+
+  @Nullable
+  private <T> T executeFileSystemTask(
+      ThreadPoolExecutor executor, Callable<T> task, int timeoutSeconds)
       throws InterruptedException, ExecutionException, TimeoutException {
-    Future<T> future = fileSystemExecutor.submit(task);
+    if (timeoutSeconds <= 0) {
+      // Waiting would time out at once, and the task could start with nobody to take its result.
+      throw new TimeoutException();
+    }
+    Future<T> future = executor.submit(task);
     try {
       return future.get(timeoutSeconds, TimeUnit.SECONDS);
     } catch (TimeoutException e) {
       future.cancel(true);
+      // A task that has not started leaves the queue, so that it takes no place of another one.
+      executor.remove((Runnable) future);
       throw e;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -1643,14 +1897,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     String credentialHandle = null;
     try {
       credentialHandle = addVendedCredential(path, scheme, fileSystemProvider, probeConf);
-      int timeoutSeconds =
-          (int)
-              propertiesMetadata
-                  .catalogPropertiesMetadata()
-                  .getOrDefault(
-                      probeConf,
-                      FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
       executeFileSystemTask(
+          fileSystemExecutor,
           () -> {
             try (FileSystem fileSystem =
                 createProbeFileSystem(path, probeConf, scheme, fileSystemProvider, user)) {
@@ -1671,7 +1919,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               return null;
             }
           },
-          timeoutSeconds);
+          connectionTimeoutSeconds(probeConf));
     } catch (TimeoutException e) {
       throw new IOException("Filesystem connection probe timed out", e);
     } catch (InterruptedException e) {
@@ -1762,10 +2010,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       Map<String, String> config,
       String scheme,
       FileSystemProvider provider,
-      String user)
+      String user,
+      @Nullable Configuration hadoopConf)
       throws IOException {
     if (scheme.equals(SCHEME_HDFS)) {
-      return new ImpersonationHDFSFileSystemProxy(path, config, () -> user).getProxy();
+      return new ImpersonationHDFSFileSystemProxy(path, config, hadoopConf, () -> user).getProxy();
     }
     return provider.getFileSystem(path, config);
   }
@@ -1778,7 +2027,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       String user)
       throws IOException {
     try {
-      return createFileSystem(path, config, scheme, provider, user);
+      return createFileSystem(path, config, scheme, provider, user, null);
     } catch (Exception e) {
       throw new ProbeInitializationException(e);
     }

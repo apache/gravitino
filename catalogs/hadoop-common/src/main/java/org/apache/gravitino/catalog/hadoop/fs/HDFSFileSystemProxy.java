@@ -25,12 +25,25 @@ import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.IPC_
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.additionalHDFSConfig;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.io.ByteStreams;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileTime;
 import java.security.PrivilegedExceptionAction;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
@@ -41,6 +54,7 @@ import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.utils.ExceptionMessages;
+import org.apache.gravitino.utils.KeytabNames;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -53,10 +67,26 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
 
   private static final Logger LOG = LoggerFactory.getLogger(HDFSFileSystemProxy.class);
 
+  // The keytab files are named like this, in the directory of KeytabNames.
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
   private static final String GRAVITINO_ID_KEY = "gravitino.identifier";
 
+  // Keytab files not deleted yet, because their proxy is still open or failed to delete them on
+  // close. A shutdown hook hands them to File.deleteOnExit, as calling it for every proxy would
+  // keep every name ever used until the JVM exits.
+  private static final Set<File> LIVE_KEYTAB_FILES = ConcurrentHashMap.newKeySet();
+  private static final AtomicReference<Thread> KEYTAB_CLEANER = new AtomicReference<>();
+  // Keytabs are a few KB. A file that is larger than this, or not a regular file, gets a name of
+  // its own, which is not reused.
+  private static final int MAX_KEYTAB_NAME_BYTES = 1 << 20;
+  // Set once the shutdown hook has handed LIVE_KEYTAB_FILES over, or when the JVM is shutting
+  // down and the hook cannot be added. Files recorded after that go to File.deleteOnExit directly.
+  private static volatile boolean keytabFilesHandedOver;
+
   @Nullable private KerberosClient kerberosClient;
+  @Nullable private File keytabFile;
+  @Nullable private String keytabSlotPrefix;
+  private int keytabSlot;
   protected UserGroupInformation initUgi;
   private FileSystem fs;
   private Configuration configuration;
@@ -77,22 +107,30 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   }
 
   protected void initFileSystem(Path path, Map<String, String> config) {
-    try {
-      Map<String, String> hadoopConfMap = additionalHDFSConfig(config);
-      Configuration conf =
-          FileSystemUtils.createCompatibleConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
+    initFileSystem(path, config, null);
+  }
 
-      conf.setBoolean(FS_DISABLE_CACHE, true);
-      conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
+  /**
+   * Logs in and creates the file system with the given Hadoop configuration.
+   *
+   * @param path the HDFS path
+   * @param config the configuration map of Gravitino
+   * @param hadoopConf the configuration {@link #hadoopConfiguration(Map)} built from {@code
+   *     config}, or null to build it here
+   */
+  protected void initFileSystem(
+      Path path, Map<String, String> config, @Nullable Configuration hadoopConf) {
+    try {
+      Configuration conf = hadoopConf != null ? hadoopConf : hadoopConfiguration(config);
       this.configuration = conf;
 
       AuthenticationConfig authenticationConfig = new AuthenticationConfig(config, configuration);
       this.impersonationEnabled = authenticationConfig.isImpersonationEnabled();
       String authType = authenticationConfig.getAuthType();
       if (AUTH_KERBEROS.equalsIgnoreCase(authType)) {
-        this.configuration.set(
-            HADOOP_SECURITY_AUTHENTICATION,
-            UserGroupInformation.AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
+        // Already set in a configuration that hadoopConfiguration built, maybe not in one built
+        // otherwise.
+        useKerberos(configuration);
         this.initUgi = initKerberosUgi(config, configuration);
       } else {
         this.initUgi = UserGroupInformation.getCurrentUser();
@@ -110,6 +148,9 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     } catch (Exception e) {
       close();
       throw new GravitinoRuntimeException(e, "Failed to create HDFS FileSystem with UGI: %s", path);
+    } catch (Error e) {
+      close();
+      throw e;
     }
   }
 
@@ -120,14 +161,27 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
    * @throws IOException if an I/O error occurs
    */
   public FileSystem getProxy() throws IOException {
-    Enhancer e = new Enhancer();
-    ClassLoader enhancerClassLoader = Enhancer.class.getClassLoader();
-    e.setClassLoader(enhancerClassLoader);
-    e.setSuperclass(fs.getClass());
-    e.setCallback(this);
-    FileSystem proxyFs = (FileSystem) e.create();
-    fs.setConf(configuration);
-    return proxyFs;
+    try {
+      Enhancer e = new Enhancer();
+      ClassLoader enhancerClassLoader = Enhancer.class.getClassLoader();
+      e.setClassLoader(enhancerClassLoader);
+      e.setSuperclass(fs.getClass());
+      e.setCallback(this);
+      FileSystem proxyFs = (FileSystem) e.create();
+      fs.setConf(configuration);
+      return proxyFs;
+    } catch (Throwable t) {
+      // The caller gets no proxy to close, for example when the file system class is final. CGLIB
+      // rethrows one cached exception for a class it failed to proxy, so t is left unchanged.
+      try {
+        fs.close();
+      } catch (Throwable e) {
+        LOG.warn("Failed to close the file system that could not be proxied", e);
+      } finally {
+        close();
+      }
+      throw t;
+    }
   }
 
   @Override
@@ -154,6 +208,59 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     return initUgi;
   }
 
+  /**
+   * Returns the settings that decide how a proxy created with the given configurations logs in: the
+   * authentication type, whether impersonation is enabled, and with Kerberos authentication the
+   * principal, keytab URI and krb5.conf. Values from {@code config.resources} files and variable
+   * expansion count.
+   *
+   * @param config the configuration map of Gravitino
+   * @param configuration the configuration {@link #hadoopConfiguration(Map)} built from {@code
+   *     config}
+   * @return the login settings, keyed by their configuration keys
+   */
+  public static Map<String, String> loginSettings(
+      Map<String, String> config, Configuration configuration) {
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(config, configuration);
+    Map<String, String> settings = new HashMap<>();
+    settings.put(AuthenticationConfig.AUTH_TYPE_KEY, authenticationConfig.getAuthType());
+    settings.put(
+        AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
+        String.valueOf(authenticationConfig.isImpersonationEnabled()));
+    if (AUTH_KERBEROS.equalsIgnoreCase(authenticationConfig.getAuthType())) {
+      // Raw values: a blank principal fails the login, not the lookup of these settings.
+      KerberosConfig kerberosConfig = new KerberosConfig(config, configuration);
+      settings.put(
+          KerberosConfig.PRINCIPAL_KEY, kerberosConfig.getRawString(KerberosConfig.PRINCIPAL_KEY));
+      settings.put(
+          KerberosConfig.KEY_TAB_URI_KEY,
+          kerberosConfig.getRawString(KerberosConfig.KEY_TAB_URI_KEY));
+      // The login applies it to the whole JVM; a changed one takes effect with a new login.
+      settings.put(Constants.HADOOP_KRB5_CONF, configuration.get(Constants.HADOOP_KRB5_CONF, ""));
+    }
+    return Collections.unmodifiableMap(settings);
+  }
+
+  /**
+   * Builds the Hadoop configuration a proxy logs in and connects with. It reads the {@code
+   * config.resources} files.
+   *
+   * @param config the configuration map of Gravitino
+   * @return the Hadoop configuration
+   */
+  public static Configuration hadoopConfiguration(Map<String, String> config) {
+    Configuration conf =
+        FileSystemUtils.createCompatibleConfiguration(
+            GRAVITINO_BYPASS, additionalHDFSConfig(config));
+    conf.setBoolean(FS_DISABLE_CACHE, true);
+    conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
+    if (AUTH_KERBEROS.equalsIgnoreCase(new AuthenticationConfig(config, conf).getAuthType())) {
+      // Set before the principal is read, as the principal may refer to this property.
+      useKerberos(conf);
+    }
+    return conf;
+  }
+
   /** Invoke the method on the underlying FileSystem using ugi.doAs. */
   protected Object invokeWithUgi(MethodProxy methodProxy, Object[] objects) throws Throwable {
     UserGroupInformation currentUgi = getRequestUser();
@@ -173,6 +280,22 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
             });
   }
 
+  @VisibleForTesting
+  @Nullable
+  static Thread keytabCleaner() {
+    return KEYTAB_CLEANER.get();
+  }
+
+  @VisibleForTesting
+  static void resetKeytabFilesHandedOver() {
+    keytabFilesHandedOver = false;
+  }
+
+  @VisibleForTesting
+  static boolean isLiveKeytabFile(File file) {
+    return LIVE_KEYTAB_FILES.contains(file);
+  }
+
   private synchronized void close() {
     if (kerberosClient != null) {
       try {
@@ -181,6 +304,124 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
         LOG.warn("Failed to stop the Kerberos ticket refresh for {}", kerberosRealm, e);
       }
       kerberosClient = null;
+    }
+    if (keytabFile != null) {
+      try {
+        // Deletes a link itself, without reading the local keytab it links to.
+        Files.deleteIfExists(keytabFile.toPath());
+        LIVE_KEYTAB_FILES.remove(keytabFile);
+        releaseKeytabSlot();
+      } catch (IOException | RuntimeException e) {
+        LOG.warn("Failed to delete the keytab file {}", keytabFile, e);
+        // Deleted at exit instead. The shutdown hook would hand it over too, but the server removes
+        // that hook when it releases the catalog class loader. Only failed deletes get here.
+        deleteOnExit(keytabFile);
+        // Its name stays taken while the file may still be there.
+        keytabSlotPrefix = null;
+      }
+      keytabFile = null;
+    }
+  }
+
+  private synchronized void recordKeytabFile(File file) {
+    File previous = keytabFile;
+    keytabFile = file;
+    if (KEYTAB_CLEANER.get() == null) {
+      Thread cleaner =
+          new Thread(HDFSFileSystemProxy::deleteLiveKeytabFilesOnExit, "gravitino-keytab-cleaner");
+      // When the server releases a catalog class loader, it removes the hooks whose context class
+      // loader is that one.
+      cleaner.setContextClassLoader(HDFSFileSystemProxy.class.getClassLoader());
+      if (KEYTAB_CLEANER.compareAndSet(null, cleaner)) {
+        try {
+          Runtime.getRuntime().addShutdownHook(cleaner);
+        } catch (IllegalStateException e) {
+          // The JVM is shutting down, so no hook will hand the files over.
+          deleteLiveKeytabFilesOnExit();
+        } catch (RuntimeException e) {
+          // Such as a SecurityException, which a later call would get too.
+          LOG.warn(
+              "Failed to add the shutdown hook that deletes the keytab files at exit, so the files "
+                  + "of the file systems still open then are left.",
+              e);
+        }
+      }
+    }
+    // The hook sets the flag and goes through the set under the same LIVE_KEYTAB_FILES lock, so
+    // either the hook sees the file or this method sees the flag.
+    synchronized (LIVE_KEYTAB_FILES) {
+      if (previous != null) {
+        LIVE_KEYTAB_FILES.remove(previous);
+      }
+      LIVE_KEYTAB_FILES.add(file);
+      if (keytabFilesHandedOver) {
+        deleteOnExit(file);
+      }
+    }
+  }
+
+  // Takes the lowest free name for the identifier, the keytab URI, its content and, for a link, its
+  // modification time, and moves the fetched file there. See KeytabNames for when a name is reused.
+  private synchronized File moveToKeytabName(String identifier, String keytabUri, File fetched)
+      throws IOException {
+    String prefix = keytabNamePrefix(identifier, keytabUri, fetched);
+    int slot = KeytabNames.reserve(prefix);
+    keytabSlotPrefix = prefix;
+    keytabSlot = slot;
+    File file =
+        new File(
+            fetched.getParentFile(),
+            new File(String.format(GRAVITINO_KEYTAB_FORMAT, prefix + "-" + slot)).getName());
+    // Moves a symbolic link itself, so the file still follows a local keytab.
+    Files.move(fetched.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+    recordKeytabFile(file);
+    return file;
+  }
+
+  private static String keytabNamePrefix(String identifier, String keytabUri, File fetched)
+      throws IOException {
+    if (Files.isRegularFile(fetched.toPath())) {
+      // A link to a local keytab is named after its modification time too, read first: renewals
+      // read the file through the link, and the JDK returns the keys it kept for a name while the
+      // file keeps its modification time. Only a name that saw the same time is reused.
+      FileTime modified =
+          Files.isSymbolicLink(fetched.toPath())
+              ? Files.getLastModifiedTime(fetched.toPath())
+              : null;
+      // Unlike Files.newInputStream on Java 8, the stream does not make a thread that interrupts
+      // the reading thread wait for the read to return.
+      try (InputStream in = new FileInputStream(fetched)) {
+        byte[] content = ByteStreams.toByteArray(ByteStreams.limit(in, MAX_KEYTAB_NAME_BYTES + 1));
+        if (content.length <= MAX_KEYTAB_NAME_BYTES) {
+          return KeytabNames.prefix(identifier, keytabUri, content, modified);
+        }
+      }
+    }
+    return identifier + "-" + UUID.randomUUID();
+  }
+
+  private synchronized void releaseKeytabSlot() {
+    if (keytabSlotPrefix == null) {
+      return;
+    }
+    KeytabNames.release(keytabSlotPrefix, keytabSlot);
+    keytabSlotPrefix = null;
+  }
+
+  private static void deleteOnExit(File file) {
+    try {
+      file.deleteOnExit();
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to delete the keytab file {} on exit", file, e);
+    }
+  }
+
+  // Shutdown hooks run concurrently, and the server's own hook may still be closing file systems
+  // whose ticket refresh reads these files. File.deleteOnExit deletes them after all hooks finish.
+  private static void deleteLiveKeytabFilesOnExit() {
+    synchronized (LIVE_KEYTAB_FILES) {
+      keytabFilesHandedOver = true;
+      LIVE_KEYTAB_FILES.forEach(HDFSFileSystemProxy::deleteOnExit);
     }
   }
 
@@ -195,15 +436,25 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
               .checkIntervalSec(kerberosConfig.getCheckIntervalSec())
               .krb5Conf(Constants.HADOOP_KRB5_CONF, Constants.SECURITY_KRB5_ENV)
               .build();
-      String keytabPath =
-          String.format(GRAVITINO_KEYTAB_FORMAT, properties.getOrDefault(GRAVITINO_ID_KEY, ""));
-      File keytabFile =
-          KerberosAuthUtils.saveKeytabFromUri(
-              kerberosConfig.getKeytab(),
-              new File(keytabPath),
-              kerberosConfig.getFetchTimeoutSec(),
-              false,
-              configuration);
+      // One file for each open proxy: another proxy for the same entity would rewrite a shared
+      // file while this one still renews its ticket from it. close() deletes it.
+      String identifier = properties.getOrDefault(GRAVITINO_ID_KEY, "");
+      // The JDK never reads the file fetched into, so its name is not reused. It is recorded
+      // before the fetch, so that close() also deletes what a failed fetch leaves behind.
+      File destination =
+          new File(
+              KeytabNames.directory(),
+              new File(
+                      String.format(
+                          GRAVITINO_KEYTAB_FORMAT, identifier + "-fetch-" + UUID.randomUUID()))
+                  .getName());
+      recordKeytabFile(destination);
+      String keytabUri = kerberosConfig.getKeytab();
+      File fetched =
+          KerberosAuthUtils.fetchKeytabFromUri(
+              keytabUri, destination, kerberosConfig.getFetchTimeoutSec(), false, configuration);
+      recordKeytabFile(fetched);
+      File keytabFile = moveToKeytabName(identifier, keytabUri, fetched);
       UserGroupInformation ugi = client.login(keytabFile.getAbsolutePath());
       // login() starts the ticket refresh, so record the client before anything else can fail.
       this.kerberosClient = client;
@@ -212,5 +463,11 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     } catch (IOException e) {
       throw ExceptionMessages.wrap("Failed to login with Kerberos", e);
     }
+  }
+
+  private static void useKerberos(Configuration conf) {
+    conf.set(
+        HADOOP_SECURITY_AUTHENTICATION,
+        UserGroupInformation.AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
   }
 }
